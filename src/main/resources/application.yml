@@ -4,6 +4,7 @@ spring:
   config:
     import:
       - mysql.yml
+      - swagger.yml
 
 
 ---
