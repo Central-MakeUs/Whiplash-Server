@@ -1,0 +1,29 @@
+spring:
+  application:
+    name: whiplash
+  config:
+    import:
+      - mysql.yml
+
+
+---
+spring.config.activate.on-profile: local
+
+spring:
+  config:
+    import:
+      - optional:classpath:env.properties
+
+logging:
+  level:
+    root: INFO
+
+---
+spring.config.activate.on-profile: dev
+
+logging:
+  level:
+    root: INFO
+
+---
+spring.config.activate.on-profile: prod
