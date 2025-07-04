@@ -5,6 +5,9 @@ spring:
     import:
       - mysql.yml
       - swagger.yml
+      - jwt.yml
+      - redis.yml
+      - oauth.yml
 
 
 ---
