@@ -1,0 +1,117 @@
+package akuma.whiplash.global.config.security.jwt;
+
+import static akuma.whiplash.domains.auth.exception.AuthErrorCode.INVALID_TOKEN;
+import static akuma.whiplash.domains.auth.exception.AuthErrorCode.TOKEN_EXPIRED;
+import static akuma.whiplash.domains.auth.exception.AuthErrorCode.TOKEN_NOT_FOUND;
+import static akuma.whiplash.global.config.security.jwt.constants.TokenType.REFRESH;
+
+import akuma.whiplash.domains.member.domain.service.MemberQueryService;
+import akuma.whiplash.domains.member.persistence.entity.MemberEntity;
+import akuma.whiplash.global.config.security.jwt.constants.TokenType;
+import akuma.whiplash.global.exception.ApplicationException;
+import akuma.whiplash.global.response.ApplicationResponse;
+import akuma.whiplash.global.response.code.BaseErrorCode;
+import akuma.whiplash.infrastructure.redis.RedisRepository;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.ExpiredJwtException;
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.io.Decoders;
+import io.jsonwebtoken.security.Keys;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import java.util.Collections;
+import java.util.List;
+import javax.crypto.SecretKey;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.stereotype.Component;
+
+@Component
+@RequiredArgsConstructor
+@Slf4j
+public class JwtUtils {
+
+    private final RedisRepository redisRepository;
+    private final MemberQueryService memberQueryService;
+
+    @Value("${jwt.secret-key}")
+    private String secret;
+
+    private static final String AUTHORIZATION = "Authorization";
+    private static final String CONTENT_TYPE = "application/json";
+    private static final String CHARACTER_ENCODING = "UTF-8";
+    private static final String ROLE = "role";
+    private static final String TYPE = "type";
+
+    public void validateToken(HttpServletResponse response, String token, TokenType tokenType) {
+        try {
+            Claims claims = parseClaims(token);
+            if (!claims.get(TYPE).equals(tokenType.name())) {
+                throw ApplicationException.from(INVALID_TOKEN);
+            }
+        } catch (ExpiredJwtException e) {
+            jwtExceptionHandler(response, TOKEN_EXPIRED);
+            throw ApplicationException.from(TOKEN_EXPIRED);
+        } catch (Exception e) {
+            jwtExceptionHandler(response, INVALID_TOKEN);
+            throw ApplicationException.from(INVALID_TOKEN);
+        }
+    }
+
+    public void validateRefreshToken(Long memberId, String deviceId, HttpServletRequest request) {
+        String refreshToken = request.getHeader(AUTHORIZATION).split(" ")[1];
+        String redisToken = redisRepository
+            .getValues(REFRESH.toString() + ":" + memberId + ":" + deviceId)
+            .orElseThrow(() -> ApplicationException.from(TOKEN_NOT_FOUND));
+
+        if (!redisToken.equals(refreshToken)) {
+            throw ApplicationException.from(INVALID_TOKEN);
+        }
+    }
+
+    public void expireRefreshToken(Long memberId, String deviceId) {
+        redisRepository.deleteValues(REFRESH.toString() + ":" + memberId + ":" + deviceId);
+    }
+
+    private Claims parseClaims(String token) {
+        SecretKey key = Keys.hmacShaKeyFor(Decoders.BASE64.decode(secret));
+
+        return Jwts.parserBuilder()
+            .setSigningKey(key)
+            .build()
+            .parseClaimsJws(token)
+            .getBody();
+    }
+
+    public Authentication getAuthentication(HttpServletResponse response, String token) throws ApplicationException {
+        Claims claims = parseClaims(token);
+        List<GrantedAuthority> authorities = Collections.singletonList(new SimpleGrantedAuthority(claims.get(ROLE).toString()));
+
+        Long memberId = Long.parseLong(claims.getSubject());
+        MemberEntity member = memberQueryService.findById(memberId);
+
+        return new UsernamePasswordAuthenticationToken(member, "", authorities);
+    }
+
+
+    private void jwtExceptionHandler(HttpServletResponse response, BaseErrorCode error) {
+        response.setStatus(error.getHttpStatus().value());
+        response.setContentType(CONTENT_TYPE);
+        response.setCharacterEncoding(CHARACTER_ENCODING);
+
+        log.error("errorCode {}, errorMessage {}", error.getCustomCode(), error.getMessage());
+
+        try {
+            String json = new ObjectMapper().writeValueAsString(ApplicationResponse.onFailure(error.getCustomCode(), error.getMessage()));
+            response.getWriter().write(json);
+        } catch (Exception e) {
+            log.error(e.getMessage());
+        }
+    }
+}

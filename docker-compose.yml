@@ -1,0 +1,123 @@
+version: '3.8'
+
+services:
+  db:
+    image: mysql:8.0
+    container_name: db
+    environment:
+      MYSQL_DATABASE: whiplash_local
+      MYSQL_USER: whiplash
+      MYSQL_PASSWORD: whiplash1!
+      MYSQL_ROOT_PASSWORD: whiplash1!
+    ports:
+      - "33366:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - whiplash-local
+    healthcheck:
+      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "whiplash", "--password=whiplash1!" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s  # 컨테이너 시작 후 30초 동안은 실패를 무시
+    deploy:
+      resources:
+        limits:
+          cpus: "2"  # 최대 2개의 코어 할당
+          memory: 2GB   # 최대 2GB 메모리 할당
+
+#  # mysql exporter
+#  mysql_exporter:
+#    image: prom/mysqld-exporter
+#    container_name: mysql_exporter
+#    ports:
+#      - "9105:9104"
+#    environment:
+#      - DATA_SOURCE_NAME=whiplash:whiplash1\!@(db:3306)/
+#    depends_on:
+#      - db
+#    networks:
+#      - whiplash-local
+
+#  prometheus:
+#    image: prom/prometheus
+#    container_name: prometheus
+#    ports:
+#      - "9092:9090"
+#    volumes:
+#      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+#    networks:
+#      - whiplash-local
+#    deploy:
+#      resources:
+#        limits:
+#          cpus: '0.5'
+#          memory: 512M
+#
+#  grafana:
+#    image: grafana/grafana
+#    container_name: grafana
+#    ports:
+#      - "3003:3000"
+#    environment:
+#      - GF_SECURITY_ADMIN_USER=admin
+#      - GF_SECURITY_ADMIN_PASSWORD=admin
+#    volumes:
+#      - grafana_data:/var/lib/grafana
+#    networks:
+#      - whiplash-local
+#    deploy:
+#      resources:
+#        limits:
+#          cpus: '0.5'
+#          memory: 512M
+
+#  k6:
+#    image: grafana/k6:latest
+#    container_name: k6
+#    volumes:
+#      - ./excel-member-post.js:/excel-member-post.js
+#    networks:
+#      - whiplash-local
+#    environment:
+#      - K6_PROMETHEUS_RW_SERVER_URL=http://prometheus:9090/api/v1/write
+#    command: run --out experimental-prometheus-rw /test.js
+
+  redis:
+    image: redis:7.0
+    container_name: redis-server
+    ports:
+      - "63790:6379"
+    command: [ "redis-server", "--requirepass", "whiplash1!" ]
+    volumes:
+      - redis_data:/data
+    networks:
+      - whiplash-local
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+
+#  # Redis Exporter
+#  redis_exporter:
+#    image: oliver006/redis_exporter
+#    container_name: redis_exporter
+#    ports:
+#      - "9122:9121"
+#    command:
+#      - '--redis.addr=redis://redis:6379'
+#      - '--redis.password=whiplash1!'
+#    depends_on:
+#      - redis
+#    networks:
+#      - whiplash-local
+
+volumes:
+  mysql_data:
+  grafana_data:
+  redis_data:
+
+networks:
+  whiplash-local:

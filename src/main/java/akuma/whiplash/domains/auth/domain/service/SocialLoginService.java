@@ -1,0 +1,65 @@
+package akuma.whiplash.domains.auth.domain.service;
+
+import static akuma.whiplash.global.response.code.CommonErrorCode.*;
+
+import akuma.whiplash.domains.auth.application.AppleVerifier;
+import akuma.whiplash.domains.auth.application.GoogleVerifier;
+import akuma.whiplash.domains.auth.application.KakaoVerifier;
+import akuma.whiplash.domains.auth.application.dto.etc.SocialMemberInfo;
+import akuma.whiplash.domains.auth.application.dto.response.AuthResponse;
+import akuma.whiplash.domains.auth.application.mapper.AuthMapper;
+import akuma.whiplash.domains.member.domain.contants.SocialType;
+import akuma.whiplash.domains.member.persistence.entity.MemberEntity;
+import akuma.whiplash.domains.member.persistence.repository.MemberRepository;
+import akuma.whiplash.global.config.security.jwt.JwtProvider;
+import akuma.whiplash.global.exception.ApplicationException;
+import akuma.whiplash.global.response.code.CommonErrorCode;
+import akuma.whiplash.infrastructure.redis.RedisRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+@RequiredArgsConstructor
+@Transactional
+public class SocialLoginService {
+
+    private final GoogleVerifier googleVerifier;
+    private final KakaoVerifier kakaoVerifier;
+    private final AppleVerifier appleVerifier;
+    private final MemberRepository memberRepository;
+    private final RedisRepository redisRepository;
+    private final JwtProvider jwtProvider;
+
+    public AuthResponse login(SocialType socialType, String token, String deviceId) {
+        SocialMemberInfo socialMemberInfo = switch (socialType) {
+            case GOOGLE -> googleVerifier.verify(token);
+            case APPLE -> appleVerifier.verify(token);
+            case KAKAO -> kakaoVerifier.verify(token);
+            default -> throw ApplicationException.from(BAD_REQUEST);
+        };
+
+        // DB에서 사용자 조회 or 신규 가입
+        MemberEntity member = memberRepository.findBySocialIdAndSocialType(socialMemberInfo.socialId(), socialMemberInfo.socialType())
+                .orElseGet(() -> memberRepository.save(
+                    AuthMapper.toMemberEntity(socialMemberInfo)
+                ));
+
+        // TODO: 멀티 디바이스 로그인 가능하도록 처리 필요
+        // 다른 디바이스 ID로 리프레시 토큰 존재할 시 기존 리프레시 토큰 삭제
+        redisRepository.getKeys("REFRESH:" + member.getId() + ":*")
+            .stream()
+            .filter(key -> !key.endsWith(deviceId))
+            .findFirst().ifPresent(redisRepository::deleteValues);
+
+        // JWT 생성
+        String accessToken = jwtProvider.generateAccessToken(member.getId(), member.getRole());
+        String refreshToken = jwtProvider.generateRefreshToken(member.getId(), deviceId, member.getRole());
+
+        return AuthResponse.builder()
+            .accessToken(accessToken)
+            .refreshToken(refreshToken)
+            .nickname(member.getNickname())
+            .build();
+    }
+}
