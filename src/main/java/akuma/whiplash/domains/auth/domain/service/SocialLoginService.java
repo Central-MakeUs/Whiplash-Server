@@ -45,6 +45,7 @@ public class SocialLoginService {
                     AuthMapper.toMemberEntity(socialMemberInfo)
                 ));
 
+        // TODO: 멀티 디바이스 로그인 가능하도록 처리 필요
         // 다른 디바이스 ID로 리프레시 토큰 존재할 시 기존 리프레시 토큰 삭제
         redisRepository.getKeys("REFRESH:" + member.getId() + ":*")
             .stream()

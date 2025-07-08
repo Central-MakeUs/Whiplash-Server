@@ -1,13 +1,11 @@
 package akuma.whiplash.domains.auth.exception;
 
 import akuma.whiplash.global.response.code.BaseErrorCode;
-import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 
 @Getter
-@AllArgsConstructor
 @RequiredArgsConstructor
 public enum AuthErrorCode implements BaseErrorCode {
 
