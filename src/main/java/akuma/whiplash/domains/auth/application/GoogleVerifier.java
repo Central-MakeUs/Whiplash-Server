@@ -9,6 +9,7 @@ import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
 import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.api.client.json.jackson2.JacksonFactory;
 import java.util.List;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -17,16 +18,15 @@ import org.springframework.stereotype.Component;
 @Component
 public class GoogleVerifier implements SocialVerifier{
 
-    @Value("${oauth.google.client-id}")
-    private String clientId;
-
     private final GoogleIdTokenVerifier verifier;
 
-    public GoogleVerifier() {
-        this.verifier = new GoogleIdTokenVerifier.Builder(new NetHttpTransport(), JacksonFactory.getDefaultInstance())
-        .setAudience(List.of(clientId))
-        .build();
+    public GoogleVerifier(@Value("${oauth.google.client-id}") String clientId) {
+        this.verifier = new GoogleIdTokenVerifier.Builder(
+            new NetHttpTransport(), JacksonFactory.getDefaultInstance()
+        ).setAudience(List.of(clientId))
+            .build();
     }
+
 
     @Override
     public SocialMemberInfo verify(String idTokenString) {
