@@ -6,12 +6,14 @@ import akuma.whiplash.domains.auth.application.AppleVerifier;
 import akuma.whiplash.domains.auth.application.GoogleVerifier;
 import akuma.whiplash.domains.auth.application.KakaoVerifier;
 import akuma.whiplash.domains.auth.application.dto.etc.SocialMemberInfo;
+import akuma.whiplash.domains.auth.application.dto.request.LogoutRequest;
 import akuma.whiplash.domains.auth.application.dto.request.SocialLoginRequest;
 import akuma.whiplash.domains.auth.application.dto.response.LoginResponse;
 import akuma.whiplash.domains.auth.application.mapper.AuthMapper;
 import akuma.whiplash.domains.member.persistence.entity.MemberEntity;
 import akuma.whiplash.domains.member.persistence.repository.MemberRepository;
 import akuma.whiplash.global.config.security.jwt.JwtProvider;
+import akuma.whiplash.global.config.security.jwt.JwtUtils;
 import akuma.whiplash.global.exception.ApplicationException;
 import akuma.whiplash.infrastructure.redis.RedisRepository;
 import lombok.RequiredArgsConstructor;
@@ -29,6 +31,7 @@ public class AuthCommandServiceImpl implements AuthCommandService {
     private final MemberRepository memberRepository;
     private final RedisRepository redisRepository;
     private final JwtProvider jwtProvider;
+    private final JwtUtils jwtUtils;
 
     @Override
     public LoginResponse login(SocialLoginRequest request) {
@@ -61,5 +64,10 @@ public class AuthCommandServiceImpl implements AuthCommandService {
             .refreshToken(refreshToken)
             .nickname(member.getNickname())
             .build();
+    }
+
+    @Override
+    public void logout(LogoutRequest request, Long memberId) {
+        jwtUtils.expireRefreshToken(memberId, request.deviceId());
     }
 }

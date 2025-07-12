@@ -6,7 +6,6 @@ import static akuma.whiplash.domains.auth.exception.AuthErrorCode.TOKEN_NOT_FOUN
 import static akuma.whiplash.global.config.security.jwt.constants.TokenType.REFRESH;
 
 import akuma.whiplash.domains.member.domain.service.MemberQueryService;
-import akuma.whiplash.domains.member.domain.service.MemberQueryServiceImpl;
 import akuma.whiplash.domains.member.persistence.entity.MemberEntity;
 import akuma.whiplash.global.config.security.jwt.constants.TokenType;
 import akuma.whiplash.global.exception.ApplicationException;
