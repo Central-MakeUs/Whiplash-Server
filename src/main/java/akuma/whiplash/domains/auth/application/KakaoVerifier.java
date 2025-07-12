@@ -2,6 +2,7 @@ package akuma.whiplash.domains.auth.application;
 
 import akuma.whiplash.domains.auth.application.dto.etc.KakaoUserInfo;
 import akuma.whiplash.domains.auth.application.dto.etc.SocialMemberInfo;
+import akuma.whiplash.domains.auth.application.dto.request.SocialLoginRequest;
 import akuma.whiplash.domains.member.domain.contants.SocialType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -14,18 +15,16 @@ public class KakaoVerifier implements SocialVerifier {
     private final WebClient webClient;
 
     @Override
-    public SocialMemberInfo verify(String accessToken) {
+    public SocialMemberInfo verify(SocialLoginRequest request) {
         KakaoUserInfo response = webClient.get()
             .uri("https://kapi.kakao.com/v2/user/me") // baseUrl 사용하지 않아도 됨
-            .headers(h -> h.setBearerAuth(accessToken))
+            .headers(h -> h.setBearerAuth(request.token()))
             .retrieve()
             .bodyToMono(KakaoUserInfo.class)
             .block();
 
-
         return SocialMemberInfo.builder()
-            .socialId(String.valueOf(response.id()))
-            .socialType(SocialType.KAKAO)
+            .socialId(SocialType.KAKAO.name() + "_" + String.valueOf(response.id()))
             .email(response.kakaoAccount().email())
             .name(response.properties().nickname())
             .build();

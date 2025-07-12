@@ -1,6 +1,7 @@
 package akuma.whiplash.domains.auth.application;
 
 import akuma.whiplash.domains.auth.application.dto.etc.SocialMemberInfo;
+import akuma.whiplash.domains.auth.application.dto.request.SocialLoginRequest;
 import akuma.whiplash.domains.member.domain.contants.SocialType;
 import akuma.whiplash.global.exception.ApplicationException;
 import akuma.whiplash.global.response.code.CommonErrorCode;
@@ -29,9 +30,9 @@ public class GoogleVerifier implements SocialVerifier{
 
 
     @Override
-    public SocialMemberInfo verify(String idTokenString) {
+    public SocialMemberInfo verify(SocialLoginRequest request) {
         try {
-            GoogleIdToken idToken = verifier.verify(idTokenString);
+            GoogleIdToken idToken = verifier.verify(request.token());
             if (idToken == null) {
                 log.warn("Google idToken verification failed");
                 throw ApplicationException.from(CommonErrorCode.BAD_REQUEST);
@@ -40,10 +41,9 @@ public class GoogleVerifier implements SocialVerifier{
             GoogleIdToken.Payload payload = idToken.getPayload();
 
             return SocialMemberInfo.builder()
-                .socialId(payload.getSubject())
+                .socialId(SocialType.GOOGLE + "_" + payload.getSubject())
                 .email(payload.getEmail())
                 .name((String) payload.get("name"))
-                .socialType(SocialType.GOOGLE)
                 .build();
         } catch (Exception e) {
             log.warn("Google idToken verification failed", e);
