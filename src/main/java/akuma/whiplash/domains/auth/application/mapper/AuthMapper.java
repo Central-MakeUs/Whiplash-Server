@@ -11,7 +11,6 @@ public class AuthMapper {
     public static MemberEntity toMemberEntity(SocialMemberInfo memberInfo) {
         return MemberEntity.builder()
             .socialId(memberInfo.socialId())
-            .socialType(memberInfo.socialType())
             .email(memberInfo.email())
             .nickname(memberInfo.name())
             .role(Role.USER)

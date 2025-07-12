@@ -35,10 +35,6 @@ public class MemberEntity extends BaseTimeEntity {
     @Column(name = "social_id", nullable = false)
     private String socialId;
 
-    @Column(name = "social_type")
-    @Enumerated(EnumType.STRING)
-    private SocialType socialType;
-
     @Column(length = 50, nullable = false)
     private String email;
 

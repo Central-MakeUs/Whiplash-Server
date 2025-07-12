@@ -5,10 +5,9 @@ import lombok.Builder;
 
 @Builder
 public record SocialMemberInfo (
-    String socialId,    // Google UID
+    String socialId,    // 플랫폼_ID(ex: KAKAO_2y8dnbk33dd)
     String email,
-    String name,
-    SocialType socialType    // "GOOGLE", "APPLE", "KAKAO"
+    String name
 ) {
 
 }

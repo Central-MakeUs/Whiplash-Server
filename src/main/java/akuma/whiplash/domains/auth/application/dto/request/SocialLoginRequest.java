@@ -17,5 +17,8 @@ public record SocialLoginRequest(
 
     @Schema(description = "디바이스 ID", example = "dsjk23121m3")
     @NotBlank(message = "디바이스 ID를 입력해주세요")
-    String deviceId
+    String deviceId,
+
+    @Schema(description = "nonce 암호화 하기 전 raw값(애플 로그인시에만 필요)")
+    String originalNonce
 ) {}
