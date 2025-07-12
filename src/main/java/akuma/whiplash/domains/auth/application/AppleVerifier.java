@@ -10,6 +10,7 @@ import com.nimbusds.jwt.SignedJWT;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 
 @Component
 @Slf4j
@@ -33,8 +34,9 @@ public class AppleVerifier implements SocialVerifier {
 
             // 2. nonce 검증
             String tokenNonce = claims.getStringClaim("nonce");
-            if (request.originalNonce() != null && !request.originalNonce().equals(tokenNonce)) {
-                log.warn("Invalid nonce: token={}, expected={}", tokenNonce, request.originalNonce());
+            String originalNonce = request.originalNonce();
+            if (!StringUtils.hasText(originalNonce) && !originalNonce.equals(tokenNonce)) {
+                log.warn("Invalid nonce: token={}, expected={}", tokenNonce, originalNonce);
                 throw ApplicationException.from(CommonErrorCode.BAD_REQUEST);
             }
 
