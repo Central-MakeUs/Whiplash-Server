@@ -15,7 +15,7 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.RUNTIME)
 public @interface SocialTypeFormat {
 
-    String message() default "이메일 형식이 올바르지 않습니다.";
+    String message() default "유효하지 않은 소셜 로그인 유형입니다.";
 
     Class<?>[] groups() default {};
 

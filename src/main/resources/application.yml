@@ -8,6 +8,7 @@ spring:
       - jwt.yml
       - redis.yml
       - oauth.yml
+      - naver.yml
 
 
 ---

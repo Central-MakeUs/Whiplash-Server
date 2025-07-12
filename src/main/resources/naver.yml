@@ -1,0 +1,16 @@
+naver:
+  map:
+    client-id: ${NCP_CLIENT_ID}
+    client-secret: ${NCP_CLIENT_SECRET}
+  search:
+    client-id: ${NAVER_CLIENT_ID}
+    client-secret: ${NAVER_CLIENT_SECRET}
+
+---
+spring.config.activate.on-profile: local
+
+---
+spring.config.activate.on-profile: dev
+
+---
+spring.config.activate.on-profile: prod
