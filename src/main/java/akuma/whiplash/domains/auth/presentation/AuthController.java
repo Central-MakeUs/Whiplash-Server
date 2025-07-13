@@ -36,7 +36,7 @@ public class AuthController {
     @CustomErrorCodes(commonErrorCodes = {BAD_REQUEST})
     @Operation(summary = "로그아웃", description = "리프레시 토큰을 삭제합니다.")
     @PostMapping("/logout")
-    public ApplicationResponse<Void> logout(@AuthenticationPrincipal MemberEntity member, LogoutRequest request) {
+    public ApplicationResponse<Void> logout(@AuthenticationPrincipal MemberEntity member, @RequestBody @Valid LogoutRequest request) {
         authUseCase.logout(request, member.getId());
         return ApplicationResponse.onSuccess();
     }
