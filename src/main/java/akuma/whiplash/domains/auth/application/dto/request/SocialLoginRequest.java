@@ -5,10 +5,11 @@ import akuma.whiplash.domains.auth.presentation.util.annotation.SocialTypeFormat
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 
+@Schema(description = "소셜 로그인 요청 DTO")
 public record SocialLoginRequest(
 
     @Schema(description = "소셜 타입", example = "GOOGLE")
-    @SocialTypeFormat(acceptedSocialTypes = {"GOOGLE", "APPLE", "KAKAO"})
+    @SocialTypeFormat(acceptedSocialTypes = {"GOOGLE", "APPLE", "KAKAO", "MOCK"})
     String socialType,
 
     @Schema(description = "토큰", example = "213jkdd")
