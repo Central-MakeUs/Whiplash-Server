@@ -2,11 +2,11 @@ package akuma.whiplash.domains.auth.presentation;
 
 import static akuma.whiplash.global.response.code.CommonErrorCode.*;
 
+import akuma.whiplash.domains.auth.application.dto.etc.MemberContext;
 import akuma.whiplash.domains.auth.application.dto.request.LogoutRequest;
 import akuma.whiplash.domains.auth.application.dto.request.SocialLoginRequest;
 import akuma.whiplash.domains.auth.application.dto.response.LoginResponse;
 import akuma.whiplash.domains.auth.application.usecase.AuthUseCase;
-import akuma.whiplash.domains.member.persistence.entity.MemberEntity;
 import akuma.whiplash.global.annotation.swagger.CustomErrorCodes;
 import akuma.whiplash.global.response.ApplicationResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -36,8 +36,8 @@ public class AuthController {
     @CustomErrorCodes(commonErrorCodes = {BAD_REQUEST})
     @Operation(summary = "로그아웃", description = "리프레시 토큰을 삭제합니다.")
     @PostMapping("/logout")
-    public ApplicationResponse<Void> logout(@AuthenticationPrincipal MemberEntity member, @RequestBody @Valid LogoutRequest request) {
-        authUseCase.logout(request, member.getId());
+    public ApplicationResponse<Void> logout(@AuthenticationPrincipal MemberContext memberContext, @RequestBody @Valid LogoutRequest request) {
+        authUseCase.logout(request, memberContext.memberId());
         return ApplicationResponse.onSuccess();
     }
 }
