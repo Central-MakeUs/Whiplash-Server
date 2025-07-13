@@ -42,8 +42,8 @@ public class AlarmEntity extends BaseTimeEntity {
     @JoinColumn(name = "member_id", nullable = false)
     private MemberEntity member;
 
-    @Column(length = 50, nullable = false)
-    private String name;
+    @Column(name = "alarm_name", length = 50, nullable = false)
+    private String alarmName;
 
     @Column(nullable = false)
     private LocalTime time;
@@ -53,19 +53,9 @@ public class AlarmEntity extends BaseTimeEntity {
     private List<Weekday> repeatDays;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "sound_type", nullable = false, length = 20)
+    @Column(name = "sound_type", length = 20, nullable = false)
     private SoundType soundType;
-
-    @Column(nullable = false)
-    private Integer volume;
-
-    @Enumerated(EnumType.STRING)
-    @Column(name = "vibration_level", nullable = false, length = 10)
-    private VibrationLevel vibrationLevel;
-
-    @Column(name = "place_name", length = 50, nullable = false)
-    private String placeName;
-
+    
     @Column(nullable = false)
     private Double latitude;
 
