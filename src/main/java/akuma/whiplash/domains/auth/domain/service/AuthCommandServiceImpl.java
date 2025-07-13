@@ -2,14 +2,15 @@ package akuma.whiplash.domains.auth.domain.service;
 
 import static akuma.whiplash.global.response.code.CommonErrorCode.*;
 
-import akuma.whiplash.domains.auth.application.AppleVerifier;
-import akuma.whiplash.domains.auth.application.GoogleVerifier;
-import akuma.whiplash.domains.auth.application.KakaoVerifier;
+import akuma.whiplash.domains.auth.application.utils.AppleVerifier;
+import akuma.whiplash.domains.auth.application.utils.GoogleVerifier;
+import akuma.whiplash.domains.auth.application.utils.KakaoVerifier;
 import akuma.whiplash.domains.auth.application.dto.etc.SocialMemberInfo;
 import akuma.whiplash.domains.auth.application.dto.request.LogoutRequest;
 import akuma.whiplash.domains.auth.application.dto.request.SocialLoginRequest;
 import akuma.whiplash.domains.auth.application.dto.response.LoginResponse;
 import akuma.whiplash.domains.auth.application.mapper.AuthMapper;
+import akuma.whiplash.domains.auth.application.utils.MockVerifier;
 import akuma.whiplash.domains.member.persistence.entity.MemberEntity;
 import akuma.whiplash.domains.member.persistence.repository.MemberRepository;
 import akuma.whiplash.global.config.security.jwt.JwtProvider;
@@ -25,9 +26,12 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional
 public class AuthCommandServiceImpl implements AuthCommandService {
 
+    private static final String BEARER_PREFIX = "Bearer ";
+
     private final GoogleVerifier googleVerifier;
     private final KakaoVerifier kakaoVerifier;
     private final AppleVerifier appleVerifier;
+    private final MockVerifier mockVerifier;
     private final MemberRepository memberRepository;
     private final RedisRepository redisRepository;
     private final JwtProvider jwtProvider;
@@ -39,13 +43,14 @@ public class AuthCommandServiceImpl implements AuthCommandService {
             case "GOOGLE" -> googleVerifier.verify(request);
             case "APPLE" -> appleVerifier.verify(request);
             case "KAKAO" -> kakaoVerifier.verify(request);
+            case "MOCK" -> mockVerifier.verify(request);
             default -> throw ApplicationException.from(BAD_REQUEST);
         };
 
         // DB에서 사용자 조회 or 신규 가입
         MemberEntity member = memberRepository.findBySocialId(socialMemberInfo.socialId())
                 .orElseGet(() -> memberRepository.save(
-                    AuthMapper.toMemberEntity(socialMemberInfo)
+                    AuthMapper.mapToMemberEntity(socialMemberInfo)
                 ));
 
         // TODO: 멀티 디바이스 로그인 가능하도록 처리 필요
@@ -60,8 +65,8 @@ public class AuthCommandServiceImpl implements AuthCommandService {
         String refreshToken = jwtProvider.generateRefreshToken(member.getId(), request.deviceId(), member.getRole());
 
         return LoginResponse.builder()
-            .accessToken(accessToken)
-            .refreshToken(refreshToken)
+            .accessToken(BEARER_PREFIX + accessToken)
+            .refreshToken(BEARER_PREFIX + refreshToken)
             .nickname(member.getNickname())
             .build();
     }
