@@ -2,6 +2,8 @@ package akuma.whiplash.domains.auth.domain.service;
 
 import static akuma.whiplash.global.response.code.CommonErrorCode.*;
 
+import akuma.whiplash.domains.auth.application.dto.etc.MemberContext;
+import akuma.whiplash.domains.auth.application.dto.response.TokenResponse;
 import akuma.whiplash.domains.auth.application.utils.AppleVerifier;
 import akuma.whiplash.domains.auth.application.utils.GoogleVerifier;
 import akuma.whiplash.domains.auth.application.utils.KakaoVerifier;
@@ -17,6 +19,7 @@ import akuma.whiplash.global.config.security.jwt.JwtProvider;
 import akuma.whiplash.global.config.security.jwt.JwtUtils;
 import akuma.whiplash.global.exception.ApplicationException;
 import akuma.whiplash.infrastructure.redis.RedisRepository;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -74,5 +77,19 @@ public class AuthCommandServiceImpl implements AuthCommandService {
     @Override
     public void logout(LogoutRequest request, Long memberId) {
         jwtUtils.expireRefreshToken(memberId, request.deviceId());
+    }
+
+    @Override
+    public TokenResponse reissueToken(String oldRefreshToken, MemberContext memberContext, String deviceId) {
+        jwtUtils.validateRefreshToken(oldRefreshToken, memberContext.memberId(), deviceId);
+        jwtUtils.expireRefreshToken(memberContext.memberId(), deviceId);
+
+        String accessToken = jwtProvider.generateAccessToken(memberContext.memberId(), memberContext.role());
+        String newRefreshToken = jwtProvider.generateRefreshToken(memberContext.memberId(), deviceId, memberContext.role());
+
+        return TokenResponse.builder()
+            .accessToken(accessToken)
+            .refreshToken(newRefreshToken)
+            .build();
     }
 }

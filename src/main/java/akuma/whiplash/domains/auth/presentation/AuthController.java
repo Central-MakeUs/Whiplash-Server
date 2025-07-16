@@ -4,12 +4,15 @@ import static akuma.whiplash.global.response.code.CommonErrorCode.*;
 
 import akuma.whiplash.domains.auth.application.dto.etc.MemberContext;
 import akuma.whiplash.domains.auth.application.dto.request.LogoutRequest;
+import akuma.whiplash.domains.auth.application.dto.request.ReissueRequest;
 import akuma.whiplash.domains.auth.application.dto.request.SocialLoginRequest;
 import akuma.whiplash.domains.auth.application.dto.response.LoginResponse;
+import akuma.whiplash.domains.auth.application.dto.response.TokenResponse;
 import akuma.whiplash.domains.auth.application.usecase.AuthUseCase;
 import akuma.whiplash.global.annotation.swagger.CustomErrorCodes;
 import akuma.whiplash.global.response.ApplicationResponse;
 import io.swagger.v3.oas.annotations.Operation;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -39,5 +42,14 @@ public class AuthController {
     public ApplicationResponse<Void> logout(@AuthenticationPrincipal MemberContext memberContext, @RequestBody @Valid LogoutRequest request) {
         authUseCase.logout(request, memberContext.memberId());
         return ApplicationResponse.onSuccess();
+    }
+
+    @CustomErrorCodes(commonErrorCodes = {BAD_REQUEST})
+    @Operation(summary = "토큰 재발급", description = "액세스, 리프레시 토큰을 재발급합니다.")
+    @PostMapping("/reissue")
+    public ApplicationResponse<TokenResponse> reissueToken(HttpServletRequest request, @AuthenticationPrincipal MemberContext memberContext, @RequestBody @Valid ReissueRequest reissueRequest) {
+        String refreshToken = request.getHeader("Authorization").split(" ")[1];
+        TokenResponse tokenResponse = authUseCase.reissueToken(refreshToken, memberContext, reissueRequest.deviceId());
+        return ApplicationResponse.onSuccess(tokenResponse);
     }
 }

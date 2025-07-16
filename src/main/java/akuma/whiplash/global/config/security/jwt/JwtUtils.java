@@ -66,8 +66,7 @@ public class JwtUtils {
         }
     }
 
-    public void validateRefreshToken(Long memberId, String deviceId, HttpServletRequest request) {
-        String refreshToken = request.getHeader(AUTHORIZATION).split(" ")[1];
+    public void validateRefreshToken(String refreshToken, Long memberId, String deviceId) {
         String redisToken = redisRepository
             .getValues(REFRESH.toString() + ":" + memberId + ":" + deviceId)
             .orElseThrow(() -> ApplicationException.from(TOKEN_NOT_FOUND));
