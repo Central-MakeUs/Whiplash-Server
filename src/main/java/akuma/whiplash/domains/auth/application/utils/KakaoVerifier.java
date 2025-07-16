@@ -1,4 +1,4 @@
-package akuma.whiplash.domains.auth.application;
+package akuma.whiplash.domains.auth.application.utils;
 
 import akuma.whiplash.domains.auth.application.dto.etc.KakaoUserInfo;
 import akuma.whiplash.domains.auth.application.dto.etc.SocialMemberInfo;
@@ -17,7 +17,7 @@ public class KakaoVerifier implements SocialVerifier {
     @Override
     public SocialMemberInfo verify(SocialLoginRequest request) {
         KakaoUserInfo response = webClient.get()
-            .uri("https://kapi.kakao.com/v2/user/me") // baseUrl 사용하지 않아도 됨
+            .uri("https://kapi.kakao.com/v2/user/me")
             .headers(h -> h.setBearerAuth(request.token()))
             .retrieve()
             .bodyToMono(KakaoUserInfo.class)

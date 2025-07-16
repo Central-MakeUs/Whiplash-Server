@@ -1,4 +1,4 @@
-package akuma.whiplash.domains.auth.application;
+package akuma.whiplash.domains.auth.application.utils;
 
 import akuma.whiplash.domains.auth.application.dto.etc.SocialMemberInfo;
 import akuma.whiplash.domains.auth.application.dto.request.SocialLoginRequest;
@@ -10,7 +10,6 @@ import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
 import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.api.client.json.jackson2.JacksonFactory;
 import java.util.List;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;

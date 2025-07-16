@@ -36,6 +36,10 @@ public class SecurityConfig {
         "/swagger-ui/**", "/swagger-resources/**"
     };
 
+    private static final String[] PUBLIC_API_ENDPOINTS = {
+        "/api/auth/social-login"
+    };
+
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
@@ -47,7 +51,7 @@ public class SecurityConfig {
                 .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
             )
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/auth/**").permitAll()
+                .requestMatchers(PUBLIC_API_ENDPOINTS).permitAll()
                 .requestMatchers(SWAGGER_ENDPOINTS).permitAll()
                 .requestMatchers(STATIC_RESOURCES).permitAll()
                 .anyRequest().authenticated()

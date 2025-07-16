@@ -1,4 +1,4 @@
-package akuma.whiplash.domains.auth.application;
+package akuma.whiplash.domains.auth.application.utils;
 
 import akuma.whiplash.domains.auth.application.dto.etc.SocialMemberInfo;
 import akuma.whiplash.domains.auth.application.dto.request.SocialLoginRequest;

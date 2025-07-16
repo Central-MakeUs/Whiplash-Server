@@ -42,7 +42,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     jwtUtils.validateToken(response, token, ACCESS);
                 }
 
-                Authentication authentication = jwtUtils.getAuthentication(response, token);
+                Authentication authentication = jwtUtils.getAuthentication(token);
                 SecurityContextHolder.getContext().setAuthentication(authentication);
                 log.info("context 인증 정보 저장 : {}", authentication.getName());
             } catch (ApplicationException e) {

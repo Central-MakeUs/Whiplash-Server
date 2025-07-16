@@ -5,6 +5,8 @@ import static akuma.whiplash.domains.auth.exception.AuthErrorCode.TOKEN_EXPIRED;
 import static akuma.whiplash.domains.auth.exception.AuthErrorCode.TOKEN_NOT_FOUND;
 import static akuma.whiplash.global.config.security.jwt.constants.TokenType.REFRESH;
 
+import akuma.whiplash.domains.auth.application.dto.etc.MemberContext;
+import akuma.whiplash.domains.auth.application.mapper.AuthMapper;
 import akuma.whiplash.domains.member.domain.service.MemberQueryService;
 import akuma.whiplash.domains.member.persistence.entity.MemberEntity;
 import akuma.whiplash.global.config.security.jwt.constants.TokenType;
@@ -89,14 +91,15 @@ public class JwtUtils {
             .getBody();
     }
 
-    public Authentication getAuthentication(HttpServletResponse response, String token) throws ApplicationException {
+    public Authentication getAuthentication(String token) throws ApplicationException {
         Claims claims = parseClaims(token);
         List<GrantedAuthority> authorities = Collections.singletonList(new SimpleGrantedAuthority(claims.get(ROLE).toString()));
 
         Long memberId = Long.parseLong(claims.getSubject());
         MemberEntity member = memberQueryService.findById(memberId);
+        MemberContext memberContext = AuthMapper.mapToMemberContext(member);
 
-        return new UsernamePasswordAuthenticationToken(member, "", authorities);
+        return new UsernamePasswordAuthenticationToken(memberContext, "", authorities);
     }
 
 
