@@ -34,7 +34,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         if (token != null) {
             log.info("토큰 함께 요청 : {}", token);
             try {
-                if (request.getRequestURI().contains("/refresh")) {
+                if (request.getRequestURI().contains("/reissue")) {
                     log.info("재발급 진행");
                     jwtUtils.validateToken(response, token, REFRESH);
                 } else {
