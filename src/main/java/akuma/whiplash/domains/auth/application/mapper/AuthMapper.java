@@ -20,6 +20,7 @@ public class AuthMapper {
 
     public static MemberContext mapToMemberContext(MemberEntity memberEntity) {
         return MemberContext.builder()
+            .role(memberEntity.getRole())
             .memberId(memberEntity.getId())
             .socialId(memberEntity.getSocialId())
             .email(memberEntity.getEmail())
