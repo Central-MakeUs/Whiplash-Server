@@ -10,17 +10,20 @@ import akuma.whiplash.domains.auth.application.dto.response.LoginResponse;
 import akuma.whiplash.domains.auth.application.dto.response.TokenResponse;
 import akuma.whiplash.domains.auth.application.usecase.AuthUseCase;
 import akuma.whiplash.global.annotation.swagger.CustomErrorCodes;
+import akuma.whiplash.global.exception.ApplicationException;
 import akuma.whiplash.global.response.ApplicationResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+@Slf4j
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/auth")
@@ -48,7 +51,15 @@ public class AuthController {
     @Operation(summary = "토큰 재발급", description = "액세스, 리프레시 토큰을 재발급합니다.")
     @PostMapping("/reissue")
     public ApplicationResponse<TokenResponse> reissueToken(HttpServletRequest request, @AuthenticationPrincipal MemberContext memberContext, @RequestBody @Valid ReissueRequest reissueRequest) {
-        String refreshToken = request.getHeader("Authorization").split(" ")[1];
+        String authHeader = request.getHeader("Authorization");
+
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            log.warn("authHeader is not valid, authHeader={}", authHeader);
+            throw ApplicationException.from(BAD_REQUEST);
+        }
+
+        String refreshToken = authHeader.substring("Bearer ".length());
+
         TokenResponse tokenResponse = authUseCase.reissueToken(refreshToken, memberContext, reissueRequest.deviceId());
         return ApplicationResponse.onSuccess(tokenResponse);
     }
