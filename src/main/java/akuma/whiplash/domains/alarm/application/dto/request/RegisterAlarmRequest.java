@@ -44,7 +44,11 @@ public record RegisterAlarmRequest(
 
     @Schema(description = "알람 소리", example = "DEFAULT")
     @NotBlank(message = "알람 소리를 선택해주세요.")
-    String soundType
+    String soundType,
+
+    @Schema(description = "사전 푸시 알림 여부", example = "true")
+    @NotNull(message = "사전 푸시 알림 여부를 선택해주세요.")
+    Boolean notifyBefore
 ) {
 
 }
