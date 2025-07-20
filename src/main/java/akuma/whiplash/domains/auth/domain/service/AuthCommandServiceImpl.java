@@ -50,6 +50,7 @@ public class AuthCommandServiceImpl implements AuthCommandService {
             default -> throw ApplicationException.from(BAD_REQUEST);
         };
 
+        // TODO: 탈퇴 후 재가입시 탈퇴한 회원의 정보가 조회되는 문제 해결 필요
         // DB에서 사용자 조회 or 신규 가입
         MemberEntity member = memberRepository.findBySocialId(socialMemberInfo.socialId())
                 .orElseGet(() -> memberRepository.save(

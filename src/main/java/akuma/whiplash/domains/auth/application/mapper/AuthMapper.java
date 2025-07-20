@@ -15,6 +15,7 @@ public class AuthMapper {
             .email(memberInfo.email())
             .nickname(memberInfo.name())
             .role(Role.USER)
+            .activeStatus(true)
             .build();
     }
 
