@@ -64,7 +64,4 @@ public class AlarmEntity extends BaseTimeEntity {
 
     @Column(length = 50, nullable = false)
     private String address;
-
-    @Column(nullable = false)
-    private boolean notifyBefore;
 }
