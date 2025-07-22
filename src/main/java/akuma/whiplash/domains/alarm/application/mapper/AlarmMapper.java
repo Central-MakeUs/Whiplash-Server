@@ -20,7 +20,6 @@ public class AlarmMapper {
             .latitude(request.latitude())
             .longitude(request.longitude())
             .address(request.address())
-            .notifyBefore(request.notifyBefore())
             .build();
     }
 
