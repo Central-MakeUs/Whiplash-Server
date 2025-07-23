@@ -26,6 +26,11 @@ logging:
 ---
 spring.config.activate.on-profile: dev
 
+spring:
+  config:
+    import:
+      - optional:classpath:env.properties
+
 logging:
   level:
     root: INFO
