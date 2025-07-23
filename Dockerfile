@@ -36,4 +36,4 @@ USER noonddu
 EXPOSE 8080
 
 # dev 프로필로 실행
-ENTRYPOINT ["java", "-jar", "-Dspring.profiles.active=dev", "/app/app.jar"]
+ENTRYPOINT ["java", "-Dspring.profiles.active=dev", "-jar", "app.jar"]
