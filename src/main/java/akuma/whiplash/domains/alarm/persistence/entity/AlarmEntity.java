@@ -1,7 +1,6 @@
 package akuma.whiplash.domains.alarm.persistence.entity;
 
 import akuma.whiplash.domains.alarm.domain.constant.SoundType;
-import akuma.whiplash.domains.alarm.domain.constant.VibrationLevel;
 import akuma.whiplash.domains.alarm.domain.constant.Weekday;
 import akuma.whiplash.domains.alarm.domain.util.RepeatDaysConverter;
 import akuma.whiplash.domains.member.persistence.entity.MemberEntity;
@@ -55,7 +54,7 @@ public class AlarmEntity extends BaseTimeEntity {
     @Enumerated(EnumType.STRING)
     @Column(name = "sound_type", length = 20, nullable = false)
     private SoundType soundType;
-    
+
     @Column(nullable = false)
     private Double latitude;
 

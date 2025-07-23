@@ -1,7 +1,11 @@
 package akuma.whiplash.domains.alarm.persistence.entity;
 
+import akuma.whiplash.domains.alarm.domain.constant.DeactivateType;
+import akuma.whiplash.global.entity.BaseTimeEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -22,7 +26,7 @@ import org.hibernate.annotations.DynamicInsert;
 @DynamicInsert
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Table(name = "alarm_occurrence")
-public class AlarmOccurrenceEntity {
+public class AlarmOccurrenceEntity extends BaseTimeEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -38,17 +42,21 @@ public class AlarmOccurrenceEntity {
     @Column(nullable = false)
     private LocalTime time;
 
-    @Column(name = "checked_in", nullable = false)
-    private Boolean checkedIn;
+    @Enumerated(EnumType.STRING)
+    @Column(name = "deactivate_type", length = 20, nullable = false)
+    private DeactivateType deactivateType;
+
+    @Column(name = "deactivate_at")
+    private LocalDateTime deactivateAt;
 
     @Column(name = "checkin_time")
     private LocalDateTime checkinTime;
 
     @Column(name = "alarm_ringing", nullable = false)
-    private Boolean alarmRinging;
+    private boolean alarmRinging;
 
     @Column(name = "ad_watched", nullable = false)
-    private Boolean adWatched;
+    private boolean adWatched;
 
     @Column(name = "dismissed_at")
     private LocalDateTime dismissedAt;
