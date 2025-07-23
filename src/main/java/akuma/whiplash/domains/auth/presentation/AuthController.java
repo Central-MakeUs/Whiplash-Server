@@ -1,5 +1,6 @@
 package akuma.whiplash.domains.auth.presentation;
 
+import static akuma.whiplash.domains.auth.exception.AuthErrorCode.*;
 import static akuma.whiplash.global.response.code.CommonErrorCode.*;
 
 import akuma.whiplash.domains.auth.application.dto.etc.MemberContext;
@@ -9,6 +10,7 @@ import akuma.whiplash.domains.auth.application.dto.request.SocialLoginRequest;
 import akuma.whiplash.domains.auth.application.dto.response.LoginResponse;
 import akuma.whiplash.domains.auth.application.dto.response.TokenResponse;
 import akuma.whiplash.domains.auth.application.usecase.AuthUseCase;
+import akuma.whiplash.domains.auth.exception.AuthErrorCode;
 import akuma.whiplash.global.annotation.swagger.CustomErrorCodes;
 import akuma.whiplash.global.exception.ApplicationException;
 import akuma.whiplash.global.response.ApplicationResponse;
@@ -31,7 +33,11 @@ public class AuthController {
 
     private final AuthUseCase authUseCase;
 
-    @CustomErrorCodes(commonErrorCodes = {BAD_REQUEST})
+    @CustomErrorCodes(
+        commonErrorCodes = {BAD_REQUEST},
+        authErrorCodes = {UNSUPPORTED_SOCIAL_TYPE}
+
+    )
     @Operation(summary = "소셜 로그인", description = "구글, 애플, 카카오 소셜 로그인을 지원합니다.")
     @PostMapping("/social-login")
     public ApplicationResponse<LoginResponse> login(@RequestBody @Valid SocialLoginRequest request) {

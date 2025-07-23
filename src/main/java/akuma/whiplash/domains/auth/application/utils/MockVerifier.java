@@ -5,7 +5,7 @@ import akuma.whiplash.domains.auth.application.dto.request.SocialLoginRequest;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
-@Component
+@Component("MOCK")
 @Profile("local")
 public class MockVerifier implements SocialVerifier {
 

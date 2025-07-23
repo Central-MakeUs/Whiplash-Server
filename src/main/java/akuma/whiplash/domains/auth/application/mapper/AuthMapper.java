@@ -4,6 +4,7 @@ import akuma.whiplash.domains.auth.application.dto.etc.MemberContext;
 import akuma.whiplash.domains.auth.application.dto.etc.SocialMemberInfo;
 import akuma.whiplash.domains.member.domain.contants.Role;
 import akuma.whiplash.domains.member.persistence.entity.MemberEntity;
+import java.time.LocalDateTime;
 
 public class AuthMapper {
 
@@ -16,6 +17,10 @@ public class AuthMapper {
             .nickname(memberInfo.name())
             .role(Role.USER)
             .activeStatus(true)
+            .privacyPolicy(true)
+            .pushNotificationPolicy(true)
+            .privacyAgreedAt(LocalDateTime.now())
+            .pushAgreedAt(LocalDateTime.now())
             .build();
     }
 

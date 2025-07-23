@@ -4,6 +4,7 @@ package akuma.whiplash.domains.auth.application.dto.request;
 import akuma.whiplash.domains.auth.presentation.util.annotation.SocialTypeFormat;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 
 @Schema(description = "소셜 로그인 요청 DTO")
 public record SocialLoginRequest(
