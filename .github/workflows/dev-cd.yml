@@ -22,7 +22,7 @@ jobs:
 
       # 3. Gradle 캐시
       - name: Cache Gradle packages
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: |
             ~/.gradle/caches
@@ -93,4 +93,4 @@ jobs:
               -e TZ=Asia/Seoul \
               $IMAGE
 
-            docker image prune -f
+            docker image prune -af

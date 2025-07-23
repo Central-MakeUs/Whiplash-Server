@@ -23,7 +23,7 @@ jobs:
 
       # 3. Gradle 캐시 설정 (빌드 속도 개선)
       - name: Cache Gradle packages
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: |
             ~/.gradle/caches
