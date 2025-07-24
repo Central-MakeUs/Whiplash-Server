@@ -3,14 +3,14 @@ springdoc:
   default-produces-media-type: application/json;charset=UTF-8
   swagger-ui:
     persist-authorization: true
-    path: /api/whiplash/swagger-ui.html
+    path: /api/noonddu/swagger-ui.html
     tags-sorter: alpha
     operations-sorter: method
     display-request-duration: true
     disable-swagger-default-url: true
   show-actuator: true
   api-docs:
-    path: /api/whiplash/v3/api-docs
+    path: /api/noonddu/v3/api-docs
 
 ---
 spring.config.activate.on-profile: "local"

@@ -15,6 +15,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
+import java.time.LocalDateTime;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -26,20 +27,14 @@ import org.hibernate.annotations.DynamicInsert;
 @SuperBuilder
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @DynamicInsert
-@Table(name = "member", uniqueConstraints = {
-    @UniqueConstraint(columnNames = {"social_id", "social_type"})
-})
+@Table(name = "member")
 public class MemberEntity extends BaseTimeEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @OneToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "member_terms_agree_id", nullable = false)
-    private MemberTermsAgree memberTermsAgree;
-
-    @Column(name = "social_id", nullable = false)
+    @Column(name = "social_id", unique = true, nullable = false)
     private String socialId;
 
     @Column(length = 50, nullable = false)
@@ -53,4 +48,26 @@ public class MemberEntity extends BaseTimeEntity {
 
     @Column(nullable = false)
     private boolean activeStatus;
+
+    @Column(name = "privacy_policy", nullable = false)
+    private boolean privacyPolicy;
+
+    @Column(name = "push_notification_policy", nullable = false)
+    private boolean pushNotificationPolicy;
+
+    @Column(name = "privacy_agreed_at", nullable = false)
+    private LocalDateTime privacyAgreedAt;
+
+    @Column(name = "push_agreed_at", nullable = false)
+    private LocalDateTime pushAgreedAt;
+
+    public void updatePrivacyPolicy(boolean privacyPolicy) {
+        this.privacyPolicy = privacyPolicy;
+        this.privacyAgreedAt = LocalDateTime.now();
+    }
+
+    public void updatePushNotificationPolicy(boolean pushNotificationPolicy) {
+        this.pushNotificationPolicy = pushNotificationPolicy;
+        this.pushAgreedAt = LocalDateTime.now();
+    }
 }

@@ -15,7 +15,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 @Slf4j
-@Component
+@Component("GOOGLE")
 public class GoogleVerifier implements SocialVerifier{
 
     private final GoogleIdTokenVerifier verifier;
