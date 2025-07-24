@@ -53,7 +53,7 @@ public class SwaggerConfig {
                                 .name("Authorization"))
                 )
                 .servers(List.of(server))
-                .info(new Info().title("Tickety TMS Swagger").version("1.0"))
+                .info(new Info().title("눈 떠! API 명세서").version("1.0"))
                 .addSecurityItem(new SecurityRequirement().addList("bearerAuth"));
     }
 
