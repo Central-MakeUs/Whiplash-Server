@@ -1,5 +1,6 @@
 package akuma.whiplash.domains.alarm.persistence.entity;
 
+import akuma.whiplash.global.entity.BaseTimeEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -20,7 +21,7 @@ import org.hibernate.annotations.DynamicInsert;
 @DynamicInsert
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Table(name = "alarm_ringing_log")
-public class AlarmRingingLogEntity {
+public class AlarmRingingLogEntity extends BaseTimeEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
