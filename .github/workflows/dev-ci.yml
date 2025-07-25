@@ -39,3 +39,13 @@ jobs:
       # 5. 테스트 실행
 #      - name: Run tests
 #        run: ./gradlew test --no-daemon
+
+      # 6. env.properties 생성
+      - name: Generate env.properties
+        run: |
+          mkdir -p src/main/resources
+          echo "${{ secrets.DEV_ENV_PROPERTIES }}" > src/main/resources/env.properties
+
+      # 7. 빌드
+      - name: Build JAR
+        run: ./gradlew bootJar --no-daemon
