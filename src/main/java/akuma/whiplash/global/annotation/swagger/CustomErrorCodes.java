@@ -1,5 +1,6 @@
 package akuma.whiplash.global.annotation.swagger;
 
+import akuma.whiplash.domains.alarm.exception.AlarmErrorCode;
 import akuma.whiplash.domains.auth.exception.AuthErrorCode;
 import akuma.whiplash.domains.member.exception.MemberErrorCode;
 import akuma.whiplash.global.response.code.CommonErrorCode;
@@ -15,4 +16,5 @@ public @interface CustomErrorCodes {
     CommonErrorCode[] commonErrorCodes() default {};
     AuthErrorCode[] authErrorCodes() default {};
     MemberErrorCode[] memberErrorCodes() default {};
+    AlarmErrorCode[] alarmErrorCodes() default {};
 }

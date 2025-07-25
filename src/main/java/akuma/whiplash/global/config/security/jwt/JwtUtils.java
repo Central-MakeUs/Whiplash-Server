@@ -45,7 +45,6 @@ public class JwtUtils {
     @Value("${jwt.secret-key}")
     private String secret;
 
-    private static final String AUTHORIZATION = "Authorization";
     private static final String CONTENT_TYPE = "application/json";
     private static final String CHARACTER_ENCODING = "UTF-8";
     private static final String ROLE = "role";
@@ -102,7 +101,7 @@ public class JwtUtils {
     }
 
 
-    private void jwtExceptionHandler(HttpServletResponse response, BaseErrorCode error) {
+    public void jwtExceptionHandler(HttpServletResponse response, BaseErrorCode error) {
         response.setStatus(error.getHttpStatus().value());
         response.setContentType(CONTENT_TYPE);
         response.setCharacterEncoding(CHARACTER_ENCODING);
