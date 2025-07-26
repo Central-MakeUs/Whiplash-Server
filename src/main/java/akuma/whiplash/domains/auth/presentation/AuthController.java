@@ -53,7 +53,10 @@ public class AuthController {
         return ApplicationResponse.onSuccess();
     }
 
-    @CustomErrorCodes(commonErrorCodes = {BAD_REQUEST})
+    @CustomErrorCodes(
+        commonErrorCodes = {BAD_REQUEST},
+        authErrorCodes = {INVALID_TOKEN}
+    )
     @Operation(summary = "토큰 재발급", description = "액세스, 리프레시 토큰을 재발급합니다.")
     @PostMapping("/reissue")
     public ApplicationResponse<TokenResponse> reissueToken(HttpServletRequest request, @AuthenticationPrincipal MemberContext memberContext, @RequestBody @Valid ReissueRequest reissueRequest) {
