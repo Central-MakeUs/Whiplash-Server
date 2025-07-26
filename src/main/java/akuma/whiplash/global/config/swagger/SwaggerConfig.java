@@ -1,5 +1,8 @@
 package akuma.whiplash.global.config.swagger;
 
+import akuma.whiplash.domains.alarm.exception.AlarmErrorCode;
+import akuma.whiplash.domains.auth.exception.AuthErrorCode;
+import akuma.whiplash.domains.member.exception.MemberErrorCode;
 import akuma.whiplash.global.annotation.swagger.CustomErrorCodes;
 import akuma.whiplash.global.response.ApplicationResponse;
 import akuma.whiplash.global.response.code.BaseErrorCode;
@@ -75,7 +78,13 @@ public class SwaggerConfig {
             CustomErrorCodes customErrorCodes = handlerMethod.getMethodAnnotation(CustomErrorCodes.class);
 
             if (customErrorCodes != null) {
-                generateErrorCodeResponse(operation, customErrorCodes.commonErrorCodes());
+                generateErrorCodeResponse(
+                    operation,
+                    customErrorCodes.commonErrorCodes(),
+                    customErrorCodes.alarmErrorCodes(),
+                    customErrorCodes.authErrorCodes(),
+                    customErrorCodes.memberErrorCodes()
+                );
             }
 
             return operation;
@@ -84,12 +93,30 @@ public class SwaggerConfig {
 
     private void generateErrorCodeResponse(
             Operation operation,
-            CommonErrorCode[] commonErrorCodes
+            CommonErrorCode[] commonErrorCodes,
+            AlarmErrorCode[] alarmErrorCodes,
+            AuthErrorCode[] authErrorCodes,
+            MemberErrorCode[] memberErrorCodes
     ) {
         ApiResponses responses = operation.getResponses();
 
         if (commonErrorCodes != null) {
             for (CommonErrorCode errorCode : commonErrorCodes) {
+                SwaggerExampleHolder SwaggerExampleHolder = getSwaggerExampleHolder(errorCode);
+                addExamplesToResponses(responses, SwaggerExampleHolder);
+            }
+
+            for (AlarmErrorCode errorCode : alarmErrorCodes) {
+                SwaggerExampleHolder SwaggerExampleHolder = getSwaggerExampleHolder(errorCode);
+                addExamplesToResponses(responses, SwaggerExampleHolder);
+            }
+
+            for (AuthErrorCode errorCode : authErrorCodes) {
+                SwaggerExampleHolder SwaggerExampleHolder = getSwaggerExampleHolder(errorCode);
+                addExamplesToResponses(responses, SwaggerExampleHolder);
+            }
+
+            for (MemberErrorCode errorCode : memberErrorCodes) {
                 SwaggerExampleHolder SwaggerExampleHolder = getSwaggerExampleHolder(errorCode);
                 addExamplesToResponses(responses, SwaggerExampleHolder);
             }
