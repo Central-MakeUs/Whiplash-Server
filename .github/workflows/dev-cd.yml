@@ -67,7 +67,7 @@ jobs:
           docker build -t $IMAGE_NAME:$TAG .
           docker push $IMAGE_NAME:$TAG
 
-      # 10. EC2 배포(docker run할 때 env.properties 마운팅 필요)
+      # 10. EC2 배포
       - name: Deploy to EC2
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -91,7 +91,6 @@ jobs:
               -p 8080:8080 \
               --restart unless-stopped \
               -e TZ=Asia/Seoul \
-              -v /tmp/config:/tmp/config \ 
               $IMAGE
 
             docker image prune -af

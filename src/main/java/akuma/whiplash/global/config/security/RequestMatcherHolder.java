@@ -35,9 +35,13 @@ public class RequestMatcherHolder {
         new RequestInfo(POST, "/api/auth/reissue", USER),
 
         // swagger
+        new RequestInfo(GET, "/api/noonddu/swagger-ui.html", null),              // 진입점
+        new RequestInfo(GET, "/api/noonddu/swagger-ui/**", null),              // UI 리소스들
+        new RequestInfo(GET, "/api/noonddu/v3/api-docs/**", null),              // API docs
+        new RequestInfo(GET, "/api/noonddu/swagger-ui.html", null),              // 진입점
         new RequestInfo(GET, "/swagger-ui/**",null),
         new RequestInfo(GET, "/swagger-ui/index.html",null),
-        new RequestInfo(GET, "/v3/api-docs/**",null),
+        new RequestInfo(GET, "/v3/api-docs/**",null), // 예비 (경로 누락 방지)
         new RequestInfo(GET, "/swagger-resources/**",null),
         new RequestInfo(GET, "/webjars/**",null),
         new RequestInfo(GET, "/favicon.ico",null),
