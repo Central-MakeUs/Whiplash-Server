@@ -44,7 +44,7 @@ jobs:
       - name: Generate env.properties
         run: |
           mkdir -p /tmp/config
-          printf "%s" "${{ secrets.DEV_ENV_PROPERTIES }}" > tmp/config/env.properties
+          printf "%s" "${{ secrets.DEV_ENV_PROPERTIES }}" > /tmp/config/env.properties
 
       # 7. 빌드
       - name: Build JAR
