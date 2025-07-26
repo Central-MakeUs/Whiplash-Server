@@ -8,6 +8,7 @@ import akuma.whiplash.domains.alarm.persistence.entity.AlarmEntity;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmOccurrenceEntity;
 import akuma.whiplash.domains.alarm.persistence.repository.AlarmOccurrenceRepository;
 import akuma.whiplash.domains.alarm.persistence.repository.AlarmRepository;
+import akuma.whiplash.domains.auth.exception.AuthErrorCode;
 import akuma.whiplash.domains.member.exception.MemberErrorCode;
 import akuma.whiplash.domains.member.persistence.entity.MemberEntity;
 import akuma.whiplash.domains.member.persistence.repository.MemberRepository;
@@ -36,7 +37,7 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
     }
 
     @Override
-    public CreateAlarmOccurrenceResponse createAlarmOccurrence(Long alarmId) {
+    public CreateAlarmOccurrenceResponse createAlarmOccurrence(Long memberId, Long alarmId) {
         AlarmEntity alarmEntity = alarmRepository.findById(alarmId)
             .orElseThrow(() -> ApplicationException.from(AlarmErrorCode.ALARM_NOT_FOUND));
 
@@ -46,9 +47,17 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
             throw ApplicationException.from(AlarmErrorCode.ALREADY_OCCURRED_EXISTS);
         }
 
+        validAlarmOwner(memberId, alarmEntity.getMember().getId());
+
         AlarmOccurrenceEntity alarmOccurrenceEntity = AlarmMapper.mapToTodayFirstAlarmOccurrenceEntity(alarmEntity);
         alarmOccurrenceRepository.save(alarmOccurrenceEntity);
 
         return AlarmMapper.mapToCreateAlarmOccurrenceResponse(alarmOccurrenceEntity.getId());
+    }
+
+    private static void validAlarmOwner(Long reqMemberId, Long alarmMemberId) {
+        if (!reqMemberId.equals(alarmMemberId)) {
+            throw ApplicationException.from(AuthErrorCode.PERMISSION_DENIED);
+        }
     }
 }

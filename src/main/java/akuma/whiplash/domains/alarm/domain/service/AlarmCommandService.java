@@ -6,5 +6,5 @@ import akuma.whiplash.domains.alarm.application.dto.response.CreateAlarmOccurren
 public interface AlarmCommandService {
 
     void createAlarm(RegisterAlarmRequest request, Long memberId);
-    CreateAlarmOccurrenceResponse createAlarmOccurrence(Long alarmId);
+    CreateAlarmOccurrenceResponse createAlarmOccurrence(Long memberId, Long alarmId);
 }

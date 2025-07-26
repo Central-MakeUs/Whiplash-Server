@@ -16,7 +16,7 @@ public class AlarmUseCase {
         alarmCommandService.createAlarm(request, memberId);
     }
 
-    public CreateAlarmOccurrenceResponse createAlarmOccurrence(Long alarmId) {
-        return alarmCommandService.createAlarmOccurrence(alarmId);
+    public CreateAlarmOccurrenceResponse createAlarmOccurrence(Long memberId, Long alarmId) {
+        return alarmCommandService.createAlarmOccurrence(memberId, alarmId);
     }
 }

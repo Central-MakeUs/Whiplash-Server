@@ -1,12 +1,14 @@
 package akuma.whiplash.domains.alarm.presentation;
 
 import static akuma.whiplash.domains.alarm.exception.AlarmErrorCode.*;
+import static akuma.whiplash.domains.auth.exception.AuthErrorCode.*;
 import static akuma.whiplash.domains.member.exception.MemberErrorCode.MEMBER_NOT_FOUND;
 
 import akuma.whiplash.domains.alarm.application.dto.request.RegisterAlarmRequest;
 import akuma.whiplash.domains.alarm.application.dto.response.CreateAlarmOccurrenceResponse;
 import akuma.whiplash.domains.alarm.application.usecase.AlarmUseCase;
 import akuma.whiplash.domains.auth.application.dto.etc.MemberContext;
+import akuma.whiplash.domains.auth.exception.AuthErrorCode;
 import akuma.whiplash.global.annotation.swagger.CustomErrorCodes;
 import akuma.whiplash.global.response.ApplicationResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -37,11 +39,14 @@ public class AlarmController {
     }
 
 
-    @CustomErrorCodes(alarmErrorCodes = {ALARM_NOT_FOUND, TODAY_IS_NOT_ALARM_DAY, ALREADY_OCCURRED_EXISTS})
+    @CustomErrorCodes(
+        alarmErrorCodes = {ALARM_NOT_FOUND, TODAY_IS_NOT_ALARM_DAY, ALREADY_OCCURRED_EXISTS},
+        authErrorCodes = {PERMISSION_DENIED}
+    )
     @Operation(summary = "알람 발생 내역 생성", description = "오늘 울려야할 알람이 처음 울렸을 때 호출하는 API입니다. 알람당 하루에 발생 내역은 1개만 생성할 수 있습니다.")
     @PostMapping("/{alarmId}/occurrences")
     public ApplicationResponse<CreateAlarmOccurrenceResponse> createAlarmOccurrence(@AuthenticationPrincipal MemberContext memberContext, @PathVariable Long alarmId) {
-        CreateAlarmOccurrenceResponse response = alarmUseCase.createAlarmOccurrence(alarmId);
+        CreateAlarmOccurrenceResponse response = alarmUseCase.createAlarmOccurrence(memberContext.memberId(), alarmId);
         return ApplicationResponse.onSuccess(response);
     }
 }
