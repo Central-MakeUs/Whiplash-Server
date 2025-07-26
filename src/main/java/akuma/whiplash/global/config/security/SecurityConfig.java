@@ -1,5 +1,8 @@
 package akuma.whiplash.global.config.security;
 
+import static akuma.whiplash.domains.member.domain.contants.Role.ADMIN;
+import static akuma.whiplash.domains.member.domain.contants.Role.USER;
+
 import akuma.whiplash.global.config.security.jwt.JwtAuthenticationFilter;
 import akuma.whiplash.global.config.security.jwt.JwtUtils;
 import java.util.Arrays;
@@ -22,28 +25,7 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 public class SecurityConfig {
 
     private final JwtUtils jwtUtils;
-
-    private static final String[] STATIC_RESOURCES = {
-        "/resource/**",
-        "/css/**",
-        "/js/**",
-        "/img/**",
-        "/lib/**",
-        "/webjars/**"
-    };
-
-    private static final String[] SWAGGER_ENDPOINTS = {
-        "/api/noonddu/swagger-ui.html",              // 진입점
-        "/api/noonddu/swagger-ui/**",                // UI 리소스들
-        "/api/noonddu/v3/api-docs/**",               // API docs
-        "/v3/api-docs/**",                            // 예비 (경로 누락 방지)
-        "/swagger-ui/**", "/swagger-resources/**"
-    };
-
-    private static final String[] PUBLIC_API_ENDPOINTS = {
-        "/api/auth/social-login",
-        "/api/auth/social-logout"
-    };
+    private final RequestMatcherHolder requestMatcherHolder;
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -56,12 +38,14 @@ public class SecurityConfig {
                 .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
             )
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers(PUBLIC_API_ENDPOINTS).permitAll()
-                .requestMatchers(SWAGGER_ENDPOINTS).permitAll()
-                .requestMatchers(STATIC_RESOURCES).permitAll()
+                .requestMatchers(requestMatcherHolder.getPatternsByMinPermission(null)).permitAll()
+                .requestMatchers(requestMatcherHolder.getPatternsByMinPermission(USER))
+                .hasAnyAuthority(USER.name(), ADMIN.name())
+                .requestMatchers(requestMatcherHolder.getPatternsByMinPermission(ADMIN))
+                .hasAnyAuthority(ADMIN.name())
                 .anyRequest().authenticated()
             )
-            .addFilterBefore(new JwtAuthenticationFilter(jwtUtils),
+            .addFilterBefore(new JwtAuthenticationFilter(jwtUtils, requestMatcherHolder),
                 UsernamePasswordAuthenticationFilter.class);
 
         return http.build();

@@ -3,6 +3,8 @@ package akuma.whiplash.global.config.security.jwt;
 import static akuma.whiplash.global.config.security.jwt.constants.TokenType.ACCESS;
 import static akuma.whiplash.global.config.security.jwt.constants.TokenType.REFRESH;
 
+import akuma.whiplash.domains.auth.exception.AuthErrorCode;
+import akuma.whiplash.global.config.security.RequestMatcherHolder;
 import akuma.whiplash.global.exception.ApplicationException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -23,6 +25,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtUtils jwtUtils;
+    private final RequestMatcherHolder requestMatcherHolder;
 
     private static final String AUTHORIZATION = "Authorization";
     private static final String BEARER = "Bearer";
@@ -48,6 +51,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             } catch (ApplicationException e) {
                 return;
             }
+        } else {
+            jwtUtils.jwtExceptionHandler(response, AuthErrorCode.INVALID_TOKEN);
+            return; // 토큰 비어있을 시 필터 체인 중단
         }
 
         filterChain.doFilter(request, response);
@@ -60,5 +66,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             return authorizationHeader.split(" ")[1];
         }
         return null;
+    }
+
+    @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) throws ServletException {
+        log.info("Request URI = {}", request.getRequestURI());
+        return requestMatcherHolder.isPermitAll(request.getRequestURI(), request.getMethod());
     }
 }

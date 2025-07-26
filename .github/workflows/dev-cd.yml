@@ -40,11 +40,11 @@ jobs:
         id: vars
         run: echo "sha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
 
-      # 6. env.properties 생성
+      # 6. env.properties 생성 (JAR 외부에 생성해 보안 취약점 예방)
       - name: Generate env.properties
         run: |
-          mkdir -p src/main/resources
-          echo "${{ secrets.DEV_ENV_PROPERTIES }}" > src/main/resources/env.properties
+          mkdir -p /tmp/config
+          printf "%s" "${{ secrets.DEV_ENV_PROPERTIES }}" > tmp/config/env.properties
 
       # 7. 빌드
       - name: Build JAR

@@ -19,10 +19,12 @@ import java.time.LocalTime;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.experimental.SuperBuilder;
 import org.hibernate.annotations.DynamicInsert;
 
 @Entity
 @Getter
+@SuperBuilder
 @DynamicInsert
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Table(name = "alarm_occurrence")
@@ -37,10 +39,10 @@ public class AlarmOccurrenceEntity extends BaseTimeEntity {
     private AlarmEntity alarm;
 
     @Column(nullable = false)
-    private LocalDate date;
+    private LocalDate date; // 알람이 원래 울려야 했던 날짜
 
     @Column(nullable = false)
-    private LocalTime time;
+    private LocalTime time; // 알람이 원래 울려야 했던 시간
 
     @Enumerated(EnumType.STRING)
     @Column(name = "deactivate_type", length = 20, nullable = false)
@@ -54,12 +56,6 @@ public class AlarmOccurrenceEntity extends BaseTimeEntity {
 
     @Column(name = "alarm_ringing", nullable = false)
     private boolean alarmRinging;
-
-    @Column(name = "ad_watched", nullable = false)
-    private boolean adWatched;
-
-    @Column(name = "dismissed_at")
-    private LocalDateTime dismissedAt;
 
     @Column(name = "ringing_count", nullable = false)
     private int ringingCount;

@@ -28,8 +28,7 @@ spring.config.activate.on-profile: dev
 
 spring:
   config:
-    import:
-      - optional:classpath:env.properties
+    additional-location: file:/tmp/config/env.properties
 
 logging:
   level:
