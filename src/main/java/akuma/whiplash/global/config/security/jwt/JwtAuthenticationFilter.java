@@ -71,6 +71,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) throws ServletException {
         log.info("Request URI = {}", request.getRequestURI());
-        return requestMatcherHolder.isPermitAll(request);
+        return requestMatcherHolder.isPermitAll(request.getRequestURI(), request.getMethod());
     }
 }

@@ -6,7 +6,6 @@ import static org.springframework.http.HttpMethod.*;
 
 import akuma.whiplash.domains.member.domain.contants.Role;
 import jakarta.annotation.Nullable;
-import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
@@ -17,6 +16,8 @@ import org.springframework.util.AntPathMatcher;
 
 @Component
 public class RequestMatcherHolder {
+
+    private static final AntPathMatcher PATH_MATCHER = new AntPathMatcher();
 
     private static final List<RequestInfo> REQUEST_INFO_LIST = List.of(
 
@@ -54,7 +55,6 @@ public class RequestMatcherHolder {
         new RequestInfo(DELETE, "/api/members/**", USER),
 
         // 빌드 에러 방지를 위해 각 권한에 대한 RequestInfo가 최소 1개씩은 리스트에 있어야함
-        new RequestInfo(GET, "/api/members/**", USER),
         new RequestInfo(GET, "/api/admin/**", ADMIN)
     );
     private final ConcurrentHashMap<String, RequestMatcher> reqMatcherCacheMap = new ConcurrentHashMap<>();
@@ -76,17 +76,13 @@ public class RequestMatcherHolder {
 
     }
 
-    public boolean isPermitAll(HttpServletRequest request) {
-        String requestUri = request.getRequestURI();
-        String method = request.getMethod();
-
-        AntPathMatcher pathMatcher = new AntPathMatcher();
+    public boolean isPermitAll(String requestUri, String method) {
 
         return REQUEST_INFO_LIST.stream()
             .filter(info -> info.minRole == null) // 권한이 필요 없는 엔드포인트
             .anyMatch(info ->
                 info.method().matches(method) &&
-                    pathMatcher.match(info.pattern(), requestUri)
+                    PATH_MATCHER.match(info.pattern(), requestUri)
             );
     }
 }
