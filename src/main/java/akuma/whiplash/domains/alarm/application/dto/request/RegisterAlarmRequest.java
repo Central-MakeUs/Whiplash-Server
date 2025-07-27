@@ -28,9 +28,9 @@ public record RegisterAlarmRequest(
     @DecimalMax(value = "180.0", message = "경도는 180 이하이어야 합니다.")
     double longitude,
 
-    @Schema(description = "알람 이름", example = "도서관 정기 출석 알람")
-    @NotBlank(message = "알람 이름을 입력해주세요.")
-    String alarmName,
+    @Schema(description = "알람 목적", example = "도서관 정기 출석 알람")
+    @NotBlank(message = "알람 목적을 입력해주세요.")
+    String alarmPurpose,
 
     @Schema(description = "알람 시간", example = "08:30")
     @NotNull(message = "알람 시간을 선택해주세요.")
