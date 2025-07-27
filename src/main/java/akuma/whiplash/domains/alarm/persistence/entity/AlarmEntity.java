@@ -41,8 +41,8 @@ public class AlarmEntity extends BaseTimeEntity {
     @JoinColumn(name = "member_id", nullable = false)
     private MemberEntity member;
 
-    @Column(name = "alarm_name", length = 50, nullable = false)
-    private String alarmName;
+    @Column(name = "alarm_purpose", length = 50, nullable = false)
+    private String alarmPurpose;
 
     @Column(nullable = false)
     private LocalTime time;

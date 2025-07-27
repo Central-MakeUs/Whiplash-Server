@@ -48,8 +48,8 @@ public class AlarmOccurrenceEntity extends BaseTimeEntity {
     @Column(name = "deactivate_type", length = 20, nullable = false)
     private DeactivateType deactivateType;
 
-    @Column(name = "deactivate_at")
-    private LocalDateTime deactivateAt;
+    @Column(name = "deactivated_at")
+    private LocalDateTime deactivatedAt;
 
     @Column(name = "checkin_time")
     private LocalDateTime checkinTime;

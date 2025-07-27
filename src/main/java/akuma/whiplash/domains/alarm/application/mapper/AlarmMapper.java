@@ -1,6 +1,7 @@
 package akuma.whiplash.domains.alarm.application.mapper;
 
 import akuma.whiplash.domains.alarm.application.dto.request.RegisterAlarmRequest;
+import akuma.whiplash.domains.alarm.application.dto.response.AlarmInfoPreviewResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.CreateAlarmOccurrenceResponse;
 import akuma.whiplash.domains.alarm.domain.constant.DeactivateType;
 import akuma.whiplash.domains.alarm.domain.constant.SoundType;
@@ -12,17 +13,16 @@ import akuma.whiplash.domains.member.persistence.entity.MemberEntity;
 import akuma.whiplash.global.exception.ApplicationException;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
-import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Objects;
-import java.util.Optional;
 
 public class AlarmMapper {
 
     public static AlarmEntity mapToAlarmEntity(RegisterAlarmRequest request, MemberEntity memberEntity) {
         return AlarmEntity.builder()
             .member(memberEntity)
-            .alarmName(request.alarmName())
+            .alarmPurpose(request.alarmPurpose())
             .time(request.time())
             .repeatDays(mapToWeekdays(request.repeatDays()))
             .soundType(SoundType.from(request.soundType()))
@@ -50,7 +50,7 @@ public class AlarmMapper {
             .deactivateType(DeactivateType.NONE)
             .checkinTime(null)
             .alarmRinging(true)
-            .deactivateAt(null)
+            .deactivatedAt(null)
             .ringingCount(1)
             .build();
     }
@@ -58,6 +58,24 @@ public class AlarmMapper {
     public static CreateAlarmOccurrenceResponse mapToCreateAlarmOccurrenceResponse(Long occurrenceId) {
         return CreateAlarmOccurrenceResponse.builder()
             .occurrenceId(occurrenceId)
+            .build();
+    }
+
+    public static AlarmInfoPreviewResponse mapToAlarmInfoPreviewResponse(AlarmEntity alarm, boolean isToggleOn) {
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("HH:mm");
+
+        return AlarmInfoPreviewResponse
+            .builder()
+            .alarmId(alarm.getId())
+            .alarmPurpose(alarm.getAlarmPurpose())
+            .repeatsDays(alarm.getRepeatDays().stream()
+                .map(Weekday::getDescription)
+                .toList())
+            .time(alarm.getTime().format(formatter))
+            .address(alarm.getAddress())
+            .latitude(alarm.getLatitude())
+            .longitude(alarm.getLongitude())
+            .isToggleOn(isToggleOn)
             .build();
     }
 
