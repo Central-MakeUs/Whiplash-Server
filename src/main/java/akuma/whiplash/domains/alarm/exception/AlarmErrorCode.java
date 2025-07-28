@@ -11,6 +11,10 @@ public enum AlarmErrorCode implements BaseErrorCode {
 
     TODAY_IS_NOT_ALARM_DAY(HttpStatus.BAD_REQUEST, "ALARM_001", "오늘은 알람이 울리는 날이 아닙니다."),
     ALREADY_OCCURRED_EXISTS(HttpStatus.BAD_REQUEST, "ALARM_002", "알람 발생 내역이 이미 생성돼 있습니다."),
+    ALREADY_DEACTIVATED(HttpStatus.BAD_REQUEST, "ALARM_003", "이미 오늘은 비활성화된 알람입니다."),
+    ALARM_OFF_LIMIT_EXCEEDED(HttpStatus.BAD_REQUEST, "ALARM_004", "잔여 알람 끄기 횟수가 부족합니다."),
+    REPEAT_DAYS_NOT_CONFIG(HttpStatus.BAD_REQUEST, "ALARM_005", "반복 요일이 설정되지 않았습니다."),
+    INVALID_CLIENT_DATE(HttpStatus.BAD_REQUEST, "ALARM_006", "요청의 날짜가 서버 기준 날짜와 일치하지 않습니다."),
 
     ALARM_NOT_FOUND(HttpStatus.NOT_FOUND, "ALARM_401", "존재하지 않는 알람입니다.")
     ;

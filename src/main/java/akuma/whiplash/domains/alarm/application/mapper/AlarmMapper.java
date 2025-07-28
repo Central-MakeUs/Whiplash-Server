@@ -9,6 +9,7 @@ import akuma.whiplash.domains.alarm.domain.constant.Weekday;
 import akuma.whiplash.domains.alarm.exception.AlarmErrorCode;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmEntity;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmOccurrenceEntity;
+import akuma.whiplash.domains.alarm.persistence.entity.AlarmOffLogEntity;
 import akuma.whiplash.domains.member.persistence.entity.MemberEntity;
 import akuma.whiplash.global.exception.ApplicationException;
 import java.time.DayOfWeek;
@@ -32,6 +33,13 @@ public class AlarmMapper {
             .build();
     }
 
+    public static AlarmOffLogEntity mapToAlarmOffLogEntity(AlarmEntity alarm, MemberEntity member) {
+        return AlarmOffLogEntity.builder()
+            .alarm(alarm)
+            .member(member)
+            .build();
+    }
+
     public static AlarmOccurrenceEntity mapToTodayFirstAlarmOccurrenceEntity(AlarmEntity alarmEntity) {
         LocalDate today = LocalDate.now();
         DayOfWeek todayDayOfWeek = today.getDayOfWeek();
@@ -52,6 +60,17 @@ public class AlarmMapper {
             .alarmRinging(true)
             .deactivatedAt(null)
             .ringingCount(1)
+            .build();
+    }
+
+    public static AlarmOccurrenceEntity mapToAlarmOccurrenceForDate(AlarmEntity alarm, LocalDate date) {
+        return AlarmOccurrenceEntity.builder()
+            .alarm(alarm)
+            .date(date)
+            .time(alarm.getTime())
+            .deactivateType(DeactivateType.NONE)
+            .alarmRinging(false)
+            .ringingCount(0)
             .build();
     }
 
