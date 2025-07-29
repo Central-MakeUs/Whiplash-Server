@@ -95,7 +95,7 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
         Optional<AlarmOccurrenceEntity> todayOccurrenceOpt =
             alarmOccurrenceRepository.findByAlarmIdAndDate(alarmId, clientDate);
 
-        // 다음 텀 알람을 끌지, 아니면 오늘 알람을 끌지 판단하는 변수
+        // 알람이 울렸는지 판단하는 변수
         // 오늘 알람이 울렸고, 오늘 울린 알람이 꺼졌으면 true(다음 텀 알람 끄기), 아니라면 false(오늘 알람 끄기)
         boolean isAfterRinging = todayOccurrenceOpt
             .map(o ->
@@ -105,12 +105,12 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
             )
             .orElse(false);
 
-        // 🔍 끌 대상 알람 날짜 계산
+        // 끌 대상 알람 날짜 계산
         LocalDate offTargetDate = isAfterRinging
             ? getNextOccurrenceDate(alarm, clientDate.plusDays(1))  // 울린 후 → 다음 텀 알람을 끈다
             : getNextOccurrenceDate(alarm, clientDate);              // 울리기 전 → 이번 텀 알람을 끈다
 
-        // 🔧 끌 대상 날짜의 알람 발생 내역 조회 (없으면 새로 생성해서 할당)
+        // 끌 대상 날짜의 알람 발생 내역 조회 (없으면 새로 생성해서 할당)
         AlarmOccurrenceEntity targetOccurrence = alarmOccurrenceRepository
             .findByAlarmIdAndDate(alarmId, offTargetDate)
             .orElseGet(() -> {
