@@ -54,7 +54,8 @@ public class AlarmController {
     }
 
     @CustomErrorCodes(
-        alarmErrorCodes = {ALARM_NOT_FOUND, TODAY_IS_NOT_ALARM_DAY, ALREADY_OCCURRED_EXISTS, ALARM_OFF_LIMIT_EXCEEDED, INVALID_CLIENT_DATE},
+        memberErrorCodes = {MEMBER_NOT_FOUND},
+        alarmErrorCodes = {ALARM_NOT_FOUND, ALARM_OFF_LIMIT_EXCEEDED, ALREADY_DEACTIVATED, INVALID_CLIENT_DATE},
         authErrorCodes = {PERMISSION_DENIED}
     )
     @Operation(summary = "알람 끄기", description = "알람을 끕니다.")
