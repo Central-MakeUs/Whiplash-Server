@@ -27,7 +27,6 @@ public class GoogleVerifier implements SocialVerifier{
             .build();
     }
 
-
     @Override
     public SocialMemberInfo verify(SocialLoginRequest request) {
         try {
@@ -38,6 +37,12 @@ public class GoogleVerifier implements SocialVerifier{
             }
 
             GoogleIdToken.Payload payload = idToken.getPayload();
+
+            String socialId = SocialType.GOOGLE + "_" + payload.getSubject();
+            String email = payload.getEmail();
+            String name = (String) payload.get("name");
+
+            log.info("Google API user info: socialId={}, email={}, name={}", socialId, email, name);
 
             return SocialMemberInfo.builder()
                 .socialId(SocialType.GOOGLE + "_" + payload.getSubject())

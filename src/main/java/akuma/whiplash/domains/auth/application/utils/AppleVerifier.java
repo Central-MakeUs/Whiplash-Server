@@ -40,6 +40,12 @@ public class AppleVerifier implements SocialVerifier {
                 throw ApplicationException.from(CommonErrorCode.BAD_REQUEST);
             }
 
+            String socialId = SocialType.APPLE.name() + "_" + claims.getSubject();
+            String email = (String) claims.getClaim("email");
+            String name = (String) claims.getClaim("name");
+
+            log.info("Apple API user info: socialId={}, email={}, name={}", socialId, email, name);
+
             return SocialMemberInfo.builder()
                 .socialId(SocialType.APPLE.name() + "_" + claims.getSubject())
                 .email((String) claims.getClaim("email"))
