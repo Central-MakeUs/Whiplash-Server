@@ -36,14 +36,16 @@ public class AlarmQueryServiceImpl implements AlarmQueryService {
 
         return alarms.stream()
             .map(alarm -> {
-                Optional<AlarmOccurrenceEntity> todayOccurrenceOpt = alarmOccurrenceRepository
-                    .findByAlarmIdAndDate(alarm.getId(), today);
+                // 가장 최근 OFF 이력 가져오기
+                Optional<AlarmOccurrenceEntity> recentOffOpt =
+                    alarmOccurrenceRepository.findTopByAlarmIdAndDeactivateTypeOrderByDateDesc(
+                        alarm.getId(), DeactivateType.OFF
+                    );
 
-                boolean isToggleOn = todayOccurrenceOpt
-                    .map(
-                        occurrence -> !DeactivateType.OFF.equals(occurrence.getDeactivateType())
-                    )
-                    .orElse(true); // 오늘 발생 내역 없으면 기본 true
+                // isToggleOn 판단
+                boolean isToggleOn = recentOffOpt
+                    .map(offOccurrence -> today.isAfter(offOccurrence.getDate())) // 오늘 > 가장 최근 OFF 기록 날짜 → ON
+                    .orElse(true); // OFF 기록 없으면 항상 ON
 
                 return AlarmMapper.mapToAlarmInfoPreviewResponse(alarm, isToggleOn);
             })

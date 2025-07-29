@@ -4,8 +4,10 @@ import static akuma.whiplash.domains.alarm.exception.AlarmErrorCode.*;
 import static akuma.whiplash.domains.auth.exception.AuthErrorCode.*;
 import static akuma.whiplash.domains.member.exception.MemberErrorCode.MEMBER_NOT_FOUND;
 
+import akuma.whiplash.domains.alarm.application.dto.request.AlarmOffRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.RegisterAlarmRequest;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmInfoPreviewResponse;
+import akuma.whiplash.domains.alarm.application.dto.response.AlarmOffResultResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.CreateAlarmOccurrenceResponse;
 import akuma.whiplash.domains.alarm.application.usecase.AlarmUseCase;
 import akuma.whiplash.domains.auth.application.dto.etc.MemberContext;
@@ -40,14 +42,6 @@ public class AlarmController {
         return ApplicationResponse.onSuccess();
     }
 
-    @CustomErrorCodes(memberErrorCodes = {MEMBER_NOT_FOUND})
-    @Operation(summary = "알람 목록 조회", description = "사용자가 등록한 알람 목록을 조회합니다.")
-    @GetMapping
-    public ApplicationResponse<List<AlarmInfoPreviewResponse>> getAlarms(@AuthenticationPrincipal MemberContext memberContext) {
-        List<AlarmInfoPreviewResponse> alarms = alarmUseCase.getAlarms(memberContext.memberId());
-        return ApplicationResponse.onSuccess(alarms);
-    }
-
     @CustomErrorCodes(
         alarmErrorCodes = {ALARM_NOT_FOUND, TODAY_IS_NOT_ALARM_DAY, ALREADY_OCCURRED_EXISTS},
         authErrorCodes = {PERMISSION_DENIED}
@@ -57,5 +51,24 @@ public class AlarmController {
     public ApplicationResponse<CreateAlarmOccurrenceResponse> createAlarmOccurrence(@AuthenticationPrincipal MemberContext memberContext, @PathVariable Long alarmId) {
         CreateAlarmOccurrenceResponse response = alarmUseCase.createAlarmOccurrence(memberContext.memberId(), alarmId);
         return ApplicationResponse.onSuccess(response);
+    }
+
+    @CustomErrorCodes(
+        alarmErrorCodes = {ALARM_NOT_FOUND, TODAY_IS_NOT_ALARM_DAY, ALREADY_OCCURRED_EXISTS, ALARM_OFF_LIMIT_EXCEEDED, INVALID_CLIENT_DATE},
+        authErrorCodes = {PERMISSION_DENIED}
+    )
+    @Operation(summary = "알람 끄기", description = "알람을 끕니다.")
+    @PostMapping("/{alarmId}/off")
+    public ApplicationResponse<AlarmOffResultResponse> alarmOff(@AuthenticationPrincipal MemberContext memberContext, @PathVariable Long alarmId, @RequestBody @Valid AlarmOffRequest request) {
+        AlarmOffResultResponse response = alarmUseCase.alarmOff(memberContext.memberId(), alarmId, request.clientNow());
+        return ApplicationResponse.onSuccess(response);
+    }
+
+    @CustomErrorCodes(memberErrorCodes = {MEMBER_NOT_FOUND})
+    @Operation(summary = "알람 목록 조회", description = "사용자가 등록한 알람 목록을 조회합니다.")
+    @GetMapping
+    public ApplicationResponse<List<AlarmInfoPreviewResponse>> getAlarms(@AuthenticationPrincipal MemberContext memberContext) {
+        List<AlarmInfoPreviewResponse> alarms = alarmUseCase.getAlarms(memberContext.memberId());
+        return ApplicationResponse.onSuccess(alarms);
     }
 }
