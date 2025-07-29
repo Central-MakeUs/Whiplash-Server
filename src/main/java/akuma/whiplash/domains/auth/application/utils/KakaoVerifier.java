@@ -5,9 +5,11 @@ import akuma.whiplash.domains.auth.application.dto.etc.SocialMemberInfo;
 import akuma.whiplash.domains.auth.application.dto.request.SocialLoginRequest;
 import akuma.whiplash.domains.member.domain.contants.SocialType;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 
+@Slf4j
 @Component("KAKAO")
 @RequiredArgsConstructor
 public class KakaoVerifier implements SocialVerifier {
@@ -22,6 +24,8 @@ public class KakaoVerifier implements SocialVerifier {
             .retrieve()
             .bodyToMono(KakaoUserInfo.class)
             .block();
+
+        log.info("Kakao API response: {}", response);
 
         return SocialMemberInfo.builder()
             .socialId(SocialType.KAKAO.name() + "_" + String.valueOf(response.id()))
