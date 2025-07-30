@@ -31,7 +31,7 @@ public class RequestMatcherHolder {
 
         // auth
         new RequestInfo(POST, "/api/auth/social-login", null),
-        new RequestInfo(POST, "/api/auth/logout", null),
+        new RequestInfo(POST, "/api/auth/logout", USER),
         new RequestInfo(POST, "/api/auth/reissue", USER),
 
         // swagger
