@@ -42,7 +42,7 @@ public record RegisterAlarmRequest(
     @Size(min = 1, message = "최소 한 개의 반복 요일을 선택해야 합니다.")
     List<@NotBlank(message = "요일은 비어 있을 수 없습니다.") String> repeatDays,
 
-    @Schema(description = "알람 소리", example = "DEFAULT")
+    @Schema(description = "알람 소리", example = "알람 소리1")
     @NotBlank(message = "알람 소리를 선택해주세요.")
     String soundType
 ) {

@@ -12,17 +12,20 @@ springdoc:
   api-docs:
     path: /api/noonddu/v3/api-docs
 
+swagger.server.url: ${SWAGGER_SERVER_URL}
+
 ---
 spring.config.activate.on-profile: "local"
 
-swagger.server.url: ${SWAGGER_SERVER_URL}
 
 ---
 spring.config.activate.on-profile: "dev"
 
-swagger.server.url: ${SWAGGER_SERVER_URL}
 
 ---
 spring.config.activate.on-profile: "prod"
 
-swagger.server.url: ${SWAGGER_SERVER_URL}
+
+---
+spring.config.activate.on-profile: "test"
+
