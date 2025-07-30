@@ -1,0 +1,32 @@
+spring:
+  config:
+    import:
+      - jwt.yml
+      - swagger.yml
+      - oauth.yml
+      - naver.yml
+      - optional:classpath:env-test.properties
+
+  jpa:
+    hibernate:
+      ddl-auto: create-drop  # 또는 create
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+
+  datasource:
+    url: jdbc:mysql://localhost:3306/dummy
+    username: dummy
+    password: dummy
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  data:
+    redis:
+      host: dummy
+      port: 6379
+      password:
+
+logging:
+  level:
+    root: INFO
