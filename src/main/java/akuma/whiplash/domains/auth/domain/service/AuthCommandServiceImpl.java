@@ -98,8 +98,8 @@ public class AuthCommandServiceImpl implements AuthCommandService {
         String newRefreshToken = jwtProvider.generateRefreshToken(memberContext.memberId(), deviceId, memberContext.role());
 
         return TokenResponse.builder()
-            .accessToken(accessToken)
-            .refreshToken(newRefreshToken)
+            .accessToken(BEARER_PREFIX + accessToken)
+            .refreshToken(BEARER_PREFIX + newRefreshToken)
             .build();
     }
 }
