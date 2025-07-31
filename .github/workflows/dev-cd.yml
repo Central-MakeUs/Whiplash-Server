@@ -40,11 +40,12 @@ jobs:
         id: vars
         run: echo "sha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
 
-      # 6. env.properties 생성
+      # 6. env.properties 생성, google.json base64 디코딩
       - name: Generate env.properties
         run: |
           mkdir -p src/main/resources
           echo "${{ secrets.DEV_ENV_PROPERTIES }}" > src/main/resources/env.properties
+          echo "${{ secrets.GOOGLE_JSON }}" | base64 -d > src/main/resources/google.json
 
       # 7. 빌드
       - name: Build JAR
