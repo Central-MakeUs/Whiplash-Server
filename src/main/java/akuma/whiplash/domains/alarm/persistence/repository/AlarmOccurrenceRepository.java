@@ -3,6 +3,7 @@ package akuma.whiplash.domains.alarm.persistence.repository;
 import akuma.whiplash.domains.alarm.domain.constant.DeactivateType;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmOccurrenceEntity;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 
@@ -13,4 +14,6 @@ public interface AlarmOccurrenceRepository extends JpaRepository<AlarmOccurrence
     Optional<AlarmOccurrenceEntity> findTopByAlarmIdAndDeactivateTypeOrderByDateDesc(
         Long alarmId, DeactivateType deactivateType
     );
+    List<AlarmOccurrenceEntity> findAllByAlarmId(Long alarmId);
+    void deleteAllByAlarmId(Long alarmId);
 }

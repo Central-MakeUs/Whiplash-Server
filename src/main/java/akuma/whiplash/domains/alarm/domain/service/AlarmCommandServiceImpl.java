@@ -14,20 +14,36 @@ import akuma.whiplash.domains.alarm.persistence.entity.AlarmOffLogEntity;
 import akuma.whiplash.domains.alarm.persistence.repository.AlarmOccurrenceRepository;
 import akuma.whiplash.domains.alarm.persistence.repository.AlarmOffLogRepository;
 import akuma.whiplash.domains.alarm.persistence.repository.AlarmRepository;
+import akuma.whiplash.domains.alarm.persistence.repository.AlarmRingingLogRepository;
 import akuma.whiplash.domains.auth.exception.AuthErrorCode;
 import akuma.whiplash.domains.member.exception.MemberErrorCode;
 import akuma.whiplash.domains.member.persistence.entity.MemberEntity;
 import akuma.whiplash.domains.member.persistence.repository.MemberRepository;
 import akuma.whiplash.global.exception.ApplicationException;
+import com.google.api.services.sheets.v4.Sheets;
+import com.google.api.services.sheets.v4.SheetsScopes;
+import com.google.api.services.sheets.v4.model.ValueRange;
+import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
+import com.google.api.client.json.jackson2.JacksonFactory;
+import com.google.auth.http.HttpCredentialsAdapter;
+import com.google.auth.oauth2.ServiceAccountCredentials;
+import java.io.FileInputStream;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional
@@ -36,7 +52,17 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
     private final AlarmRepository alarmRepository;
     private final AlarmOccurrenceRepository alarmOccurrenceRepository;
     private final AlarmOffLogRepository alarmOffLogRepository;
+    private final AlarmRingingLogRepository alarmRingingLogRepository;
     private final MemberRepository memberRepository;
+
+    @Value("${oauth.google.sheet.id}")
+    private String spreadsheetsId;
+
+    @Value("${oauth.google.sheet.credentials-path}")
+    private String credentialsPath;
+
+    @Value("${oauth.google.sheet.range}")
+    private String sheetRange;
 
     @Override
     public void createAlarm(RegisterAlarmRequest request, Long memberId) {
@@ -145,6 +171,81 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
             .reactivateDayOfWeek(reactivateDayOfWeek)
             .remainingOffCount(remainingCount)
             .build();
+    }
+
+    @Override
+    public void removeAlarm(Long memberId, Long alarmId, String reason) {
+        // 1. 알람 조회 및 소유자 검증
+        AlarmEntity alarm = findAlarmById(alarmId);
+        validAlarmOwner(memberId, alarm.getMember().getId());
+
+        // 2. 다음 알람 발생일 기준으로 삭제 가능 마감 시각 계산 (다음날 00시 이전까지만 삭제 허용)
+        LocalDate nextDate = getNextOccurrenceDate(alarm, LocalDate.now());
+        LocalDateTime limitTime = nextDate.minusDays(1).atTime(LocalTime.MAX);
+
+        // 3. 현재 시간이 삭제 마감 시간 이후라면 삭제 불가
+        if (LocalDateTime.now().isAfter(limitTime)) {
+            throw ApplicationException.from(ALARM_DELETE_NOT_AVAILABLE);
+        }
+
+        // 4. 오늘 알람 발생 내역이 있고, 비활성화되지 않았다면 삭제 불가
+        alarmOccurrenceRepository.findByAlarmIdAndDate(alarmId, LocalDate.now())
+            .ifPresent(o -> {
+                if (o.getDeactivateType() == DeactivateType.NONE) {
+                    throw ApplicationException.from(ALARM_DELETE_NOT_AVAILABLE);
+                }
+            });
+
+        // 5. 삭제 사유를 Google Sheets에 로그로 기록
+        logDeleteReason(alarm.getAlarmPurpose(), reason);
+
+        // 6. 알람 발생 내역 전체 조회 및 관련 로그 제거
+        List<AlarmOccurrenceEntity> occurrences = alarmOccurrenceRepository.findAllByAlarmId(alarmId);
+        for (AlarmOccurrenceEntity occ : occurrences) {
+            alarmRingingLogRepository.deleteAllByAlarmOccurrenceId(occ.getId());
+        }
+
+        // 7. 알람 발생 이력, 끈 이력 삭제
+        alarmOccurrenceRepository.deleteAll(occurrences);
+        alarmOffLogRepository.deleteAllByAlarmId(alarmId);
+
+        // 8. 알람 자체 삭제
+        alarmRepository.delete(alarm);
+    }
+
+
+    private void logDeleteReason(String alarmPurpose, String reason) {
+        try {
+            // 1. Google Sheets API 클라이언트 생성
+            Sheets sheets = new Sheets.Builder(
+                GoogleNetHttpTransport.newTrustedTransport(),
+                JacksonFactory.getDefaultInstance(),
+                new HttpCredentialsAdapter(
+                    ServiceAccountCredentials.fromStream(
+                        new ClassPathResource(credentialsPath).getInputStream() // classpath 리소스 처리
+                    ).createScoped(Collections.singleton(SheetsScopes.SPREADSHEETS))
+                )
+            )
+                .setApplicationName("눈 떠!")
+                .build();
+
+            // 2. 기록할 값 구성
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+            String formattedDateTime = LocalDateTime.now().format(formatter);
+
+            ValueRange body = new ValueRange().setValues(
+                List.of(List.of(alarmPurpose, reason, formattedDateTime))
+            );
+
+            // 3. 스프레드시트에 행 추가 (append 방식)
+            sheets.spreadsheets().values()
+                .append(spreadsheetsId, sheetRange, body)
+                .setValueInputOption("RAW")
+                .execute();
+
+        } catch (Exception e) {
+            log.warn("Failed to log delete reason", e);
+        }
     }
 
     private LocalDate getNextOccurrenceDate(AlarmEntity alarm, LocalDate fromDate) {

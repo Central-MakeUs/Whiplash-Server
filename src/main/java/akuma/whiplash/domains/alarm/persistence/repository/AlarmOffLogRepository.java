@@ -11,4 +11,5 @@ public interface AlarmOffLogRepository extends JpaRepository<AlarmOffLogEntity, 
         LocalDateTime start,
         LocalDateTime end
     );
+    void deleteAllByAlarmId(Long alarmId);
 }

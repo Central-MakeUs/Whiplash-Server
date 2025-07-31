@@ -30,6 +30,11 @@ public class AlarmUseCase {
         return alarmCommandService.alarmOff(memberId, alarmId, clientNow);
     }
 
+    public void removeAlarm(Long memberId, Long alarmId, String reason) {
+        alarmCommandService.removeAlarm(memberId, alarmId, reason);
+    }
+
+
     public List<AlarmInfoPreviewResponse> getAlarms(Long memberId) {
         return alarmQueryService.getAlarms(memberId);
     }
