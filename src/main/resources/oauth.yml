@@ -1,6 +1,11 @@
 oauth:
   google:
     client-id: ${GOOGLE_CLIENT_ID}
+    sheet:
+      id: ${GOOGLE_SHEET_ID}
+      credentials-path: ${GOOGLE_SHEET_CREDENTIALS}
+      range: "알람 삭제 이유!A:C"
+
   apple:
     client-id: ${APPLE_CLIENT_ID}
 #  kakao:

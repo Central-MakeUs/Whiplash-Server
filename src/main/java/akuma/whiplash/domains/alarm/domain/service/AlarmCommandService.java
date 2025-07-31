@@ -10,4 +10,5 @@ public interface AlarmCommandService {
     void createAlarm(RegisterAlarmRequest request, Long memberId);
     CreateAlarmOccurrenceResponse createAlarmOccurrence(Long memberId, Long alarmId);
     AlarmOffResultResponse alarmOff(Long memberId, Long alarmId, LocalDateTime clientNow);
+    void removeAlarm(Long memberId, Long alarmId, String reason);
 }

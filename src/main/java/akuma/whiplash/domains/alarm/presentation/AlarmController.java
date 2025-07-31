@@ -5,6 +5,7 @@ import static akuma.whiplash.domains.auth.exception.AuthErrorCode.*;
 import static akuma.whiplash.domains.member.exception.MemberErrorCode.MEMBER_NOT_FOUND;
 
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmOffRequest;
+import akuma.whiplash.domains.alarm.application.dto.request.RemoveAlarmRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.RegisterAlarmRequest;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmInfoPreviewResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmOffResultResponse;
@@ -19,6 +20,7 @@ import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -64,6 +66,22 @@ public class AlarmController {
         AlarmOffResultResponse response = alarmUseCase.alarmOff(memberContext.memberId(), alarmId, request.clientNow());
         return ApplicationResponse.onSuccess(response);
     }
+
+    @CustomErrorCodes(
+        alarmErrorCodes = {ALARM_NOT_FOUND, ALARM_DELETE_NOT_AVAILABLE},
+        authErrorCodes = {PERMISSION_DENIED}
+    )
+    @Operation(summary = "알람 삭제", description = "알람을 삭제합니다.")
+    @DeleteMapping("/{alarmId}")
+    public ApplicationResponse<Void> removeAlarm(
+        @AuthenticationPrincipal MemberContext memberContext,
+        @PathVariable Long alarmId,
+        @RequestBody @Valid RemoveAlarmRequest request
+    ) {
+        alarmUseCase.removeAlarm(memberContext.memberId(), alarmId, request.reason());
+        return ApplicationResponse.onSuccess();
+    }
+
 
     @CustomErrorCodes(memberErrorCodes = {MEMBER_NOT_FOUND})
     @Operation(summary = "알람 목록 조회", description = "사용자가 등록한 알람 목록을 조회합니다.")
