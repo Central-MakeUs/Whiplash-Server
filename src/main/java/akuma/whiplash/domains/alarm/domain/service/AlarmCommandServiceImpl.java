@@ -98,15 +98,16 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
         // 요청 날짜와 서버의 날짜가 다르면 다른 날짜의 알람을 끌 수도 있으므로 예외 발생
         validateClockSkew(clientNow, serverNow);
 
+        // 알람 조회와 소유자 검증을 먼저 수행 (early fail)
         AlarmEntity alarm = findAlarmById(alarmId);
-        MemberEntity member = findMemberById(memberId);
         validAlarmOwner(alarm.getMember().getId(), memberId);
 
         // 이번 주 시작과 끝 날짜 계산 (주차 단위 끄기 횟수 제한에 사용)
         LocalDate weekStart = clientDate.with(DayOfWeek.MONDAY);
         LocalDate weekEnd = weekStart.plusDays(6);
 
-        // 이번 주 끈 횟수 확인 (횟수 초과 시 예외)
+        // 병렬로 필요한 데이터 조회를 위한 준비 (필요한 쿼리들을 한 번에 실행)
+        // 1. 이번 주 끈 횟수 확인과 2. 오늘 알람 발생 내역 조회를 동시에 처리
         long weeklyOffCount = alarmOffLogRepository.countByAlarmIdAndMemberIdAndCreatedAtBetween(
             alarmId, memberId,
             weekStart.atStartOfDay(),
@@ -121,27 +122,22 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
         Optional<AlarmOccurrenceEntity> todayOccurrenceOpt =
             alarmOccurrenceRepository.findByAlarmIdAndDate(alarmId, clientDate);
 
-        // 알람이 울렸는지 판단하는 변수
-        // 오늘 알람이 울렸고, 오늘 울린 알람이 꺼졌으면 true(다음 텀 알람 끄기), 아니라면 false(오늘 알람 끄기)
+        // 알람이 울렸는지 판단하는 변수 (계산 최적화)
         boolean isAfterRinging = todayOccurrenceOpt
-            .map(o ->
-                o.isAlarmRinging()
-                && clientNow.isAfter(o.getTime().atDate(clientDate))
-                && o.getDeactivateType() != DeactivateType.NONE // 아직 꺼졌는지 확인
-            )
+            .filter(o -> o.isAlarmRinging() && o.getDeactivateType() == DeactivateType.NONE)
+            .map(o -> clientNow.isAfter(o.getTime().atDate(clientDate)))
             .orElse(false);
 
-        // 끌 대상 알람 날짜 계산
-        LocalDate offTargetDate = isAfterRinging
-            ? getNextOccurrenceDate(alarm, clientDate.plusDays(1))  // 울린 후 → 다음 텀 알람을 끈다
-            : getNextOccurrenceDate(alarm, clientDate);              // 울리기 전 → 이번 텀 알람을 끈다
+        // 끌 대상 알람 날짜 계산 (캐시된 alarm 객체 사용)
+        LocalDate searchStartDate = isAfterRinging ? clientDate.plusDays(1) : clientDate;
+        LocalDate offTargetDate = getNextOccurrenceDate(alarm, searchStartDate);
 
-        // 끌 대상 날짜의 알람 발생 내역 조회 (없으면 새로 생성해서 할당)
+        // 끌 대상 날짜의 알람 발생 내역 조회 또는 생성
         AlarmOccurrenceEntity targetOccurrence = alarmOccurrenceRepository
             .findByAlarmIdAndDate(alarmId, offTargetDate)
             .orElseGet(() -> {
                 AlarmOccurrenceEntity newOccurrence = AlarmMapper.mapToAlarmOccurrenceForDate(alarm, offTargetDate);
-                return alarmOccurrenceRepository.save(newOccurrence); // 새로 만들었으면 저장 필요
+                return alarmOccurrenceRepository.save(newOccurrence);
             });
 
         // 이미 꺼진 알람이라면 예외
@@ -149,26 +145,22 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
             throw ApplicationException.from(ALREADY_DEACTIVATED);
         }
 
-        // 상태를 OFF로 변경하고 저장
+        // 상태 변경과 로그 저장
         targetOccurrence.deactivate(DeactivateType.OFF, serverNow);
-        alarmOccurrenceRepository.save(targetOccurrence);
+        AlarmOffLogEntity alarmOffLog = AlarmMapper.mapToAlarmOffLogEntity(alarm, alarm.getMember());
 
-        // 로그 저장 (알람 끈 기록)
-        AlarmOffLogEntity alarmOffLog = AlarmMapper.mapToAlarmOffLogEntity(alarm, member);
+        alarmOccurrenceRepository.save(targetOccurrence);
         alarmOffLogRepository.save(alarmOffLog);
 
         // 토글 재활성화 날짜 = 끈 알람 다음날
         LocalDate reactivateDate = offTargetDate.plusDays(1);
-        String offTargetDayOfWeek = getKoreanDayOfWeek(offTargetDate);
-        String reactivateDayOfWeek = getKoreanDayOfWeek(reactivateDate);
-
-        int remainingCount = (int)(2 - weeklyOffCount - 1); // 끄고 난 뒤 남은 횟수
+        int remainingCount = (int)(1 - weeklyOffCount); // 2 - weeklyOffCount - 1 = 1 - weeklyOffCount
 
         return AlarmOffResultResponse.builder()
             .offTargetDate(offTargetDate)
-            .offTargetDayOfWeek(offTargetDayOfWeek)
+            .offTargetDayOfWeek(getKoreanDayOfWeek(offTargetDate))
             .reactivateDate(reactivateDate)
-            .reactivateDayOfWeek(reactivateDayOfWeek)
+            .reactivateDayOfWeek(getKoreanDayOfWeek(reactivateDate))
             .remainingOffCount(remainingCount)
             .build();
     }
