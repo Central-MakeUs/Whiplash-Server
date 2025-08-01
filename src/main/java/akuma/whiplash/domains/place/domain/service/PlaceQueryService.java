@@ -8,4 +8,5 @@ public interface PlaceQueryService {
 
     List<PlaceInfoResponse> searchPlaces(String query);
     PlaceDetailResponse getPlaceDetailByCoord(double latitude, double longitude);
+    List<String> searchPlaceKeywords(String query);
 }

@@ -1,14 +1,20 @@
 package akuma.whiplash.domains.place.domain.service;
 
+import akuma.whiplash.domains.place.application.dto.response.NaverPlaceItem;
 import akuma.whiplash.domains.place.application.dto.response.PlaceSearchResponse;
 import akuma.whiplash.domains.place.application.dto.response.PlaceInfoResponse;
 import akuma.whiplash.domains.place.application.dto.response.ReverseGeocodeApiResponse;
 import akuma.whiplash.domains.place.application.dto.response.PlaceDetailResponse;
 import akuma.whiplash.global.exception.ApplicationException;
 import akuma.whiplash.global.response.code.CommonErrorCode;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
@@ -124,6 +130,43 @@ public class PlaceQueryServiceImpl implements PlaceQueryService {
             .address(fullAddress)
             .name(placeName != null ? placeName : "장소 없음")
             .build();
+    }
+
+    @Override
+    public List<String> searchPlaceKeywords(String query) {
+        String uri = UriComponentsBuilder
+            .fromUriString("https://openapi.naver.com/v1/search/local.json")
+            .queryParam("query", query)
+            .queryParam("display", "5")
+            .build()
+            .toUriString();
+
+        PlaceSearchResponse response = webClient.get()
+            .uri(uri)
+            .header("X-Naver-Client-Id", naverClientId)
+            .header("X-Naver-Client-Secret", naverClientSecret)
+            .retrieve()
+            .bodyToMono(PlaceSearchResponse.class)
+            .block();
+
+        if (response == null || response.getItems() == null) return List.of();
+
+        Pattern keywordPattern = Pattern.compile(".*?(동|로|길)");
+
+        Set<String> keywordSuggestions = new LinkedHashSet<>();
+
+        for (NaverPlaceItem item : response.getItems()) {
+            extractKeyword(item.getAddress(), keywordPattern).ifPresent(keywordSuggestions::add);
+            extractKeyword(item.getRoadAddress(), keywordPattern).ifPresent(keywordSuggestions::add);
+        }
+
+        return new ArrayList<>(keywordSuggestions);
+    }
+
+    private Optional<String> extractKeyword(String address, Pattern pattern) {
+        if (address == null) return Optional.empty();
+        Matcher matcher = pattern.matcher(address);
+        return matcher.find() ? Optional.of(matcher.group()) : Optional.empty();
     }
 
     private String sanitize(String html) {
