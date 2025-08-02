@@ -159,7 +159,7 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
         return AlarmOffResultResponse.builder()
             .offTargetDate(offTargetDate)
             .offTargetDayOfWeek(getKoreanDayOfWeek(offTargetDate))
-            .reactivateDate(reactivateDate)
+            .reactivateDate(reactivateDate) // 다시 활성화 되는 날짜
             .reactivateDayOfWeek(getKoreanDayOfWeek(reactivateDate))
             .remainingOffCount(remainingCount)
             .build();
