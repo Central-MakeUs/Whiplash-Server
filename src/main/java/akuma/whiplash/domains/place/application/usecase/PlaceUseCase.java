@@ -20,4 +20,8 @@ public class PlaceUseCase {
     public PlaceDetailResponse getPlaceDetail(double latitude, double longitude) {
         return placeQueryService.getPlaceDetailByCoord(latitude, longitude);
     }
+
+    public List<String> searchPlaceKeywords(String query) {
+        return placeQueryService.searchPlaceKeywords(query);
+    }
 }

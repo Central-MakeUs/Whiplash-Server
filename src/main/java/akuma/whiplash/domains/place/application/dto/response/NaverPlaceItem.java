@@ -8,6 +8,7 @@ import lombok.Getter;
 public class NaverPlaceItem {
     private String title;
     private String address;
+    private String roadAddress;
     private String mapx;
     private String mapy;
 }

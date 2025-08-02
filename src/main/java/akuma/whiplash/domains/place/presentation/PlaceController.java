@@ -37,4 +37,12 @@ public class PlaceController {
         PlaceDetailResponse placeDetail = placeUseCase.getPlaceDetail(latitude, longitude);
         return ApplicationResponse.onSuccess(placeDetail);
     }
+
+    @CustomErrorCodes(commonErrorCodes = {BAD_REQUEST})
+    @Operation(summary = "연관 장소 키워드 추천", description = "텍스트 기반 연관 장소 키워드를 도로명 주소 형태로 제공합니다.")
+    @GetMapping("/keywords")
+    public ApplicationResponse<List<String>> searchPlaceKeywords(@RequestParam String query) {
+        List<String> keywords = placeUseCase.searchPlaceKeywords(query);
+        return ApplicationResponse.onSuccess(keywords);
+    }
 }
