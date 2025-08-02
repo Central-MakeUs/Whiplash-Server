@@ -69,6 +69,8 @@ public class AlarmMapper {
             .date(date)
             .time(alarm.getTime())
             .deactivateType(DeactivateType.NONE)
+            .deactivatedAt(null)
+            .checkinTime(null)
             .alarmRinging(false)
             .ringingCount(0)
             .build();
