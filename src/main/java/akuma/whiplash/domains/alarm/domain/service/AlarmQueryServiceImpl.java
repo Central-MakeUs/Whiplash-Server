@@ -1,22 +1,32 @@
 package akuma.whiplash.domains.alarm.domain.service;
 
+import static akuma.whiplash.domains.alarm.exception.AlarmErrorCode.REPEAT_DAYS_NOT_CONFIG;
+
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmInfoPreviewResponse;
-import akuma.whiplash.domains.alarm.application.mapper.AlarmMapper;
 import akuma.whiplash.domains.alarm.domain.constant.DeactivateType;
+import akuma.whiplash.domains.alarm.domain.constant.Weekday;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmEntity;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmOccurrenceEntity;
 import akuma.whiplash.domains.alarm.persistence.repository.AlarmOccurrenceRepository;
+import akuma.whiplash.domains.alarm.persistence.repository.AlarmOffLogRepository;
 import akuma.whiplash.domains.alarm.persistence.repository.AlarmRepository;
 import akuma.whiplash.domains.member.exception.MemberErrorCode;
 import akuma.whiplash.domains.member.persistence.repository.MemberRepository;
 import akuma.whiplash.global.exception.ApplicationException;
+import java.time.DayOfWeek;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -24,31 +34,131 @@ public class AlarmQueryServiceImpl implements AlarmQueryService {
 
     private final AlarmRepository alarmRepository;
     private final AlarmOccurrenceRepository alarmOccurrenceRepository;
+    private final AlarmOffLogRepository alarmOffLogRepository;
     private final MemberRepository memberRepository;
 
     @Override
     public List<AlarmInfoPreviewResponse> getAlarms(Long memberId) {
+        // 1. 멤버 유효성 검증
         memberRepository.findById(memberId)
             .orElseThrow(() -> ApplicationException.from(MemberErrorCode.MEMBER_NOT_FOUND));
 
+        // 2. 알람 목록 조회
         List<AlarmEntity> alarms = alarmRepository.findAllByMemberId(memberId);
         LocalDate today = LocalDate.now();
 
         return alarms.stream()
             .map(alarm -> {
-                // 가장 최근 OFF 이력 가져오기
-                Optional<AlarmOccurrenceEntity> recentOffOpt =
-                    alarmOccurrenceRepository.findTopByAlarmIdAndDeactivateTypeOrderByDateDesc(
-                        alarm.getId(), DeactivateType.OFF
+                // 3. 가장 최근 OFF 또는 CHECKIN 이력 조회
+                Optional<AlarmOccurrenceEntity> recentOccurrenceOpt =
+                    alarmOccurrenceRepository.findTopByAlarmIdAndDeactivateTypeInOrderByDateDescTimeDesc(
+                        alarm.getId(),
+                        List.of(DeactivateType.OFF, DeactivateType.CHECKIN)
                     );
 
-                // isToggleOn 판단
-                boolean isToggleOn = recentOffOpt
-                    .map(offOccurrence -> today.isAfter(offOccurrence.getDate())) // 오늘 > 가장 최근 OFF 기록 날짜 → ON
-                    .orElse(true); // OFF 기록 없으면 항상 ON
+                // 4. 반복 요일을 Java DayOfWeek 집합으로 변환
+                Set<DayOfWeek> repeatSet = alarm.getRepeatDays().stream()
+                    .map(Weekday::getDayOfWeek)
+                    .collect(Collectors.toSet());
 
-                return AlarmMapper.mapToAlarmInfoPreviewResponse(alarm, isToggleOn);
+                // 5. 오늘 기준 알람 예정일 계산: 첫 번째/두 번째/세 번째 텀
+                LocalDate firstDate = calculateNextRepeatDate(repeatSet, today);
+                LocalDate secondDate = calculateNextRepeatDate(repeatSet, firstDate.plusDays(1));
+                LocalDate thirdDate = calculateNextRepeatDate(repeatSet, secondDate.plusDays(1));
+
+                // 6. 기본값 초기화
+                boolean isToggleOn = true;
+                LocalDate firstUpcomingDate = firstDate;
+                LocalDate secondUpcomingDate = secondDate;
+
+                // 7. 끄기 이력 존재할 경우 조건 분기 처리
+                if (recentOccurrenceOpt.isPresent()) {
+                    AlarmOccurrenceEntity lastOccurrence = recentOccurrenceOpt.get();
+                    LocalDate occurredDate = lastOccurrence.getDate();
+                    DeactivateType type = lastOccurrence.getDeactivateType();
+
+                    // 최근 OFF or CHECKIN이 오늘 이후의 알람에 대해서 발생했다면 다음 텀부터 반영
+                    if (occurredDate.equals(firstDate)) {
+                        // CHECKIN 또는 OFF가 오늘(다음 텀) 발생한 경우
+                        firstUpcomingDate = secondDate;
+                        secondUpcomingDate = thirdDate;
+
+                        if (type == DeactivateType.OFF) {
+                            isToggleOn = false;
+                        }
+                    }
+                }
+
+                // 8. 알람 당 이번 주 남은 알람 끄기 횟수 계산
+                long remainingOffCount = calculateRemainingOffCount(memberId, alarm.getId());
+
+                return AlarmInfoPreviewResponse.builder()
+                    .alarmId(alarm.getId())
+                    .alarmPurpose(alarm.getAlarmPurpose())
+                    .repeatsDays(
+                        alarm.getRepeatDays().stream()
+                            .map(Weekday::getDescription) // ["월", "목", "토"] 형식
+                            .toList()
+                    )
+                    .time(alarm.getTime().toString())
+                    .address(alarm.getAddress())
+                    .latitude(alarm.getLatitude())
+                    .longitude(alarm.getLongitude())
+                    .isToggleOn(isToggleOn)
+                    .firstUpcomingDay(firstUpcomingDate)
+                    .firstUpcomingDayOfWeek(getKoreanDayOfWeek(firstUpcomingDate))
+                    .secondUpcomingDay(secondUpcomingDate)
+                    .secondUpcomingDayOfWeek(getKoreanDayOfWeek(secondUpcomingDate))
+                    .remainingOffCount(remainingOffCount)
+                    .build();
             })
             .toList();
     }
+
+    /**
+     * 주어진 날짜(fromDate)부터 7일 이내 반복 요일 중 가장 빠른 날짜를 반환합니다.
+     *
+     * @param repeatDays 알람 반복 요일 (예: 월, 수, 금)
+     * @param fromDate 기준 날짜
+     * @return repeatDays에 해당하는 가장 가까운 알람 발생일
+     */
+    private LocalDate calculateNextRepeatDate(Set<DayOfWeek> repeatDays, LocalDate fromDate) {
+        for (int i = 0; i < 7; i++) {
+            LocalDate candidate = fromDate.plusDays(i);
+            if (repeatDays.contains(candidate.getDayOfWeek())) {
+                return candidate;
+            }
+        }
+        throw ApplicationException.from(REPEAT_DAYS_NOT_CONFIG);
+    }
+
+    /**
+     * 이번 주 월요일부터 현재까지의 OFF 로그를 기반으로 남은 끄기 횟수 계산
+     */
+    private long calculateRemainingOffCount(Long memberId, Long alarmId) {
+        LocalDate today = LocalDate.now();
+        LocalDate monday = today.with(DayOfWeek.MONDAY);
+        LocalDateTime weekStart = monday.atStartOfDay();
+        LocalDateTime now = LocalDateTime.now();
+
+        long offCount = alarmOffLogRepository.countByAlarmIdAndMemberIdAndCreatedAtBetween(
+            alarmId, memberId, weekStart, now
+        );
+
+        return Math.max(0, 2 - offCount);
+    }
+
+    private String getKoreanDayOfWeek(LocalDate date) {
+        return switch (date.getDayOfWeek()) {
+            case MONDAY -> "월요일";
+            case TUESDAY -> "화요일";
+            case WEDNESDAY -> "수요일";
+            case THURSDAY -> "목요일";
+            case FRIDAY -> "금요일";
+            case SATURDAY -> "토요일";
+            case SUNDAY -> "일요일";
+        };
+    }
 }
+
+

@@ -16,6 +16,7 @@ public enum AlarmErrorCode implements BaseErrorCode {
     REPEAT_DAYS_NOT_CONFIG(HttpStatus.BAD_REQUEST, "ALARM_005", "반복 요일이 설정되지 않았습니다."),
     INVALID_CLIENT_DATE(HttpStatus.BAD_REQUEST, "ALARM_006", "요청의 날짜가 서버 기준 날짜와 일치하지 않습니다."),
     ALARM_DELETE_NOT_AVAILABLE(HttpStatus.BAD_REQUEST, "ALARM_007", "지금은 알람을 삭제할 수 없습니다."),
+    INVALID_WEEKDAY(HttpStatus.BAD_REQUEST, "ALARM_008", "유효하지 않은 요일 정보입니다."),
 
     ALARM_NOT_FOUND(HttpStatus.NOT_FOUND, "ALARM_401", "존재하지 않는 알람입니다.")
     ;

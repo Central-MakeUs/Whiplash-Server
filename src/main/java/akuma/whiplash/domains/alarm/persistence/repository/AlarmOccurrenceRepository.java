@@ -11,8 +11,8 @@ public interface AlarmOccurrenceRepository extends JpaRepository<AlarmOccurrence
 
     boolean existsByAlarmIdAndDate(Long alarmId, LocalDate date);
     Optional<AlarmOccurrenceEntity> findByAlarmIdAndDate(Long alarmId, LocalDate date);
-    Optional<AlarmOccurrenceEntity> findTopByAlarmIdAndDeactivateTypeOrderByDateDesc(
-        Long alarmId, DeactivateType deactivateType
+    Optional<AlarmOccurrenceEntity> findTopByAlarmIdAndDeactivateTypeInOrderByDateDescTimeDesc(
+        Long alarmId, List<DeactivateType> deactivateTypes
     );
     List<AlarmOccurrenceEntity> findAllByAlarmId(Long alarmId);
     void deleteAllByAlarmId(Long alarmId);

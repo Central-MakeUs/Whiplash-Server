@@ -1,5 +1,9 @@
 package akuma.whiplash.domains.alarm.domain.constant;
 
+import static akuma.whiplash.domains.alarm.exception.AlarmErrorCode.*;
+
+import akuma.whiplash.domains.alarm.exception.AlarmErrorCode;
+import akuma.whiplash.global.exception.ApplicationException;
 import java.time.DayOfWeek;
 import java.util.Arrays;
 import lombok.Getter;
@@ -23,7 +27,21 @@ public enum Weekday {
         return Arrays.stream(values())
             .filter(w -> w.description.equals(description))
             .findFirst()
-            .orElse(null);
+            .orElseThrow(() -> ApplicationException.from(INVALID_WEEKDAY));
     }
 
+    public static Weekday from(DayOfWeek dayOfWeek) {
+        return Arrays.stream(values())
+            .filter(w -> w.dayOfWeek.equals(dayOfWeek))
+            .findFirst()
+            .orElseThrow(() -> ApplicationException.from(INVALID_WEEKDAY));
+    }
+
+    public static String getDescriptionOfDayOfWeek(DayOfWeek dayOfWeek) {
+        return Arrays.stream(values())
+            .filter(w -> w.dayOfWeek == dayOfWeek)
+            .findFirst()
+            .map(Weekday::getDescription)
+            .orElseThrow(() -> ApplicationException.from(INVALID_WEEKDAY));
+    }
 }
