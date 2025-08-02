@@ -32,6 +32,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
+        String clientIp = getClientIp(request);
+        log.info("요청 IP: {}", clientIp);
+
         String token = extractToken(request);
 
         if (token != null) {
@@ -75,5 +78,16 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     protected boolean shouldNotFilter(HttpServletRequest request) throws ServletException {
         log.info("Request URI = {}", request.getRequestURI());
         return requestMatcherHolder.isPermitAll(request.getRequestURI(), request.getMethod());
+    }
+
+    private String getClientIp(HttpServletRequest request) {
+        String ip = request.getHeader("X-Forwarded-For");
+
+        if (ip != null && !ip.isEmpty() && !"unknown".equalsIgnoreCase(ip)) {
+            // 여러 IP가 있을 수 있으므로 첫 번째 꺼냄
+            return ip.split(",")[0];
+        }
+
+        return request.getRemoteAddr(); // 프록시 없을 경우
     }
 }

@@ -5,7 +5,10 @@ import akuma.whiplash.domains.alarm.persistence.entity.AlarmOccurrenceEntity;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 public interface AlarmOccurrenceRepository extends JpaRepository<AlarmOccurrenceEntity, Long> {
 
@@ -15,5 +18,7 @@ public interface AlarmOccurrenceRepository extends JpaRepository<AlarmOccurrence
         Long alarmId, List<DeactivateType> deactivateTypes
     );
     List<AlarmOccurrenceEntity> findAllByAlarmId(Long alarmId);
-    void deleteAllByAlarmId(Long alarmId);
+
+    @Query("SELECT ao.alarm.id FROM AlarmOccurrenceEntity ao WHERE ao.date = :date")
+    Set<Long> findAlarmIdsByDate(@Param("date") LocalDate date);
 }

@@ -1,6 +1,8 @@
 spring:
   application:
     name: whiplash
+  jackson:
+    time-zone: Asia/Seoul
   config:
     import:
       - mysql.yml
