@@ -45,10 +45,14 @@ public class PlaceQueryServiceImpl implements PlaceQueryService {
     @Value("${naver.map.client-secret}")
     private String ncpClientSecret;
 
+    private static final String NAVER_LOCAL_SEARCH_URL = "https://openapi.naver.com/v1/search/local.json";
+
+    private static final String NCP_REVERSE_GEOCODE_URL = "https://maps.apigw.ntruss.com/map-reversegeocode/v2/gc";
+
     @Override
     public List<PlaceInfoResponse> searchPlaces(String query) {
         String uri = UriComponentsBuilder
-            .fromUriString("https://openapi.naver.com/v1/search/local.json")
+            .fromUriString(NAVER_LOCAL_SEARCH_URL)
             .queryParam("query", query)
             .queryParam("display", "5")
             .build()
@@ -78,7 +82,7 @@ public class PlaceQueryServiceImpl implements PlaceQueryService {
     @Override
     public PlaceDetailResponse getPlaceDetailByCoord(double latitude, double longitude) {
         String uri = UriComponentsBuilder
-            .fromUriString("https://maps.apigw.ntruss.com/map-reversegeocode/v2/gc")
+            .fromUriString(NCP_REVERSE_GEOCODE_URL)
             .queryParam("coords", longitude + "," + latitude)
             .queryParam("output", "json")
             .queryParam("orders", "roadaddr,addr")
@@ -135,7 +139,7 @@ public class PlaceQueryServiceImpl implements PlaceQueryService {
     @Override
     public List<String> searchPlaceKeywords(String query) {
         String uri = UriComponentsBuilder
-            .fromUriString("https://openapi.naver.com/v1/search/local.json")
+            .fromUriString(NAVER_LOCAL_SEARCH_URL)
             .queryParam("query", query)
             .queryParam("display", "5")
             .build()
