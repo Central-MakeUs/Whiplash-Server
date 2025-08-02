@@ -152,14 +152,14 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
         alarmOccurrenceRepository.save(targetOccurrence);
         alarmOffLogRepository.save(alarmOffLog);
 
-        // 토글 재활성화 날짜 = 끈 알람 다음날
-        LocalDate reactivateDate = offTargetDate.plusDays(1);
-        int remainingCount = (int)(1 - weeklyOffCount); // 2 - weeklyOffCount - 1 = 1 - weeklyOffCount
+        // 다음 알람이 울리는 날짜
+        LocalDate reactivateDate = getNextOccurrenceDate(alarm, offTargetDate);
+        int remainingCount = (int) Math.max(0, 2 - weeklyOffCount);
 
         return AlarmOffResultResponse.builder()
             .offTargetDate(offTargetDate)
             .offTargetDayOfWeek(getKoreanDayOfWeek(offTargetDate))
-            .reactivateDate(reactivateDate) // 다시 활성화 되는 날짜
+            .reactivateDate(reactivateDate) 
             .reactivateDayOfWeek(getKoreanDayOfWeek(reactivateDate))
             .remainingOffCount(remainingCount)
             .build();
