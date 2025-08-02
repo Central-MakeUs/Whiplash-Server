@@ -33,12 +33,11 @@ public class AlarmOccurrenceBatchService {
         LocalDate today = LocalDate.now();
         DayOfWeek todayDayOfWeek = today.getDayOfWeek();
 
-        // 1. 오늘 요일에 반복 설정된 알람 전체 조회
-        List<AlarmEntity> todayAlarms = alarmRepository.findAll().stream()
-            .filter(alarm -> alarm.getRepeatDays().contains(todayDayOfWeek.name()))
-            .toList();
+        // 1. 오늘 반복 요일에 해당하는 알람만 DB에서 조회 (native query + LIKE)
+        String likeKeyword = "\"" + todayDayOfWeek.name() + "\""; // ex: "MONDAY"
+        List<AlarmEntity> todayAlarms = alarmRepository.findByRepeatDaysLike(likeKeyword);
 
-        log.info("[Batch] 오늘({}) 울릴 알람 수: {}", todayDayOfWeek, todayAlarms.size());
+        log.info("[AlarmOccurrence Create Batch] 오늘({}) 울릴 알람 수: {}", todayDayOfWeek, todayAlarms.size());
 
         // 2. 이미 alarm_occurrence가 생성된 알람 ID 목록 조회
         Set<Long> existingAlarmIds = alarmOccurrenceRepository.findAlarmIdsByDate(today);
@@ -67,10 +66,10 @@ public class AlarmOccurrenceBatchService {
             }
         }
 
-        log.info("[AlarmOccurrence Create Batch] 완료 - 생성: {}, 건너뜀: {}, 실패: {}", createdCount, skippedCount, failedCount);
+        log.info("[AlarmOccurrence Create Batch] 완료 - 생성: {}, 건너뜀: {}, 실패: {}",
+            createdCount, skippedCount, failedCount);
 
-        return AlarmOccurrenceCreateBatchResult
-            .builder()
+        return AlarmOccurrenceCreateBatchResult.builder()
             .createdCount(createdCount)
             .skippedCount(skippedCount)
             .failedCount(failedCount)
