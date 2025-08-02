@@ -20,10 +20,14 @@ public class GoogleVerifier implements SocialVerifier{
 
     private final GoogleIdTokenVerifier verifier;
 
-    public GoogleVerifier(@Value("${oauth.google.client-id}") String clientId) {
+    public GoogleVerifier(
+        @Value("${oauth.google.client-id.android}") String androidClientId,
+        @Value("${oauth.google.client-id.ios}") String iosClientId
+    ) {
         this.verifier = new GoogleIdTokenVerifier.Builder(
             new NetHttpTransport(), JacksonFactory.getDefaultInstance()
-        ).setAudience(List.of(clientId))
+        )
+            .setAudience(List.of(androidClientId, iosClientId))
             .build();
     }
 
@@ -31,6 +35,8 @@ public class GoogleVerifier implements SocialVerifier{
     public SocialMemberInfo verify(SocialLoginRequest request) {
         try {
             GoogleIdToken idToken = verifier.verify(request.token());
+
+            // TODO: 여기서 에러
             if (idToken == null) {
                 log.warn("Google idToken verification failed");
                 throw ApplicationException.from(CommonErrorCode.BAD_REQUEST);

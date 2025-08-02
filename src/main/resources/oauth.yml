@@ -1,6 +1,8 @@
 oauth:
   google:
-    client-id: ${GOOGLE_CLIENT_ID}
+    client-id:
+      android: ${GOOGLE_CLIENT_ID_ANDROID}
+      ios: ${GOOGLE_CLIENT_ID_IOS}
     sheet:
       id: ${GOOGLE_SHEET_ID}
       credentials-path: ${GOOGLE_SHEET_CREDENTIALS}
