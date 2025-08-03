@@ -5,8 +5,8 @@ import static akuma.whiplash.domains.auth.exception.AuthErrorCode.*;
 import static akuma.whiplash.domains.member.exception.MemberErrorCode.MEMBER_NOT_FOUND;
 
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmOffRequest;
-import akuma.whiplash.domains.alarm.application.dto.request.RemoveAlarmRequest;
-import akuma.whiplash.domains.alarm.application.dto.request.RegisterAlarmRequest;
+import akuma.whiplash.domains.alarm.application.dto.request.AlarmRemoveRequest;
+import akuma.whiplash.domains.alarm.application.dto.request.AlarmRegisterRequest;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmInfoPreviewResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmOffResultResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.CreateAlarmOccurrenceResponse;
@@ -39,7 +39,7 @@ public class AlarmController {
     @CustomErrorCodes(memberErrorCodes = {MEMBER_NOT_FOUND})
     @Operation(summary = "알람 등록", description = "사용자가 알람을 등록합니다.")
     @PostMapping
-    public ApplicationResponse<Void> createAlarm(@AuthenticationPrincipal MemberContext memberContext, @RequestBody @Valid RegisterAlarmRequest request) {
+    public ApplicationResponse<Void> createAlarm(@AuthenticationPrincipal MemberContext memberContext, @RequestBody @Valid AlarmRegisterRequest request) {
         alarmUseCase.createAlarm(request, memberContext.memberId());
         return ApplicationResponse.onSuccess();
     }
@@ -76,7 +76,7 @@ public class AlarmController {
     public ApplicationResponse<Void> removeAlarm(
         @AuthenticationPrincipal MemberContext memberContext,
         @PathVariable Long alarmId,
-        @RequestBody @Valid RemoveAlarmRequest request
+        @RequestBody @Valid AlarmRemoveRequest request
     ) {
         alarmUseCase.removeAlarm(memberContext.memberId(), alarmId, request.reason());
         return ApplicationResponse.onSuccess();

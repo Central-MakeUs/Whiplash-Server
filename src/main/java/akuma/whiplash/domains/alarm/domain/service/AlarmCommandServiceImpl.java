@@ -2,7 +2,7 @@ package akuma.whiplash.domains.alarm.domain.service;
 
 import static akuma.whiplash.domains.alarm.exception.AlarmErrorCode.*;
 
-import akuma.whiplash.domains.alarm.application.dto.request.RegisterAlarmRequest;
+import akuma.whiplash.domains.alarm.application.dto.request.AlarmRegisterRequest;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmOffResultResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.CreateAlarmOccurrenceResponse;
 import akuma.whiplash.domains.alarm.application.mapper.AlarmMapper;
@@ -27,7 +27,6 @@ import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
 import com.google.api.client.json.jackson2.JacksonFactory;
 import com.google.auth.http.HttpCredentialsAdapter;
 import com.google.auth.oauth2.ServiceAccountCredentials;
-import java.io.FileInputStream;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -65,7 +64,7 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
     private String sheetRange;
 
     @Override
-    public void createAlarm(RegisterAlarmRequest request, Long memberId) {
+    public void createAlarm(AlarmRegisterRequest request, Long memberId) {
         MemberEntity memberEntity = findMemberById(memberId);
 
         AlarmEntity alarm = AlarmMapper.mapToAlarmEntity(request, memberEntity);

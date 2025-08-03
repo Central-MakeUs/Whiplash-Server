@@ -1,6 +1,6 @@
 package akuma.whiplash.domains.alarm.application.mapper;
 
-import akuma.whiplash.domains.alarm.application.dto.request.RegisterAlarmRequest;
+import akuma.whiplash.domains.alarm.application.dto.request.AlarmRegisterRequest;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmInfoPreviewResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.CreateAlarmOccurrenceResponse;
 import akuma.whiplash.domains.alarm.domain.constant.DeactivateType;
@@ -20,7 +20,7 @@ import java.util.Objects;
 
 public class AlarmMapper {
 
-    public static AlarmEntity mapToAlarmEntity(RegisterAlarmRequest request, MemberEntity memberEntity) {
+    public static AlarmEntity mapToAlarmEntity(AlarmRegisterRequest request, MemberEntity memberEntity) {
         return AlarmEntity.builder()
             .member(memberEntity)
             .alarmPurpose(request.alarmPurpose())
