@@ -3,6 +3,7 @@ package akuma.whiplash.domains.alarm.domain.service;
 import static akuma.whiplash.domains.alarm.exception.AlarmErrorCode.REPEAT_DAYS_NOT_CONFIG;
 
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmInfoPreviewResponse;
+import akuma.whiplash.domains.alarm.application.mapper.AlarmMapper;
 import akuma.whiplash.domains.alarm.domain.constant.DeactivateType;
 import akuma.whiplash.domains.alarm.domain.constant.Weekday;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmEntity;
@@ -37,9 +38,10 @@ public class AlarmQueryServiceImpl implements AlarmQueryService {
     private final AlarmOffLogRepository alarmOffLogRepository;
     private final MemberRepository memberRepository;
 
+    @Transactional
     @Override
     public List<AlarmInfoPreviewResponse> getAlarms(Long memberId) {
-        // 1. 멤버 유효성 검증
+        // 1. 요청한 회원 존재 여부 검증
         memberRepository.findById(memberId)
             .orElseThrow(() -> ApplicationException.from(MemberErrorCode.MEMBER_NOT_FOUND));
 
@@ -48,71 +50,89 @@ public class AlarmQueryServiceImpl implements AlarmQueryService {
         LocalDate today = LocalDate.now();
 
         return alarms.stream()
-            .map(alarm -> {
-                // 3. 가장 최근 OFF 또는 CHECKIN 이력 조회
-                Optional<AlarmOccurrenceEntity> recentOccurrenceOpt =
-                    alarmOccurrenceRepository.findTopByAlarmIdAndDeactivateTypeInOrderByDateDescTimeDesc(
-                        alarm.getId(),
-                        List.of(DeactivateType.OFF, DeactivateType.CHECKIN)
-                    );
-
-                // 4. 반복 요일을 Java DayOfWeek 집합으로 변환
-                Set<DayOfWeek> repeatSet = alarm.getRepeatDays().stream()
-                    .map(Weekday::getDayOfWeek)
-                    .collect(Collectors.toSet());
-
-                // 5. 오늘 기준 알람 예정일 계산: 첫 번째/두 번째/세 번째 텀
-                LocalDate firstDate = calculateNextRepeatDate(repeatSet, today);
-                LocalDate secondDate = calculateNextRepeatDate(repeatSet, firstDate.plusDays(1));
-                LocalDate thirdDate = calculateNextRepeatDate(repeatSet, secondDate.plusDays(1));
-
-                // 6. 기본값 초기화
-                boolean isToggleOn = true;
-                LocalDate firstUpcomingDate = firstDate;
-                LocalDate secondUpcomingDate = secondDate;
-
-                // 7. 끄기 이력 존재할 경우 조건 분기 처리
-                if (recentOccurrenceOpt.isPresent()) {
-                    AlarmOccurrenceEntity lastOccurrence = recentOccurrenceOpt.get();
-                    LocalDate occurredDate = lastOccurrence.getDate();
-                    DeactivateType type = lastOccurrence.getDeactivateType();
-
-                    // 최근 OFF or CHECKIN이 오늘 이후의 알람에 대해서 발생했다면 다음 텀부터 반영
-                    if (occurredDate.equals(firstDate)) {
-                        // CHECKIN 또는 OFF가 오늘(다음 텀) 발생한 경우
-                        firstUpcomingDate = secondDate;
-                        secondUpcomingDate = thirdDate;
-
-                        if (type == DeactivateType.OFF) {
-                            isToggleOn = false;
-                        }
-                    }
-                }
-
-                // 8. 알람 당 이번 주 남은 알람 끄기 횟수 계산
-                long remainingOffCount = calculateRemainingOffCount(memberId, alarm.getId());
-
-                return AlarmInfoPreviewResponse.builder()
-                    .alarmId(alarm.getId())
-                    .alarmPurpose(alarm.getAlarmPurpose())
-                    .repeatsDays(
-                        alarm.getRepeatDays().stream()
-                            .map(Weekday::getDescription) // ["월", "목", "토"] 형식
-                            .toList()
-                    )
-                    .time(alarm.getTime().toString())
-                    .address(alarm.getAddress())
-                    .latitude(alarm.getLatitude())
-                    .longitude(alarm.getLongitude())
-                    .isToggleOn(isToggleOn)
-                    .firstUpcomingDay(firstUpcomingDate)
-                    .firstUpcomingDayOfWeek(getKoreanDayOfWeek(firstUpcomingDate))
-                    .secondUpcomingDay(secondUpcomingDate)
-                    .secondUpcomingDayOfWeek(getKoreanDayOfWeek(secondUpcomingDate))
-                    .remainingOffCount(remainingOffCount)
-                    .build();
-            })
+            .map(alarm -> buildPreviewResponse(alarm, today, memberId))
             .toList();
+    }
+
+    private AlarmInfoPreviewResponse buildPreviewResponse(AlarmEntity alarm, LocalDate today, Long memberId) {
+        // 1. 가장 최근 OFF 또는 CHECKIN 이력 조회
+        Optional<AlarmOccurrenceEntity> recentOccurrenceOpt =
+            alarmOccurrenceRepository.findTopByAlarmIdAndDeactivateTypeInOrderByDateDescTimeDesc(
+                alarm.getId(),
+                List.of(DeactivateType.OFF, DeactivateType.CHECKIN)
+            );
+
+        // 2. 반복 요일을 DayOfWeek로 변환
+        Set<DayOfWeek> repeatSet = alarm.getRepeatDays().stream()
+            .map(Weekday::getDayOfWeek)
+            .collect(Collectors.toSet());
+
+        // 3. 오늘 기준 알람 예정일 계산: 첫 번째/두 번째/세 번째 텀
+        LocalDate firstDate = calculateNextRepeatDate(repeatSet, today);
+        LocalDate secondDate = calculateNextRepeatDate(repeatSet, firstDate.plusDays(1));
+        LocalDate thirdDate = calculateNextRepeatDate(repeatSet, secondDate.plusDays(1));
+
+        /**
+         * 최근 알람 비활성화(OFF) 이력이 오늘의 알람에 대해 발생한 경우,
+         * 현재(firstDate)는 이미 꺼진 상태이므로 다음 알람(firstUpcomingDate)은 그 다음 텀(secondDate)이 되어야 한다.
+         *
+         * 예시)
+         *   - 알람 반복 요일이 월, 수, 금일 때
+         *   - 오늘이 수요일이고 최근 OFF 이력이 수요일(firstDate)로 존재한다면,
+         *     → 이번 수요일 알람은 꺼졌으므로 다음 울림일은 금요일(secondDate)이 되어야 함.
+         *
+         * 또한,
+         *   - 최근 끄기 이력이 OFF 타입인 경우에만 isToggleOn = false (수동 OFF에만 토글 반영)
+         *   - CHECKIN은 출석으로 꺼졌기 때문에 토글은 그대로 유지됨 (isToggleOn = true)
+         */
+
+        // 4. 다음 알람일(firstUpcomingDate), 다음+1 알람일(secondUpcomingDate) 결정
+        boolean isCurrentDeactivated = recentOccurrenceOpt
+            .map(occ -> occ.getDate().equals(firstDate))
+            .orElse(false);
+
+        boolean isOff = recentOccurrenceOpt
+            .map(occ -> occ.getDeactivateType() == DeactivateType.OFF)
+            .orElse(false);
+
+        // 현재 비활성화 상태이고, OFF로 꺼졌으면 toggle 비활성화
+        boolean isToggleOn = !(isCurrentDeactivated && isOff);
+
+        // final로 선언된 upcomingDate
+        final LocalDate resolvedFirstUpcomingDate = isCurrentDeactivated ? secondDate : firstDate;
+        final LocalDate resolvedSecondUpcomingDate = isCurrentDeactivated ? thirdDate : secondDate;
+
+        // 5. AlarmOccurrence 존재 여부 확인 후 없으면 생성
+        AlarmOccurrenceEntity occurrence = alarmOccurrenceRepository
+            .findByAlarmIdAndDate(alarm.getId(), resolvedFirstUpcomingDate)
+            .orElseGet(() -> {
+                AlarmOccurrenceEntity newOccurrence = AlarmMapper.mapToAlarmOccurrenceForDate(alarm, resolvedFirstUpcomingDate);
+                return alarmOccurrenceRepository.save(newOccurrence);
+            });
+
+        // 6. 알람 당 이번 주 남은 알람 끄기 횟수 계산
+        long remainingOffCount = calculateRemainingOffCount(memberId, alarm.getId());
+
+        return AlarmInfoPreviewResponse.builder()
+            .alarmId(alarm.getId())
+            .alarmPurpose(alarm.getAlarmPurpose())
+            .repeatsDays(
+                alarm.getRepeatDays().stream()
+                    .map(Weekday::getDescription)
+                    .toList()
+            )
+            .time(alarm.getTime().toString())
+            .address(alarm.getAddress())
+            .latitude(alarm.getLatitude())
+            .longitude(alarm.getLongitude())
+            .isToggleOn(isToggleOn)
+            .firstUpcomingDay(resolvedFirstUpcomingDate)
+            .firstUpcomingDayOfWeek(getKoreanDayOfWeek(resolvedFirstUpcomingDate))
+            .secondUpcomingDay(resolvedSecondUpcomingDate)
+            .secondUpcomingDayOfWeek(getKoreanDayOfWeek(resolvedSecondUpcomingDate))
+            .remainingOffCount(remainingOffCount)
+            .firstUpcomingAlarmOccurrenceId(occurrence.getId())
+            .build();
     }
 
     /**
@@ -160,5 +180,6 @@ public class AlarmQueryServiceImpl implements AlarmQueryService {
         };
     }
 }
+
 
 
