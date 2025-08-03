@@ -1,5 +1,6 @@
 package akuma.whiplash.domains.alarm.application.usecase;
 
+import akuma.whiplash.domains.alarm.application.dto.request.AlarmCheckinRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmRegisterRequest;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmInfoPreviewResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmOffResultResponse;
@@ -34,6 +35,9 @@ public class AlarmUseCase {
         alarmCommandService.removeAlarm(memberId, alarmId, reason);
     }
 
+    public void checkinAlarm(Long memberId, Long alarmId, Long occurrenceId, AlarmCheckinRequest request) {
+        alarmCommandService.checkinAlarm(memberId, alarmId, occurrenceId, request);
+    }
 
     public List<AlarmInfoPreviewResponse> getAlarms(Long memberId) {
         return alarmQueryService.getAlarms(memberId);

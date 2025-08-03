@@ -1,7 +1,10 @@
 package akuma.whiplash.domains.alarm.persistence.entity;
 
+import static akuma.whiplash.domains.alarm.exception.AlarmErrorCode.ALREADY_DEACTIVATED;
+
 import akuma.whiplash.domains.alarm.domain.constant.DeactivateType;
 import akuma.whiplash.global.entity.BaseTimeEntity;
+import akuma.whiplash.global.exception.ApplicationException;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -63,5 +66,10 @@ public class AlarmOccurrenceEntity extends BaseTimeEntity {
     public void deactivate(DeactivateType type, LocalDateTime time) {
         this.deactivateType = type;        // 알람 종료 방식 설정: OFF 또는 CHECKIN
         this.deactivatedAt = time;         // 알람을 끈 시간
+    }
+
+    public void checkin(LocalDateTime now) {
+        this.deactivateType = DeactivateType.CHECKIN;
+        this.checkinTime = now;
     }
 }

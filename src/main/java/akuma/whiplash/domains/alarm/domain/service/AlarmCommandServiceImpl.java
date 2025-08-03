@@ -2,6 +2,7 @@ package akuma.whiplash.domains.alarm.domain.service;
 
 import static akuma.whiplash.domains.alarm.exception.AlarmErrorCode.*;
 
+import akuma.whiplash.domains.alarm.application.dto.request.AlarmCheckinRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmRegisterRequest;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmOffResultResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.CreateAlarmOccurrenceResponse;
@@ -20,6 +21,7 @@ import akuma.whiplash.domains.member.exception.MemberErrorCode;
 import akuma.whiplash.domains.member.persistence.entity.MemberEntity;
 import akuma.whiplash.domains.member.persistence.repository.MemberRepository;
 import akuma.whiplash.global.exception.ApplicationException;
+import akuma.whiplash.global.response.code.CommonErrorCode;
 import com.google.api.services.sheets.v4.Sheets;
 import com.google.api.services.sheets.v4.SheetsScopes;
 import com.google.api.services.sheets.v4.model.ValueRange;
@@ -62,6 +64,8 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
 
     @Value("${oauth.google.sheet.range}")
     private String sheetRange;
+
+    private static final double CHECKIN_RADIUS_METERS = 100.0;
 
     @Override
     public void createAlarm(AlarmRegisterRequest request, Long memberId) {
@@ -204,6 +208,67 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
         alarmRepository.delete(alarm);
     }
 
+    @Override
+    public void checkinAlarm(Long memberId, Long alarmId, Long occurrenceId, AlarmCheckinRequest request) {
+        // 1. 알람 조회 및 소유자 검증
+        AlarmEntity alarm = alarmRepository.findById(alarmId)
+            .orElseThrow(() -> ApplicationException.from(ALARM_NOT_FOUND));
+
+        validAlarmOwner(memberId, alarm.getMember().getId());
+
+        // 2. 알람 발생 이력 조회
+        AlarmOccurrenceEntity occurrence = alarmOccurrenceRepository.findById(occurrenceId)
+            .orElseThrow(() -> ApplicationException.from(ALARM_OCCURENCE_NOT_FOUND));
+
+        if (!occurrence.getAlarm().getId().equals(alarmId)) {
+            log.warn("[도착 인증] 해당 알람의 발생 내역이 아닙니다.");
+        }
+
+        // 3. 위치 인증 반경 이내인지 확인
+        boolean isInRange = isWithinDistance(
+            alarm.getLatitude(), alarm.getLongitude(),
+            request.latitude(), request.longitude(),
+            CHECKIN_RADIUS_METERS
+        );
+
+        if (!isInRange) {
+            throw ApplicationException.from(CHECKIN_OUT_OF_RANGE);
+        }
+
+        // 4. 출석 체크 처리
+        if (occurrence.getDeactivateType() != DeactivateType.NONE) {
+            throw ApplicationException.from(ALREADY_DEACTIVATED);
+        }
+
+        occurrence.checkin(LocalDateTime.now());
+    }
+
+    /**
+     * 위치 인증 반경 내 도착 여부 계산
+     *
+     * @param lat1 기준 위도 (알람 설정 위치)
+     * @param lon1 기준 경도
+     * @param lat2 사용자 위도
+     * @param lon2 사용자 경도
+     * @param radiusMeters 반경(m)
+     * @return true if within radius
+     */
+    private boolean isWithinDistance(double lat1, double lon1, double lat2, double lon2, double radiusMeters) {
+        double earthRadius = 6371000; // meters
+
+        double dLat = Math.toRadians(lat2 - lat1);
+        double dLon = Math.toRadians(lon2 - lon1);
+
+        double a = Math.sin(dLat / 2) * Math.sin(dLat / 2)
+            + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
+            * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+
+        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+        double distance = earthRadius * c;
+
+        return distance <= radiusMeters;
+    }
 
     private void logDeleteReason(String alarmPurpose, String reason) {
         try {
