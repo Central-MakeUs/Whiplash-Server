@@ -10,7 +10,7 @@ import java.time.LocalTime;
 import java.util.List;
 
 @Schema(description = "알람 등록 요청 DTO")
-public record RegisterAlarmRequest(
+public record AlarmRegisterRequest(
 
     @Schema(description = "장소", example = "서울시 중구 퇴계로 24")
     @NotBlank(message = "장소를 입력해주세요.")

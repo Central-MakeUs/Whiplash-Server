@@ -4,9 +4,10 @@ import static akuma.whiplash.domains.alarm.exception.AlarmErrorCode.*;
 import static akuma.whiplash.domains.auth.exception.AuthErrorCode.*;
 import static akuma.whiplash.domains.member.exception.MemberErrorCode.MEMBER_NOT_FOUND;
 
+import akuma.whiplash.domains.alarm.application.dto.request.AlarmCheckinRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmOffRequest;
-import akuma.whiplash.domains.alarm.application.dto.request.RemoveAlarmRequest;
-import akuma.whiplash.domains.alarm.application.dto.request.RegisterAlarmRequest;
+import akuma.whiplash.domains.alarm.application.dto.request.AlarmRemoveRequest;
+import akuma.whiplash.domains.alarm.application.dto.request.AlarmRegisterRequest;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmInfoPreviewResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmOffResultResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.CreateAlarmOccurrenceResponse;
@@ -39,7 +40,7 @@ public class AlarmController {
     @CustomErrorCodes(memberErrorCodes = {MEMBER_NOT_FOUND})
     @Operation(summary = "알람 등록", description = "사용자가 알람을 등록합니다.")
     @PostMapping
-    public ApplicationResponse<Void> createAlarm(@AuthenticationPrincipal MemberContext memberContext, @RequestBody @Valid RegisterAlarmRequest request) {
+    public ApplicationResponse<Void> createAlarm(@AuthenticationPrincipal MemberContext memberContext, @RequestBody @Valid AlarmRegisterRequest request) {
         alarmUseCase.createAlarm(request, memberContext.memberId());
         return ApplicationResponse.onSuccess();
     }
@@ -76,12 +77,27 @@ public class AlarmController {
     public ApplicationResponse<Void> removeAlarm(
         @AuthenticationPrincipal MemberContext memberContext,
         @PathVariable Long alarmId,
-        @RequestBody @Valid RemoveAlarmRequest request
+        @RequestBody @Valid AlarmRemoveRequest request
     ) {
         alarmUseCase.removeAlarm(memberContext.memberId(), alarmId, request.reason());
         return ApplicationResponse.onSuccess();
     }
 
+    @CustomErrorCodes(
+        alarmErrorCodes = {ALARM_NOT_FOUND, ALARM_OCCURENCE_NOT_FOUND, CHECKIN_OUT_OF_RANGE, ALREADY_DEACTIVATED},
+        authErrorCodes = {PERMISSION_DENIED}
+    )
+    @Operation(summary = "알람 도착 인증", description = "알람 도착 인증을 합니다. 도착 위치 반경 100m 내에 들어와야 도착 인증이 가능합니다.")
+    @PostMapping("/{alarmId}/occurrences/{occurrenceId}/checkin")
+    public ApplicationResponse<Void> checkin(
+        @PathVariable Long alarmId,
+        @PathVariable Long occurrenceId,
+        @RequestBody @Valid AlarmCheckinRequest request,
+        @AuthenticationPrincipal MemberContext memberContext
+    ) {
+        alarmUseCase.checkinAlarm(memberContext.memberId(), alarmId, occurrenceId, request);
+        return ApplicationResponse.onSuccess();
+    }
 
     @CustomErrorCodes(memberErrorCodes = {MEMBER_NOT_FOUND})
     @Operation(summary = "알람 목록 조회", description = "사용자가 등록한 알람 목록을 조회합니다.")
