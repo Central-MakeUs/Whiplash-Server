@@ -65,6 +65,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         filterChain.doFilter(request, response);
     }
 
+    @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) throws ServletException {
+        log.info("Request URI = {}", request.getRequestURI());
+        return requestMatcherHolder.isPermitAll(request.getRequestURI(), request.getMethod());
+    }
+
     private String extractToken(HttpServletRequest request) {
         String authorizationHeader = request.getHeader(AUTHORIZATION);
 
@@ -72,12 +78,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             return authorizationHeader.split(" ")[1];
         }
         return null;
-    }
-
-    @Override
-    protected boolean shouldNotFilter(HttpServletRequest request) throws ServletException {
-        log.info("Request URI = {}", request.getRequestURI());
-        return requestMatcherHolder.isPermitAll(request.getRequestURI(), request.getMethod());
     }
 
     private String getClientIp(HttpServletRequest request) {
