@@ -18,6 +18,7 @@ public enum AuthErrorCode implements BaseErrorCode {
     INVALID_VERIFICATION_CODE(HttpStatus.UNAUTHORIZED, "AUTH_105", "유효하지 않은 인증번호입니다."),
 
     PERMISSION_DENIED(HttpStatus.FORBIDDEN, "AUTH_301", "권한이 없습니다."),
+    IS_SLEEPER_ACCOUNT(HttpStatus.FORBIDDEN, "AUTH_302", "휴면 처리된 계정입니다. 관리자에게 문의해주세요."),
 
     TOKEN_NOT_FOUND(HttpStatus.NOT_FOUND, "AUTH_401", "존재하지 않는 토큰입니다."),
     ;

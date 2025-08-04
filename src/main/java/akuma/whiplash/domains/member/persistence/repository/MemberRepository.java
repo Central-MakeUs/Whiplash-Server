@@ -6,6 +6,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface MemberRepository extends JpaRepository<MemberEntity, Long> {
 
-    Optional<MemberEntity> findBySocialIdAndActiveStatusIsTrue(String socialId);
+    Optional<MemberEntity> findBySocialId(String socialId);
     Optional<MemberEntity> findByIdAndActiveStatusIsTrue(Long memberId);
 }

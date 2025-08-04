@@ -170,6 +170,7 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
             .build();
     }
 
+    // TODO: alarm, alarm_occurrence soft delete 적용
     @Override
     public void removeAlarm(Long memberId, Long alarmId, String reason) {
         // 1. 알람 조회 및 소유자 검증

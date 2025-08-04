@@ -56,10 +56,12 @@ public class AuthCommandServiceImpl implements AuthCommandService {
         boolean isNewMember = false;
         MemberEntity member;
 
-        Optional<MemberEntity> findMember = memberRepository.findBySocialIdAndActiveStatusIsTrue(socialMemberInfo.socialId());
+        Optional<MemberEntity> findMember = memberRepository.findBySocialId(socialMemberInfo.socialId());
 
         if (findMember.isPresent()) {
-            member = findMember.get();
+            // TODO:휴면 계정으로 로그인 하시겠습니까? 처리
+            if (!findMember.get().isActiveStatus()) throw ApplicationException.from(AuthErrorCode.IS_SLEEPER_ACCOUNT);
+            else member = findMember.get();
         } else {
             member = memberRepository.save(AuthMapper.mapToMemberEntity(socialMemberInfo));
             isNewMember = true;
