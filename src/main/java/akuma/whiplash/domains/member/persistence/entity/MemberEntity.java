@@ -70,4 +70,8 @@ public class MemberEntity extends BaseTimeEntity {
         this.pushNotificationPolicy = pushNotificationPolicy;
         this.pushAgreedAt = LocalDateTime.now();
     }
+
+    public void updateDeactivate() {
+        this.activeStatus = false;
+    }
 }
