@@ -56,7 +56,7 @@ public class AuthCommandServiceImpl implements AuthCommandService {
         boolean isNewMember = false;
         MemberEntity member;
 
-        Optional<MemberEntity> findMember = memberRepository.findBySocialId(socialMemberInfo.socialId());
+        Optional<MemberEntity> findMember = memberRepository.findBySocialIdAndActiveStatusIsTrue(socialMemberInfo.socialId());
 
         if (findMember.isPresent()) {
             member = findMember.get();

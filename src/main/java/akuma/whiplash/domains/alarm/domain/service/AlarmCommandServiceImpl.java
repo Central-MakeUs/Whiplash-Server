@@ -82,7 +82,7 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
         validAlarmOwner(memberId, alarmEntity.getMember().getId());
 
         // 각 알람이 울릴 때 알람 발생 내역은 1개만 허용(반복 울림은 alarm_ringing_log로 관리), 오늘 날짜 기준 알람 발생 내역이 이미 존재하면 예외 발생
-        boolean alreadyExists = alarmOccurrenceRepository.existsByAlarmIdAndDate(alarmId, LocalDate.now());
+        boolean alreadyExists = alarmOccurrenceRepository.existsByAlarmIdAndDateIfActive(alarmId, LocalDate.now());
         if (alreadyExists) {
             throw ApplicationException.from(ALREADY_OCCURRED_EXISTS);
         }
@@ -123,7 +123,7 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
 
         // 오늘 알람 발생 내역 조회
         Optional<AlarmOccurrenceEntity> todayOccurrenceOpt =
-            alarmOccurrenceRepository.findByAlarmIdAndDate(alarmId, clientDate);
+            alarmOccurrenceRepository.findByAlarmIdAndDateIfActive(alarmId, clientDate);
 
         // 알람이 울렸는지 판단하는 변수 (계산 최적화)
         boolean isAfterRinging = todayOccurrenceOpt
@@ -137,7 +137,7 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
 
         // 끌 대상 날짜의 알람 발생 내역 조회 또는 생성
         AlarmOccurrenceEntity targetOccurrence = alarmOccurrenceRepository
-            .findByAlarmIdAndDate(alarmId, offTargetDate)
+            .findByAlarmIdAndDateIfActive(alarmId, offTargetDate)
             .orElseGet(() -> {
                 AlarmOccurrenceEntity newOccurrence = AlarmMapper.mapToAlarmOccurrenceForDate(alarm, offTargetDate);
                 return alarmOccurrenceRepository.save(newOccurrence);
@@ -156,9 +156,11 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
         alarmOffLogRepository.save(alarmOffLog);
 
         // 다음 알람이 울리는 날짜
-        LocalDate reactivateDate = getNextOccurrenceDate(alarm, offTargetDate);
-        int remainingCount = (int) Math.max(0, 2 - weeklyOffCount);
+        LocalDate reactivateDate = getNextOccurrenceDate(alarm, offTargetDate.plusDays(1));
+        // 주 2회 제한, 이미 1번 끔 → 이번에 또 끄면 2회 → 남은 횟수는 0
+        int remainingCount = (int) (2 - (weeklyOffCount + 1));
 
+        // TODO: reactivateDate, reactivateDayOfWeek, remainingOffCount 로직 확인
         return AlarmOffResultResponse.builder()
             .offTargetDate(offTargetDate)
             .offTargetDayOfWeek(getKoreanDayOfWeek(offTargetDate))
@@ -184,7 +186,7 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
         }
 
         // 4. 오늘 알람 발생 내역이 있고, 비활성화되지 않았다면 삭제 불가
-        alarmOccurrenceRepository.findByAlarmIdAndDate(alarmId, LocalDate.now())
+        alarmOccurrenceRepository.findByAlarmIdAndDateIfActive(alarmId, LocalDate.now())
             .ifPresent(o -> {
                 if (o.getDeactivateType() == DeactivateType.NONE) {
                     throw ApplicationException.from(ALARM_DELETE_NOT_AVAILABLE);
@@ -195,7 +197,7 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
         logDeleteReason(alarm.getAlarmPurpose(), reason);
 
         // 6. 알람 발생 내역 전체 조회 및 관련 로그 제거
-        List<AlarmOccurrenceEntity> occurrences = alarmOccurrenceRepository.findAllByAlarmId(alarmId);
+        List<AlarmOccurrenceEntity> occurrences = alarmOccurrenceRepository.findAllByAlarmIdIfActive(alarmId);
         for (AlarmOccurrenceEntity occ : occurrences) {
             alarmRingingLogRepository.deleteAllByAlarmOccurrenceId(occ.getId());
         }
