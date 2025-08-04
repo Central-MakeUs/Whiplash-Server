@@ -4,4 +4,5 @@ import akuma.whiplash.domains.member.application.dto.request.MemberTermsModifyRe
 
 public interface MemberCommandService {
     void modifyMemberTermsInfo(Long memberId, MemberTermsModifyRequest request);
+    void softDeleteMember(Long memberId);
 }

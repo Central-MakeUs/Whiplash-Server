@@ -35,8 +35,7 @@ public class AuthController {
 
     @CustomErrorCodes(
         commonErrorCodes = {BAD_REQUEST},
-        authErrorCodes = {UNSUPPORTED_SOCIAL_TYPE}
-
+        authErrorCodes = {UNSUPPORTED_SOCIAL_TYPE, IS_SLEEPER_ACCOUNT}
     )
     @Operation(summary = "소셜 로그인", description = "구글, 애플, 카카오 소셜 로그인을 지원합니다.")
     @PostMapping("/social-login")

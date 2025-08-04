@@ -11,6 +11,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -28,6 +29,14 @@ public class MemberController {
     @PutMapping("/terms")
     public ApplicationResponse<Void> modifyMemberTermsInfo(@AuthenticationPrincipal MemberContext memberContext, @RequestBody @Valid MemberTermsModifyRequest request) {
         memberUseCase.modifyMemberTermsInfo(memberContext.memberId(), request);
+        return ApplicationResponse.onSuccess();
+    }
+
+    @CustomErrorCodes
+    @Operation(summary = "회원 탈퇴", description = "회원 정보와 관련된 알람 정보를 soft delete 합니다.")
+    @DeleteMapping
+    public ApplicationResponse<Void> softDeleteMember(@AuthenticationPrincipal MemberContext memberContext) {
+        memberUseCase.softDeleteMember(memberContext.memberId());
         return ApplicationResponse.onSuccess();
     }
 }

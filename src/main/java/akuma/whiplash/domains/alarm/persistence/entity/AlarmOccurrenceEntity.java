@@ -63,6 +63,9 @@ public class AlarmOccurrenceEntity extends BaseTimeEntity {
     @Column(name = "ringing_count", nullable = false)
     private int ringingCount;
 
+    @Column(name = "member_active_status",nullable = false)
+    private boolean memberActiveStatus;
+
     public void deactivate(DeactivateType type, LocalDateTime time) {
         this.deactivateType = type;        // 알람 종료 방식 설정: OFF 또는 CHECKIN
         this.deactivatedAt = time;         // 알람을 끈 시간

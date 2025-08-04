@@ -30,6 +30,7 @@ public class AlarmMapper {
             .latitude(request.latitude())
             .longitude(request.longitude())
             .address(request.address())
+            .memberActiveStatus(true)
             .build();
     }
 
@@ -60,6 +61,7 @@ public class AlarmMapper {
             .alarmRinging(true)
             .deactivatedAt(null)
             .ringingCount(1)
+            .memberActiveStatus(true)
             .build();
     }
 
@@ -73,30 +75,13 @@ public class AlarmMapper {
             .checkinTime(null)
             .alarmRinging(false)
             .ringingCount(0)
+            .memberActiveStatus(true)
             .build();
     }
 
     public static CreateAlarmOccurrenceResponse mapToCreateAlarmOccurrenceResponse(Long occurrenceId) {
         return CreateAlarmOccurrenceResponse.builder()
             .occurrenceId(occurrenceId)
-            .build();
-    }
-
-    public static AlarmInfoPreviewResponse mapToAlarmInfoPreviewResponse(AlarmEntity alarm, boolean isToggleOn) {
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("HH:mm");
-
-        return AlarmInfoPreviewResponse
-            .builder()
-            .alarmId(alarm.getId())
-            .alarmPurpose(alarm.getAlarmPurpose())
-            .repeatsDays(alarm.getRepeatDays().stream()
-                .map(Weekday::getDescription)
-                .toList())
-            .time(alarm.getTime().format(formatter))
-            .address(alarm.getAddress())
-            .latitude(alarm.getLatitude())
-            .longitude(alarm.getLongitude())
-            .isToggleOn(isToggleOn)
             .build();
     }
 
