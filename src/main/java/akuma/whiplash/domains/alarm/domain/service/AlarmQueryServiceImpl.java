@@ -14,6 +14,7 @@ import akuma.whiplash.domains.alarm.persistence.repository.AlarmRepository;
 import akuma.whiplash.domains.member.exception.MemberErrorCode;
 import akuma.whiplash.domains.member.persistence.repository.MemberRepository;
 import akuma.whiplash.global.exception.ApplicationException;
+import akuma.whiplash.global.response.code.CommonErrorCode;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -23,6 +24,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -101,12 +103,19 @@ public class AlarmQueryServiceImpl implements AlarmQueryService {
         final LocalDate resolvedFirstUpcomingDate = isCurrentDeactivated ? secondDate : firstDate;
         final LocalDate resolvedSecondUpcomingDate = isCurrentDeactivated ? thirdDate : secondDate;
 
+        // TODO: 도착 인증 API 동작 방식 변경시 이 로직 수정 필요
         // 5. AlarmOccurrence 존재 여부 확인 후 없으면 생성
         AlarmOccurrenceEntity occurrence = alarmOccurrenceRepository
             .findTopByAlarmIdAndDateOrderByCreatedAtDesc(alarm.getId(), resolvedFirstUpcomingDate)
             .orElseGet(() -> {
                 AlarmOccurrenceEntity newOccurrence = AlarmMapper.mapToAlarmOccurrenceForDate(alarm, resolvedFirstUpcomingDate);
-                return alarmOccurrenceRepository.save(newOccurrence);
+                try {
+                    return alarmOccurrenceRepository.save(newOccurrence);
+                } catch (DataIntegrityViolationException e) {
+                    return alarmOccurrenceRepository
+                        .findTopByAlarmIdAndDateOrderByCreatedAtDesc(alarm.getId(), resolvedFirstUpcomingDate)
+                        .orElseThrow(() -> ApplicationException.from(CommonErrorCode.INTERNAL_SERVER_ERROR));
+                }
             });
 
         // 6. 회원의 이번 주 남은 알람 끄기 횟수 계산
