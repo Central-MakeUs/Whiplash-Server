@@ -51,7 +51,6 @@ public class AuthCommandServiceImpl implements AuthCommandService {
 
         SocialMemberInfo socialMemberInfo = verifier.verify(request);
         
-        // TODO: 탈퇴 후 재가입시 탈퇴한 회원의 정보가 조회되는 문제 해결 필요
         // DB에서 사용자 조회 or 신규 가입
         boolean isNewMember = false;
         MemberEntity member;
@@ -59,9 +58,7 @@ public class AuthCommandServiceImpl implements AuthCommandService {
         Optional<MemberEntity> findMember = memberRepository.findBySocialId(socialMemberInfo.socialId());
 
         if (findMember.isPresent()) {
-            // TODO:휴면 계정으로 로그인 하시겠습니까? 처리
-            if (!findMember.get().isActiveStatus()) throw ApplicationException.from(AuthErrorCode.IS_SLEEPER_ACCOUNT);
-            else member = findMember.get();
+            member = findMember.get();
         } else {
             member = memberRepository.save(AuthMapper.mapToMemberEntity(socialMemberInfo));
             isNewMember = true;

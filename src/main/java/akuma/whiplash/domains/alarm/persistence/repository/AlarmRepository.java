@@ -9,16 +9,15 @@ import org.springframework.data.repository.query.Param;
 
 public interface AlarmRepository extends JpaRepository<AlarmEntity, Long> {
 
-    List<AlarmEntity> findAllByMemberIdAndMemberActiveStatusIsTrue(Long memberId);
+    List<AlarmEntity> findAllByMemberId(Long memberId);
 
-    @Query(value = "SELECT * FROM alarm WHERE repeat_days LIKE %:day% AND member_active_status = true", nativeQuery = true)
+    @Query(value = "SELECT * FROM alarm WHERE repeat_days LIKE %:day%", nativeQuery = true)
     List<AlarmEntity> findByRepeatDaysLike(@Param("day") String day);
 
-    @Modifying(clearAutomatically = true)
+    @Modifying
     @Query("""
-    UPDATE AlarmEntity a 
-    SET a.memberActiveStatus = false 
-    WHERE a.member.id = :memberId
+        DELETE FROM AlarmEntity a
+        WHERE a.member.id = :memberId
     """)
-    void updateMemberDeactivateByMemberId(@Param("memberId") Long memberId);
+    void deleteByMemberId(@Param("memberId") Long memberId);
 }

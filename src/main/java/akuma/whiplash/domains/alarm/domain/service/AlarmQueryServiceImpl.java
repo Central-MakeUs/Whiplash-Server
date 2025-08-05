@@ -18,7 +18,6 @@ import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -46,7 +45,7 @@ public class AlarmQueryServiceImpl implements AlarmQueryService {
             .orElseThrow(() -> ApplicationException.from(MemberErrorCode.MEMBER_NOT_FOUND));
 
         // 2. 알람 목록 조회
-        List<AlarmEntity> alarms = alarmRepository.findAllByMemberIdAndMemberActiveStatusIsTrue(memberId);
+        List<AlarmEntity> alarms = alarmRepository.findAllByMemberId(memberId);
         LocalDate today = LocalDate.now();
 
         return alarms.stream()
@@ -57,7 +56,7 @@ public class AlarmQueryServiceImpl implements AlarmQueryService {
     private AlarmInfoPreviewResponse buildPreviewResponse(AlarmEntity alarm, LocalDate today, Long memberId) {
         // 1. 가장 최근 OFF 또는 CHECKIN 이력 조회
         Optional<AlarmOccurrenceEntity> recentOccurrenceOpt =
-            alarmOccurrenceRepository.findTopByAlarmIdAndDeactivateTypeInAndMemberActiveStatusIsTrueOrderByDateDescTimeDesc(
+            alarmOccurrenceRepository.findTopByAlarmIdAndDeactivateTypeInOrderByDateDescTimeDesc(
                 alarm.getId(),
                 List.of(DeactivateType.OFF, DeactivateType.CHECKIN)
             );
@@ -104,7 +103,7 @@ public class AlarmQueryServiceImpl implements AlarmQueryService {
 
         // 5. AlarmOccurrence 존재 여부 확인 후 없으면 생성
         AlarmOccurrenceEntity occurrence = alarmOccurrenceRepository
-            .findByAlarmIdAndDateIfActive(alarm.getId(), resolvedFirstUpcomingDate)
+            .findTopByAlarmIdAndDateOrderByCreatedAtDesc(alarm.getId(), resolvedFirstUpcomingDate)
             .orElseGet(() -> {
                 AlarmOccurrenceEntity newOccurrence = AlarmMapper.mapToAlarmOccurrenceForDate(alarm, resolvedFirstUpcomingDate);
                 return alarmOccurrenceRepository.save(newOccurrence);

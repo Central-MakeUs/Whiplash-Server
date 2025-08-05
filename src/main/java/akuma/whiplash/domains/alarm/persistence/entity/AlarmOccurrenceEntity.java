@@ -1,10 +1,8 @@
 package akuma.whiplash.domains.alarm.persistence.entity;
 
-import static akuma.whiplash.domains.alarm.exception.AlarmErrorCode.ALREADY_DEACTIVATED;
 
 import akuma.whiplash.domains.alarm.domain.constant.DeactivateType;
 import akuma.whiplash.global.entity.BaseTimeEntity;
-import akuma.whiplash.global.exception.ApplicationException;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -16,6 +14,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -30,7 +29,15 @@ import org.hibernate.annotations.DynamicInsert;
 @SuperBuilder
 @DynamicInsert
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-@Table(name = "alarm_occurrence")
+@Table(
+    name = "alarm_occurrence",
+    uniqueConstraints = {
+        @UniqueConstraint(
+            name = "uk_alarm_date",
+            columnNames = {"alarm_id", "date"}
+        )
+    }
+)
 public class AlarmOccurrenceEntity extends BaseTimeEntity {
 
     @Id
@@ -62,9 +69,6 @@ public class AlarmOccurrenceEntity extends BaseTimeEntity {
 
     @Column(name = "ringing_count", nullable = false)
     private int ringingCount;
-
-    @Column(name = "member_active_status",nullable = false)
-    private boolean memberActiveStatus;
 
     public void deactivate(DeactivateType type, LocalDateTime time) {
         this.deactivateType = type;        // 알람 종료 방식 설정: OFF 또는 CHECKIN

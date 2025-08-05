@@ -84,7 +84,7 @@ public class AlarmController {
     }
 
     @CustomErrorCodes(
-        alarmErrorCodes = {ALARM_NOT_FOUND, ALARM_OCCURENCE_NOT_FOUND, CHECKIN_OUT_OF_RANGE, ALREADY_DEACTIVATED},
+        alarmErrorCodes = {ALARM_NOT_FOUND, ALARM_OCCURRENCE_NOT_FOUND, CHECKIN_OUT_OF_RANGE, ALREADY_DEACTIVATED},
         authErrorCodes = {PERMISSION_DENIED}
     )
     @Operation(summary = "알람 도착 인증", description = "알람 도착 인증을 합니다. 도착 위치 반경 100m 내에 들어와야 도착 인증이 가능합니다.")

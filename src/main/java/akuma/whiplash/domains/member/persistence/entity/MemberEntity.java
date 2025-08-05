@@ -46,9 +46,6 @@ public class MemberEntity extends BaseTimeEntity {
     @Enumerated(EnumType.STRING)
     private Role role;
 
-    @Column(nullable = false)
-    private boolean activeStatus;
-
     @Column(name = "privacy_policy", nullable = false)
     private boolean privacyPolicy;
 
@@ -69,9 +66,5 @@ public class MemberEntity extends BaseTimeEntity {
     public void updatePushNotificationPolicy(boolean pushNotificationPolicy) {
         this.pushNotificationPolicy = pushNotificationPolicy;
         this.pushAgreedAt = LocalDateTime.now();
-    }
-
-    public void updateDeactivate() {
-        this.activeStatus = false;
     }
 }

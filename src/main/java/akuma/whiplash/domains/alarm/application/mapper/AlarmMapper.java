@@ -30,7 +30,6 @@ public class AlarmMapper {
             .latitude(request.latitude())
             .longitude(request.longitude())
             .address(request.address())
-            .memberActiveStatus(true)
             .build();
     }
 
@@ -61,7 +60,6 @@ public class AlarmMapper {
             .alarmRinging(true)
             .deactivatedAt(null)
             .ringingCount(1)
-            .memberActiveStatus(true)
             .build();
     }
 
@@ -75,7 +73,6 @@ public class AlarmMapper {
             .checkinTime(null)
             .alarmRinging(false)
             .ringingCount(0)
-            .memberActiveStatus(true)
             .build();
     }
 

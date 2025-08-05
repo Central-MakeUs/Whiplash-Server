@@ -63,7 +63,4 @@ public class AlarmEntity extends BaseTimeEntity {
 
     @Column(length = 50, nullable = false)
     private String address;
-
-    @Column(name = "member_active_status", nullable = false)
-    private boolean memberActiveStatus;
 }

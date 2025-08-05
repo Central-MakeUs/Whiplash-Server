@@ -20,7 +20,7 @@ public enum AlarmErrorCode implements BaseErrorCode {
     CHECKIN_OUT_OF_RANGE(HttpStatus.BAD_REQUEST, "ALARM_009", "지정된 위치 반경 내에 있지 않아 출석할 수 없습니다."),
 
     ALARM_NOT_FOUND(HttpStatus.NOT_FOUND, "ALARM_401", "존재하지 않는 알람입니다."),
-    ALARM_OCCURENCE_NOT_FOUND(HttpStatus.NOT_FOUND, "ALARM_402", "알람 발생 내역이 존재하지 않습니다.")
+    ALARM_OCCURRENCE_NOT_FOUND(HttpStatus.NOT_FOUND, "ALARM_402", "알람 발생 내역이 존재하지 않습니다.")
     ;
 
     private final HttpStatus httpStatus;

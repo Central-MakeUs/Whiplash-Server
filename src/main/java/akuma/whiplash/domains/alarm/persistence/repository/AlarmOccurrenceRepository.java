@@ -18,9 +18,8 @@ public interface AlarmOccurrenceRepository extends JpaRepository<AlarmOccurrence
     FROM AlarmOccurrenceEntity ao
     WHERE ao.alarm.id = :alarmId
       AND ao.date = :date
-      AND ao.memberActiveStatus = true
     """)
-    boolean existsByAlarmIdAndDateIfActive(
+    boolean existsByAlarmIdAndDate(
         @Param("alarmId") Long alarmId,
         @Param("date") LocalDate date
     );
@@ -30,14 +29,19 @@ public interface AlarmOccurrenceRepository extends JpaRepository<AlarmOccurrence
     FROM AlarmOccurrenceEntity ao
     WHERE ao.alarm.id = :alarmId
       AND ao.date = :date
-      AND ao.memberActiveStatus = true
     """)
-    Optional<AlarmOccurrenceEntity> findByAlarmIdAndDateIfActive(
+    Optional<AlarmOccurrenceEntity> findByAlarmIdAndDate(
         @Param("alarmId") Long alarmId,
         @Param("date") LocalDate date
     );
 
-    Optional<AlarmOccurrenceEntity> findTopByAlarmIdAndDeactivateTypeInAndMemberActiveStatusIsTrueOrderByDateDescTimeDesc(
+    Optional<AlarmOccurrenceEntity> findTopByAlarmIdAndDateOrderByCreatedAtDesc(
+        Long alarmId,
+        LocalDate date
+    );
+
+
+    Optional<AlarmOccurrenceEntity> findTopByAlarmIdAndDeactivateTypeInOrderByDateDescTimeDesc(
         Long alarmId, List<DeactivateType> deactivateTypes
     );
 
@@ -45,25 +49,20 @@ public interface AlarmOccurrenceRepository extends JpaRepository<AlarmOccurrence
     SELECT ao
     FROM AlarmOccurrenceEntity ao
     WHERE ao.alarm.id = :alarmId
-      AND ao.memberActiveStatus = true
     """)
-    List<AlarmOccurrenceEntity> findAllByAlarmIdIfActive(@Param("alarmId") Long alarmId);
+    List<AlarmOccurrenceEntity> findAllByAlarmId(@Param("alarmId") Long alarmId);
 
     @Query("""
     SELECT ao.alarm.id
     FROM AlarmOccurrenceEntity ao
     WHERE ao.date = :date
-      AND ao.memberActiveStatus = true
     """)
-    Set<Long> findAlarmIdsByDateIfActive(@Param("date") LocalDate date);
+    Set<Long> findAlarmIdsByDate(@Param("date") LocalDate date);
 
-    @Modifying(clearAutomatically = true)
+    @Modifying
     @Query("""
-    UPDATE AlarmOccurrenceEntity ao 
-    SET ao.memberActiveStatus = false 
-    WHERE ao.alarm.id IN (
-        SELECT a.id FROM AlarmEntity a WHERE a.member.id = :memberId
-    )
+        DELETE FROM AlarmOccurrenceEntity ao
+        WHERE ao.alarm.member.id = :memberId
     """)
-    void updateMemberDeactivateByMemberId(@Param("memberId") Long memberId);
+    void deleteByMemberId(@Param("memberId") Long memberId);
 }

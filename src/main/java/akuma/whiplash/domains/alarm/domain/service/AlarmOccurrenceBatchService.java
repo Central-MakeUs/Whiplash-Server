@@ -40,7 +40,7 @@ public class AlarmOccurrenceBatchService {
         log.info("[AlarmOccurrence Create Batch] 오늘({}) 울릴 알람 수: {}", todayDayOfWeek, todayAlarms.size());
 
         // 2. 이미 alarm_occurrence가 생성된 알람 ID 목록 조회
-        Set<Long> existingAlarmIds = alarmOccurrenceRepository.findAlarmIdsByDateIfActive(today);
+        Set<Long> existingAlarmIds = alarmOccurrenceRepository.findAlarmIdsByDate(today);
 
         int createdCount = 0;
         int skippedCount = 0;
