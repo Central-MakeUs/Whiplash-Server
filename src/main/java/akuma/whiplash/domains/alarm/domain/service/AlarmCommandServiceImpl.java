@@ -110,8 +110,8 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
 
         // 병렬로 필요한 데이터 조회를 위한 준비 (필요한 쿼리들을 한 번에 실행)
         // 1. 이번 주 끈 횟수 확인과 2. 오늘 알람 발생 내역 조회를 동시에 처리
-        long weeklyOffCount = alarmOffLogRepository.countByAlarmIdAndMemberIdAndCreatedAtBetween(
-            alarmId, memberId,
+        long weeklyOffCount = alarmOffLogRepository.countByMemberIdAndCreatedAtBetween(
+            memberId,
             weekStart.atStartOfDay(),
             weekEnd.plusDays(1).atStartOfDay()
         );
@@ -159,7 +159,6 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
         // 주 2회 제한, 이미 1번 끔 → 이번에 또 끄면 2회 → 남은 횟수는 0
         int remainingCount = (int) (2 - (weeklyOffCount + 1));
 
-        // TODO: reactivateDate, reactivateDayOfWeek, remainingOffCount 로직 확인
         return AlarmOffResultResponse.builder()
             .offTargetDate(offTargetDate)
             .offTargetDayOfWeek(getKoreanDayOfWeek(offTargetDate))
@@ -176,37 +175,20 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
         AlarmEntity alarm = findAlarmById(alarmId);
         validAlarmOwner(memberId, alarm.getMember().getId());
 
-        // 2. 다음 알람 발생일 기준으로 삭제 가능 마감 시각 계산 (다음날 00시 이전까지만 삭제 허용)
-        LocalDate nextDate = getNextOccurrenceDate(alarm, LocalDate.now());
-        LocalDateTime limitTime = nextDate.minusDays(1).atTime(LocalTime.MAX);
-
-        // 3. 현재 시간이 삭제 마감 시간 이후라면 삭제 불가
-        if (LocalDateTime.now().isAfter(limitTime)) {
-            throw ApplicationException.from(ALARM_DELETE_NOT_AVAILABLE);
-        }
-
-        // 4. 오늘 알람 발생 내역이 있고, 비활성화되지 않았다면 삭제 불가
-        alarmOccurrenceRepository.findByAlarmIdAndDate(alarmId, LocalDate.now())
-            .ifPresent(o -> {
-                if (o.getDeactivateType() == DeactivateType.NONE) {
-                    throw ApplicationException.from(ALARM_DELETE_NOT_AVAILABLE);
-                }
-            });
-
-        // 5. 삭제 사유를 Google Sheets에 로그로 기록
+        // 2. 삭제 사유를 Google Sheets에 로그로 기록
         logDeleteReason(alarm.getAlarmPurpose(), reason);
 
-        // 6. 알람 발생 내역 전체 조회 및 관련 로그 제거
+        // 3. 알람 발생 내역 전체 조회 및 관련 로그 제거
         List<AlarmOccurrenceEntity> occurrences = alarmOccurrenceRepository.findAllByAlarmId(alarmId);
         for (AlarmOccurrenceEntity occ : occurrences) {
             alarmRingingLogRepository.deleteAllByAlarmOccurrenceId(occ.getId());
         }
 
-        // 7. 알람 발생 이력, 끈 이력 삭제
+        // 4. 알람 발생 이력, 끈 이력 삭제
         alarmOccurrenceRepository.deleteAll(occurrences);
         alarmOffLogRepository.deleteAllByAlarmId(alarmId);
 
-        // 8. 알람 자체 삭제
+        // 5. 알람 자체 삭제
         alarmRepository.delete(alarm);
     }
 

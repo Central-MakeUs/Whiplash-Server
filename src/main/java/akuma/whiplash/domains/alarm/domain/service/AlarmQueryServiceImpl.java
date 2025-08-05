@@ -109,7 +109,7 @@ public class AlarmQueryServiceImpl implements AlarmQueryService {
                 return alarmOccurrenceRepository.save(newOccurrence);
             });
 
-        // 6. 알람 당 이번 주 남은 알람 끄기 횟수 계산
+        // 6. 회원의 이번 주 남은 알람 끄기 횟수 계산
         long remainingOffCount = calculateRemainingOffCount(memberId, alarm.getId());
 
         return AlarmInfoPreviewResponse.builder()
@@ -160,8 +160,8 @@ public class AlarmQueryServiceImpl implements AlarmQueryService {
         LocalDateTime weekStart = monday.atStartOfDay();
         LocalDateTime now = LocalDateTime.now();
 
-        long offCount = alarmOffLogRepository.countByAlarmIdAndMemberIdAndCreatedAtBetween(
-            alarmId, memberId, weekStart, now
+        long offCount = alarmOffLogRepository.countByMemberIdAndCreatedAtBetween(
+            memberId, weekStart, now
         );
 
         return Math.max(0, 2 - offCount);

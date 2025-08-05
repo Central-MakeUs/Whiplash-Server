@@ -8,8 +8,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface AlarmOffLogRepository extends JpaRepository<AlarmOffLogEntity, Long> {
-    long countByAlarmIdAndMemberIdAndCreatedAtBetween(
-        Long alarmId,
+    long countByMemberIdAndCreatedAtBetween(
         Long memberId,
         LocalDateTime start,
         LocalDateTime end
