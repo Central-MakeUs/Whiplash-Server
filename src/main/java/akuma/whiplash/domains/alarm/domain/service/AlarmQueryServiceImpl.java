@@ -14,16 +14,17 @@ import akuma.whiplash.domains.alarm.persistence.repository.AlarmRepository;
 import akuma.whiplash.domains.member.exception.MemberErrorCode;
 import akuma.whiplash.domains.member.persistence.repository.MemberRepository;
 import akuma.whiplash.global.exception.ApplicationException;
+import akuma.whiplash.global.response.code.CommonErrorCode;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -46,7 +47,7 @@ public class AlarmQueryServiceImpl implements AlarmQueryService {
             .orElseThrow(() -> ApplicationException.from(MemberErrorCode.MEMBER_NOT_FOUND));
 
         // 2. 알람 목록 조회
-        List<AlarmEntity> alarms = alarmRepository.findAllByMemberIdAndMemberActiveStatusIsTrue(memberId);
+        List<AlarmEntity> alarms = alarmRepository.findAllByMemberId(memberId);
         LocalDate today = LocalDate.now();
 
         return alarms.stream()
@@ -57,7 +58,7 @@ public class AlarmQueryServiceImpl implements AlarmQueryService {
     private AlarmInfoPreviewResponse buildPreviewResponse(AlarmEntity alarm, LocalDate today, Long memberId) {
         // 1. 가장 최근 OFF 또는 CHECKIN 이력 조회
         Optional<AlarmOccurrenceEntity> recentOccurrenceOpt =
-            alarmOccurrenceRepository.findTopByAlarmIdAndDeactivateTypeInAndMemberActiveStatusIsTrueOrderByDateDescTimeDesc(
+            alarmOccurrenceRepository.findTopByAlarmIdAndDeactivateTypeInOrderByDateDescTimeDesc(
                 alarm.getId(),
                 List.of(DeactivateType.OFF, DeactivateType.CHECKIN)
             );
@@ -102,15 +103,22 @@ public class AlarmQueryServiceImpl implements AlarmQueryService {
         final LocalDate resolvedFirstUpcomingDate = isCurrentDeactivated ? secondDate : firstDate;
         final LocalDate resolvedSecondUpcomingDate = isCurrentDeactivated ? thirdDate : secondDate;
 
+        // TODO: 도착 인증 API 동작 방식 변경시 이 로직 수정 필요
         // 5. AlarmOccurrence 존재 여부 확인 후 없으면 생성
         AlarmOccurrenceEntity occurrence = alarmOccurrenceRepository
-            .findByAlarmIdAndDateIfActive(alarm.getId(), resolvedFirstUpcomingDate)
+            .findTopByAlarmIdAndDateOrderByCreatedAtDesc(alarm.getId(), resolvedFirstUpcomingDate)
             .orElseGet(() -> {
                 AlarmOccurrenceEntity newOccurrence = AlarmMapper.mapToAlarmOccurrenceForDate(alarm, resolvedFirstUpcomingDate);
-                return alarmOccurrenceRepository.save(newOccurrence);
+                try {
+                    return alarmOccurrenceRepository.save(newOccurrence);
+                } catch (DataIntegrityViolationException e) {
+                    return alarmOccurrenceRepository
+                        .findTopByAlarmIdAndDateOrderByCreatedAtDesc(alarm.getId(), resolvedFirstUpcomingDate)
+                        .orElseThrow(() -> ApplicationException.from(CommonErrorCode.INTERNAL_SERVER_ERROR));
+                }
             });
 
-        // 6. 알람 당 이번 주 남은 알람 끄기 횟수 계산
+        // 6. 회원의 이번 주 남은 알람 끄기 횟수 계산
         long remainingOffCount = calculateRemainingOffCount(memberId, alarm.getId());
 
         return AlarmInfoPreviewResponse.builder()
@@ -161,8 +169,8 @@ public class AlarmQueryServiceImpl implements AlarmQueryService {
         LocalDateTime weekStart = monday.atStartOfDay();
         LocalDateTime now = LocalDateTime.now();
 
-        long offCount = alarmOffLogRepository.countByAlarmIdAndMemberIdAndCreatedAtBetween(
-            alarmId, memberId, weekStart, now
+        long offCount = alarmOffLogRepository.countByMemberIdAndCreatedAtBetween(
+            memberId, weekStart, now
         );
 
         return Math.max(0, 2 - offCount);

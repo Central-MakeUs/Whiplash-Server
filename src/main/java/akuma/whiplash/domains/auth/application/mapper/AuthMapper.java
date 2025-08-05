@@ -16,7 +16,6 @@ public class AuthMapper {
             .email(memberInfo.email())
             .nickname(memberInfo.name())
             .role(Role.USER)
-            .activeStatus(true)
             .privacyPolicy(true)
             .pushNotificationPolicy(true)
             .privacyAgreedAt(LocalDateTime.now())

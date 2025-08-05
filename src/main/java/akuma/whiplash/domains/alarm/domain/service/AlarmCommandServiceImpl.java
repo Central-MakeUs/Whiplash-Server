@@ -21,7 +21,6 @@ import akuma.whiplash.domains.member.exception.MemberErrorCode;
 import akuma.whiplash.domains.member.persistence.entity.MemberEntity;
 import akuma.whiplash.domains.member.persistence.repository.MemberRepository;
 import akuma.whiplash.global.exception.ApplicationException;
-import akuma.whiplash.global.response.code.CommonErrorCode;
 import com.google.api.services.sheets.v4.Sheets;
 import com.google.api.services.sheets.v4.SheetsScopes;
 import com.google.api.services.sheets.v4.model.ValueRange;
@@ -82,7 +81,7 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
         validAlarmOwner(memberId, alarmEntity.getMember().getId());
 
         // 각 알람이 울릴 때 알람 발생 내역은 1개만 허용(반복 울림은 alarm_ringing_log로 관리), 오늘 날짜 기준 알람 발생 내역이 이미 존재하면 예외 발생
-        boolean alreadyExists = alarmOccurrenceRepository.existsByAlarmIdAndDateIfActive(alarmId, LocalDate.now());
+        boolean alreadyExists = alarmOccurrenceRepository.existsByAlarmIdAndDate(alarmId, LocalDate.now());
         if (alreadyExists) {
             throw ApplicationException.from(ALREADY_OCCURRED_EXISTS);
         }
@@ -111,8 +110,8 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
 
         // 병렬로 필요한 데이터 조회를 위한 준비 (필요한 쿼리들을 한 번에 실행)
         // 1. 이번 주 끈 횟수 확인과 2. 오늘 알람 발생 내역 조회를 동시에 처리
-        long weeklyOffCount = alarmOffLogRepository.countByAlarmIdAndMemberIdAndCreatedAtBetween(
-            alarmId, memberId,
+        long weeklyOffCount = alarmOffLogRepository.countByMemberIdAndCreatedAtBetween(
+            memberId,
             weekStart.atStartOfDay(),
             weekEnd.plusDays(1).atStartOfDay()
         );
@@ -123,7 +122,7 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
 
         // 오늘 알람 발생 내역 조회
         Optional<AlarmOccurrenceEntity> todayOccurrenceOpt =
-            alarmOccurrenceRepository.findByAlarmIdAndDateIfActive(alarmId, clientDate);
+            alarmOccurrenceRepository.findByAlarmIdAndDate(alarmId, clientDate);
 
         // 알람이 울렸는지 판단하는 변수 (계산 최적화)
         boolean isAfterRinging = todayOccurrenceOpt
@@ -137,7 +136,7 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
 
         // 끌 대상 날짜의 알람 발생 내역 조회 또는 생성
         AlarmOccurrenceEntity targetOccurrence = alarmOccurrenceRepository
-            .findByAlarmIdAndDateIfActive(alarmId, offTargetDate)
+            .findByAlarmIdAndDate(alarmId, offTargetDate)
             .orElseGet(() -> {
                 AlarmOccurrenceEntity newOccurrence = AlarmMapper.mapToAlarmOccurrenceForDate(alarm, offTargetDate);
                 return alarmOccurrenceRepository.save(newOccurrence);
@@ -160,7 +159,6 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
         // 주 2회 제한, 이미 1번 끔 → 이번에 또 끄면 2회 → 남은 횟수는 0
         int remainingCount = (int) (2 - (weeklyOffCount + 1));
 
-        // TODO: reactivateDate, reactivateDayOfWeek, remainingOffCount 로직 확인
         return AlarmOffResultResponse.builder()
             .offTargetDate(offTargetDate)
             .offTargetDayOfWeek(getKoreanDayOfWeek(offTargetDate))
@@ -177,37 +175,20 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
         AlarmEntity alarm = findAlarmById(alarmId);
         validAlarmOwner(memberId, alarm.getMember().getId());
 
-        // 2. 다음 알람 발생일 기준으로 삭제 가능 마감 시각 계산 (다음날 00시 이전까지만 삭제 허용)
-        LocalDate nextDate = getNextOccurrenceDate(alarm, LocalDate.now());
-        LocalDateTime limitTime = nextDate.minusDays(1).atTime(LocalTime.MAX);
-
-        // 3. 현재 시간이 삭제 마감 시간 이후라면 삭제 불가
-        if (LocalDateTime.now().isAfter(limitTime)) {
-            throw ApplicationException.from(ALARM_DELETE_NOT_AVAILABLE);
-        }
-
-        // 4. 오늘 알람 발생 내역이 있고, 비활성화되지 않았다면 삭제 불가
-        alarmOccurrenceRepository.findByAlarmIdAndDateIfActive(alarmId, LocalDate.now())
-            .ifPresent(o -> {
-                if (o.getDeactivateType() == DeactivateType.NONE) {
-                    throw ApplicationException.from(ALARM_DELETE_NOT_AVAILABLE);
-                }
-            });
-
-        // 5. 삭제 사유를 Google Sheets에 로그로 기록
+        // 2. 삭제 사유를 Google Sheets에 로그로 기록
         logDeleteReason(alarm.getAlarmPurpose(), reason);
 
-        // 6. 알람 발생 내역 전체 조회 및 관련 로그 제거
-        List<AlarmOccurrenceEntity> occurrences = alarmOccurrenceRepository.findAllByAlarmIdIfActive(alarmId);
+        // 3. 알람 발생 내역 전체 조회 및 관련 로그 제거
+        List<AlarmOccurrenceEntity> occurrences = alarmOccurrenceRepository.findAllByAlarmId(alarmId);
         for (AlarmOccurrenceEntity occ : occurrences) {
             alarmRingingLogRepository.deleteAllByAlarmOccurrenceId(occ.getId());
         }
 
-        // 7. 알람 발생 이력, 끈 이력 삭제
+        // 4. 알람 발생 이력, 끈 이력 삭제
         alarmOccurrenceRepository.deleteAll(occurrences);
         alarmOffLogRepository.deleteAllByAlarmId(alarmId);
 
-        // 8. 알람 자체 삭제
+        // 5. 알람 자체 삭제
         alarmRepository.delete(alarm);
     }
 
@@ -221,7 +202,7 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
 
         // 2. 알람 발생 이력 조회
         AlarmOccurrenceEntity occurrence = alarmOccurrenceRepository.findById(occurrenceId)
-            .orElseThrow(() -> ApplicationException.from(ALARM_OCCURENCE_NOT_FOUND));
+            .orElseThrow(() -> ApplicationException.from(ALARM_OCCURRENCE_NOT_FOUND));
 
         if (!occurrence.getAlarm().getId().equals(alarmId)) {
             log.warn("[도착 인증] 해당 알람의 발생 내역이 아닙니다.");

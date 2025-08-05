@@ -33,10 +33,10 @@ public class MemberController {
     }
 
     @CustomErrorCodes
-    @Operation(summary = "회원 탈퇴", description = "회원 정보와 관련된 알람 정보를 soft delete 합니다.")
+    @Operation(summary = "회원 탈퇴", description = "회원 정보, 관련된 알람 정보를 hard delete 합니다.")
     @DeleteMapping
-    public ApplicationResponse<Void> softDeleteMember(@AuthenticationPrincipal MemberContext memberContext) {
-        memberUseCase.softDeleteMember(memberContext.memberId());
+    public ApplicationResponse<Void> hardDeleteMember(@AuthenticationPrincipal MemberContext memberContext) {
+        memberUseCase.hardDeleteMember(memberContext.memberId());
         return ApplicationResponse.onSuccess();
     }
 }

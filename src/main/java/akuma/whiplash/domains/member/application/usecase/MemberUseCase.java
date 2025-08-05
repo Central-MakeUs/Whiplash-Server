@@ -16,7 +16,7 @@ public class MemberUseCase {
         memberCommandService.modifyMemberTermsInfo(memberId, request);
     }
 
-    public void softDeleteMember(Long memberId) {
-        memberCommandService.softDeleteMember(memberId);
+    public void hardDeleteMember(Long memberId) {
+        memberCommandService.hardDeleteMember(memberId);
     }
 }

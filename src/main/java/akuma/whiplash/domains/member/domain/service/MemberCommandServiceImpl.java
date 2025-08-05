@@ -1,7 +1,9 @@
 package akuma.whiplash.domains.member.domain.service;
 
 import akuma.whiplash.domains.alarm.persistence.repository.AlarmOccurrenceRepository;
+import akuma.whiplash.domains.alarm.persistence.repository.AlarmOffLogRepository;
 import akuma.whiplash.domains.alarm.persistence.repository.AlarmRepository;
+import akuma.whiplash.domains.alarm.persistence.repository.AlarmRingingLogRepository;
 import akuma.whiplash.domains.member.application.dto.request.MemberTermsModifyRequest;
 import akuma.whiplash.domains.member.exception.MemberErrorCode;
 import akuma.whiplash.domains.member.persistence.entity.MemberEntity;
@@ -19,10 +21,12 @@ public class MemberCommandServiceImpl implements MemberCommandService {
     private final MemberRepository memberRepository;
     private final AlarmRepository alarmRepository;
     private final AlarmOccurrenceRepository alarmOccurrenceRepository;
+    private final AlarmOffLogRepository alarmOffLogRepository;
+    private final AlarmRingingLogRepository alarmRingingLogRepository;
 
     @Override
     public void modifyMemberTermsInfo(Long memberId, MemberTermsModifyRequest request) {
-        MemberEntity member = memberRepository.findByIdAndActiveStatusIsTrue(memberId)
+        MemberEntity member = memberRepository.findById(memberId)
             .orElseThrow(() -> ApplicationException.from(MemberErrorCode.MEMBER_NOT_FOUND));
 
         if (request.privacyPolicy() != null) {
@@ -35,23 +39,25 @@ public class MemberCommandServiceImpl implements MemberCommandService {
     }
 
     @Override
-    public void softDeleteMember(Long memberId) {
-        MemberEntity member = memberRepository.findByIdAndActiveStatusIsTrue(memberId)
+    public void hardDeleteMember(Long memberId) {
+        MemberEntity member = memberRepository.findById(memberId)
             .orElseThrow(() -> ApplicationException.from(MemberErrorCode.MEMBER_NOT_FOUND));
 
-        // 1. member 비활성화
-        member.updateDeactivate();
+        // 2. alarm_ringing_log 삭제
+        alarmRingingLogRepository.deleteByMemberId(memberId);
 
-        // 뒤에서 @Modifying(clearAutomatically = true) 호출하므로 명시적으로 영속성 컨텍스트 호출 필요
-        memberRepository.flush();
+        // 3. alarm_occurrence 삭제
+        alarmOccurrenceRepository.deleteByMemberId(memberId);
 
-        // 2. alarm 테이블 비정규화 컬럼 동기화
-        alarmRepository.updateMemberDeactivateByMemberId(memberId);
+        // 4. alarm_off_log 삭제
+        alarmOffLogRepository.deleteByMemberId(memberId);
 
-        // 3. alarm_occurrence 테이블 비정규화 컬럼 동기화
-        alarmOccurrenceRepository.updateMemberDeactivateByMemberId(memberId);
+        // 5. alarm 삭제
+        alarmRepository.deleteByMemberId(memberId);
 
-        // TODO: alarm_ringing_log 삭제
+        // 6. member 삭제
+        memberRepository.delete(member);
+
 
         // TODO: 리프레시 토큰, FCM 토큰 삭제
     }
