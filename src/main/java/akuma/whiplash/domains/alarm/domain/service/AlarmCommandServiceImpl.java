@@ -32,7 +32,6 @@ import com.google.auth.oauth2.ServiceAccountCredentials;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Collections;
 import java.util.List;
@@ -101,7 +100,7 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
         LocalDate clientDate = clientNow.toLocalDate(); // 클라이언트 기준 날짜
 
         // 1. 클라이언트와 서버 시간 간 불일치 검사
-        validateClockSkew(clientNow, serverNow);
+        validClockSkew(clientNow, serverNow);
 
         // 2. 알람 조회 및 소유자 검증
         AlarmEntity findAlarm = findAlarmById(alarmId);
@@ -323,7 +322,7 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
         }
     }
 
-    private static void validateClockSkew(LocalDateTime clientNow, LocalDateTime serverNow) {
+    private static void validClockSkew(LocalDateTime clientNow, LocalDateTime serverNow) {
         LocalDate clientDate = clientNow.toLocalDate();
         LocalDate serverDate = serverNow.toLocalDate();
 

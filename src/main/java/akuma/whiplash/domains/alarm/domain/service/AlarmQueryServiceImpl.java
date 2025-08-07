@@ -105,7 +105,7 @@ public class AlarmQueryServiceImpl implements AlarmQueryService {
         final LocalDate resolvedSecondUpcomingDate = isCurrentDeactivated ? thirdDate : secondDate;
 
         // 5. 회원의 이번 주 남은 알람 끄기 횟수 계산
-        long remainingOffCount = calculateRemainingOffCount(memberId, alarm.getId());
+        long remainingOffCount = calculateRemainingOffCount(memberId);
 
         return AlarmInfoPreviewResponse.builder()
             .alarmId(alarm.getId())
@@ -121,9 +121,9 @@ public class AlarmQueryServiceImpl implements AlarmQueryService {
             .longitude(alarm.getLongitude())
             .isToggleOn(isToggleOn)
             .firstUpcomingDay(resolvedFirstUpcomingDate)
-            .firstUpcomingDayOfWeek(getKoreanDayOfWeek(resolvedFirstUpcomingDate))
+            .firstUpcomingDayOfWeek(DateUtil.getKoreanDayOfWeek(resolvedFirstUpcomingDate))
             .secondUpcomingDay(resolvedSecondUpcomingDate)
-            .secondUpcomingDayOfWeek(getKoreanDayOfWeek(resolvedSecondUpcomingDate))
+            .secondUpcomingDayOfWeek(DateUtil.getKoreanDayOfWeek(resolvedSecondUpcomingDate))
             .remainingOffCount(remainingOffCount)
             .build();
     }
@@ -131,7 +131,7 @@ public class AlarmQueryServiceImpl implements AlarmQueryService {
     /**
      * 이번 주 월요일부터 현재까지의 OFF 로그를 기반으로 남은 끄기 횟수 계산
      */
-    private long calculateRemainingOffCount(Long memberId, Long alarmId) {
+    private long calculateRemainingOffCount(Long memberId) {
         LocalDate today = LocalDate.now();
         LocalDate monday = today.with(DayOfWeek.MONDAY);
         LocalDateTime weekStart = monday.atStartOfDay();
@@ -142,18 +142,6 @@ public class AlarmQueryServiceImpl implements AlarmQueryService {
         );
 
         return Math.max(0, 2 - offCount);
-    }
-
-    private String getKoreanDayOfWeek(LocalDate date) {
-        return switch (date.getDayOfWeek()) {
-            case MONDAY -> "월요일";
-            case TUESDAY -> "화요일";
-            case WEDNESDAY -> "수요일";
-            case THURSDAY -> "목요일";
-            case FRIDAY -> "금요일";
-            case SATURDAY -> "토요일";
-            case SUNDAY -> "일요일";
-        };
     }
 }
 
