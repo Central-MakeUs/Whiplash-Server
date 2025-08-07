@@ -21,6 +21,7 @@ import akuma.whiplash.domains.member.exception.MemberErrorCode;
 import akuma.whiplash.domains.member.persistence.entity.MemberEntity;
 import akuma.whiplash.domains.member.persistence.repository.MemberRepository;
 import akuma.whiplash.global.exception.ApplicationException;
+import akuma.whiplash.global.util.date.DateUtil;
 import com.google.api.services.sheets.v4.Sheets;
 import com.google.api.services.sheets.v4.SheetsScopes;
 import com.google.api.services.sheets.v4.model.ValueRange;
@@ -31,11 +32,12 @@ import com.google.auth.oauth2.ServiceAccountCredentials;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -95,80 +97,82 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
     @Override
     public AlarmOffResultResponse alarmOff(Long memberId, Long alarmId, LocalDateTime clientNow) {
         LocalDateTime serverNow = LocalDateTime.now(); // 서버 기준 현재 시간 (DB 기록용)
-        LocalDate clientDate = clientNow.toLocalDate();      // 클라이언트 기준 현재 날짜
+        LocalDate clientDate = clientNow.toLocalDate(); // 클라이언트 기준 날짜
 
-        // 요청 날짜와 서버의 날짜가 다르면 다른 날짜의 알람을 끌 수도 있으므로 예외 발생
-        validateClockSkew(clientNow, serverNow);
+        // 1. 클라이언트와 서버 시간 간 불일치 검사
+        validClockSkew(clientNow, serverNow);
 
-        // 알람 조회와 소유자 검증을 먼저 수행 (early fail)
-        AlarmEntity alarm = findAlarmById(alarmId);
-        validAlarmOwner(alarm.getMember().getId(), memberId);
+        // 2. 알람 조회 및 소유자 검증
+        AlarmEntity findAlarm = findAlarmById(alarmId);
+        validAlarmOwner(findAlarm.getMember().getId(), memberId);
 
-        // 이번 주 시작과 끝 날짜 계산 (주차 단위 끄기 횟수 제한에 사용)
-        LocalDate weekStart = clientDate.with(DayOfWeek.MONDAY);
-        LocalDate weekEnd = weekStart.plusDays(6);
+        // 3. 이번 주 시작~끝 날짜 계산 (주간 OFF 제한용)
+        LocalDate weekStart = DateUtil.getWeekStartDate(clientDate);
+        LocalDate weekEnd = DateUtil.getWeekEndDate(weekStart);
 
-        // 병렬로 필요한 데이터 조회를 위한 준비 (필요한 쿼리들을 한 번에 실행)
-        // 1. 이번 주 끈 횟수 확인과 2. 오늘 알람 발생 내역 조회를 동시에 처리
+        // 4. 이번 주 끈 횟수 조회
         long weeklyOffCount = alarmOffLogRepository.countByMemberIdAndCreatedAtBetween(
             memberId,
             weekStart.atStartOfDay(),
             weekEnd.plusDays(1).atStartOfDay()
         );
 
+        // 5. 제한 초과 시 예외 발생
         if (weeklyOffCount >= 2) {
             throw ApplicationException.from(ALARM_OFF_LIMIT_EXCEEDED);
         }
 
-        // 오늘 알람 발생 내역 조회
+        // 6. 오늘 알람 발생 내역 조회
         Optional<AlarmOccurrenceEntity> todayOccurrenceOpt =
             alarmOccurrenceRepository.findByAlarmIdAndDate(alarmId, clientDate);
 
-        // 알람이 울렸는지 판단하는 변수 (계산 최적화)
+        // 7. 알람이 울렸고 비활성화되지 않은 상태라면 → 다음 알람을 대상으로 설정
         boolean isAfterRinging = todayOccurrenceOpt
             .filter(o -> o.isAlarmRinging() && o.getDeactivateType() == DeactivateType.NONE)
             .map(o -> clientNow.isAfter(o.getTime().atDate(clientDate)))
             .orElse(false);
 
-        // 끌 대상 알람 날짜 계산 (캐시된 alarm 객체 사용)
+        // 8. 꺼야 할 알람 날짜 계산
         LocalDate searchStartDate = isAfterRinging ? clientDate.plusDays(1) : clientDate;
-        LocalDate offTargetDate = getNextOccurrenceDate(alarm, searchStartDate);
+        Set<DayOfWeek> repeatDays = findAlarm.getRepeatDays().stream()
+            .map(Weekday::getDayOfWeek)
+            .collect(Collectors.toSet());
+        LocalDate offTargetDate = DateUtil.getNextOccurrenceDate(repeatDays, searchStartDate);
 
-        // 끌 대상 날짜의 알람 발생 내역 조회 또는 생성
+        // 9. 같은 주인지 검증
+        validSameWeek(offTargetDate, clientDate);
+
+        // 10. 발생 내역 조회 또는 생성
         AlarmOccurrenceEntity targetOccurrence = alarmOccurrenceRepository
             .findByAlarmIdAndDate(alarmId, offTargetDate)
-            .orElseGet(() -> {
-                AlarmOccurrenceEntity newOccurrence = AlarmMapper.mapToAlarmOccurrenceForDate(alarm, offTargetDate);
-                return alarmOccurrenceRepository.save(newOccurrence);
-            });
+            .orElseGet(() -> alarmOccurrenceRepository.save(
+                AlarmMapper.mapToAlarmOccurrenceForDate(findAlarm, offTargetDate)));
 
-        // 이미 꺼진 알람이라면 예외
+        // 11. 이미 꺼져 있다면 예외
         if (targetOccurrence.getDeactivateType() != DeactivateType.NONE) {
             throw ApplicationException.from(ALREADY_DEACTIVATED);
         }
 
-        // 상태 변경과 로그 저장
+        // 12. 발생 내역 상태 변경 및 로그 기록
         targetOccurrence.deactivate(DeactivateType.OFF, serverNow);
-        AlarmOffLogEntity alarmOffLog = AlarmMapper.mapToAlarmOffLogEntity(alarm, alarm.getMember());
+        AlarmOffLogEntity alarmOffLog = AlarmMapper.mapToAlarmOffLogEntity(findAlarm, findAlarm.getMember());
 
         alarmOccurrenceRepository.save(targetOccurrence);
         alarmOffLogRepository.save(alarmOffLog);
 
-        // 다음 알람이 울리는 날짜
-        LocalDate reactivateDate = getNextOccurrenceDate(alarm, offTargetDate.plusDays(1));
-        // 주 2회 제한, 이미 1번 끔 → 이번에 또 끄면 2회 → 남은 횟수는 0
+        // 13. 다음 알람 울림 날짜 계산 및 응답 구성
+        LocalDate reactivateDate = DateUtil.getNextOccurrenceDate(repeatDays, offTargetDate.plusDays(1));
         int remainingCount = (int) (2 - (weeklyOffCount + 1));
 
         return AlarmOffResultResponse.builder()
             .offTargetDate(offTargetDate)
-            .offTargetDayOfWeek(getKoreanDayOfWeek(offTargetDate))
-            .reactivateDate(reactivateDate) 
-            .reactivateDayOfWeek(getKoreanDayOfWeek(reactivateDate))
+            .offTargetDayOfWeek(DateUtil.getKoreanDayOfWeek(offTargetDate))
+            .reactivateDate(reactivateDate)
+            .reactivateDayOfWeek(DateUtil.getKoreanDayOfWeek(reactivateDate))
             .remainingOffCount(remainingCount)
             .build();
     }
 
-    // TODO: alarm, alarm_occurrence soft delete 적용
     @Override
     public void removeAlarm(Long memberId, Long alarmId, String reason) {
         // 1. 알람 조회 및 소유자 검증
@@ -192,38 +196,46 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
         alarmRepository.delete(alarm);
     }
 
-    @Override
-    public void checkinAlarm(Long memberId, Long alarmId, Long occurrenceId, AlarmCheckinRequest request) {
-        // 1. 알람 조회 및 소유자 검증
-        AlarmEntity alarm = alarmRepository.findById(alarmId)
-            .orElseThrow(() -> ApplicationException.from(ALARM_NOT_FOUND));
 
+    @Override
+    public void checkinAlarm(Long memberId, Long alarmId, AlarmCheckinRequest request) {
+        // 1. 알람 조회 및 소유자 검증
+        AlarmEntity alarm = findAlarmById(alarmId);
         validAlarmOwner(memberId, alarm.getMember().getId());
 
-        // 2. 알람 발생 이력 조회
-        AlarmOccurrenceEntity occurrence = alarmOccurrenceRepository.findById(occurrenceId)
-            .orElseThrow(() -> ApplicationException.from(ALARM_OCCURRENCE_NOT_FOUND));
+        // 2. 오늘 날짜 기준으로 다음 알람 발생 날짜 계산
+        LocalDate today = LocalDate.now();
+        Set<DayOfWeek> repeatDays = alarm.getRepeatDays().stream()
+            .map(Weekday::getDayOfWeek)
+            .collect(Collectors.toSet());
 
-        if (!occurrence.getAlarm().getId().equals(alarmId)) {
-            log.warn("[도착 인증] 해당 알람의 발생 내역이 아닙니다.");
+        // TODO: 요청일보다 이전 날짜에 울려야할 알람을 꺼야하는 경우도 처리해야함(사용자가 알람을 안꺼서
+        LocalDate targetDate = DateUtil.getNextOccurrenceDate(repeatDays, today);
+
+        // 3. 요청일과 끄려고 하는 날짜가 같은 주인지 검증
+        validSameWeek(targetDate, today);
+
+        // 4. 해당 날짜의 발생 내역이 없으면 생성
+        AlarmOccurrenceEntity occurrence = alarmOccurrenceRepository
+            .findByAlarmIdAndDate(alarmId, targetDate)
+            .orElseGet(() -> alarmOccurrenceRepository.save(
+                AlarmMapper.mapToAlarmOccurrenceForDate(alarm, targetDate)));
+
+        // 5. 이미 끄기/체크인 처리되었으면 예외
+        if (occurrence.getDeactivateType() != DeactivateType.NONE) {
+            throw ApplicationException.from(ALREADY_DEACTIVATED);
         }
 
-        // 3. 위치 인증 반경 이내인지 확인
+        // 6. 위치 반경 내 도달했는지 검증
         boolean isInRange = isWithinDistance(
             alarm.getLatitude(), alarm.getLongitude(),
-            request.latitude(), request.longitude(),
-            CHECKIN_RADIUS_METERS
-        );
+            request.latitude(), request.longitude(), CHECKIN_RADIUS_METERS);
 
         if (!isInRange) {
             throw ApplicationException.from(CHECKIN_OUT_OF_RANGE);
         }
 
-        // 4. 출석 체크 처리
-        if (occurrence.getDeactivateType() != DeactivateType.NONE) {
-            throw ApplicationException.from(ALREADY_DEACTIVATED);
-        }
-
+        // 7. 체크인 처리
         occurrence.checkin(LocalDateTime.now());
     }
 
@@ -288,34 +300,6 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
         }
     }
 
-    private LocalDate getNextOccurrenceDate(AlarmEntity alarm, LocalDate fromDate) {
-        List<DayOfWeek> repeatDays = alarm.getRepeatDays().stream()
-            .map(Weekday::getDayOfWeek)
-            .sorted()
-            .toList();
-
-        for (int i = 0; i < 7; i++) {
-            LocalDate candidate = fromDate.plusDays(i);
-            if (repeatDays.contains(candidate.getDayOfWeek())) {
-                return candidate;
-            }
-        }
-
-        throw ApplicationException.from(REPEAT_DAYS_NOT_CONFIG);
-    }
-
-    private String getKoreanDayOfWeek(LocalDate date) {
-        return switch (date.getDayOfWeek()) {
-            case MONDAY -> "월요일";
-            case TUESDAY -> "화요일";
-            case WEDNESDAY -> "수요일";
-            case THURSDAY -> "목요일";
-            case FRIDAY -> "금요일";
-            case SATURDAY -> "토요일";
-            case SUNDAY -> "일요일";
-        };
-    }
-
     private MemberEntity findMemberById(Long memberId) {
         return memberRepository.findById(memberId)
             .orElseThrow(() -> ApplicationException.from(MemberErrorCode.MEMBER_NOT_FOUND));
@@ -326,13 +310,19 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
             .orElseThrow(() -> ApplicationException.from(ALARM_NOT_FOUND));
     }
 
+    private static void validSameWeek(LocalDate offTargetDate, LocalDate clientDate) {
+        if (!DateUtil.isSameWeek(offTargetDate, clientDate)) {
+            throw ApplicationException.from(NEXT_WEEK_ALARM_DEACTIVATION_NOT_ALLOWED);
+        }
+    }
+
     private static void validAlarmOwner(Long reqMemberId, Long alarmMemberId) {
         if (!reqMemberId.equals(alarmMemberId)) {
             throw ApplicationException.from(AuthErrorCode.PERMISSION_DENIED);
         }
     }
 
-    private static void validateClockSkew(LocalDateTime clientNow, LocalDateTime serverNow) {
+    private static void validClockSkew(LocalDateTime clientNow, LocalDateTime serverNow) {
         LocalDate clientDate = clientNow.toLocalDate();
         LocalDate serverDate = serverNow.toLocalDate();
 

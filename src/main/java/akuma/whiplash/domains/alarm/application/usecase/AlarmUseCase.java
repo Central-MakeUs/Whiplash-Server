@@ -35,8 +35,8 @@ public class AlarmUseCase {
         alarmCommandService.removeAlarm(memberId, alarmId, reason);
     }
 
-    public void checkinAlarm(Long memberId, Long alarmId, Long occurrenceId, AlarmCheckinRequest request) {
-        alarmCommandService.checkinAlarm(memberId, alarmId, occurrenceId, request);
+    public void checkinAlarm(Long memberId, Long alarmId, AlarmCheckinRequest request) {
+        alarmCommandService.checkinAlarm(memberId, alarmId, request);
     }
 
     public List<AlarmInfoPreviewResponse> getAlarms(Long memberId) {
