@@ -15,6 +15,7 @@ import akuma.whiplash.domains.member.exception.MemberErrorCode;
 import akuma.whiplash.domains.member.persistence.repository.MemberRepository;
 import akuma.whiplash.global.exception.ApplicationException;
 import akuma.whiplash.global.response.code.CommonErrorCode;
+import akuma.whiplash.global.util.date.DateUtil;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -69,9 +70,9 @@ public class AlarmQueryServiceImpl implements AlarmQueryService {
             .collect(Collectors.toSet());
 
         // 3. 오늘 기준 알람 예정일 계산: 첫 번째/두 번째/세 번째 텀
-        LocalDate firstDate = calculateNextRepeatDate(repeatSet, today);
-        LocalDate secondDate = calculateNextRepeatDate(repeatSet, firstDate.plusDays(1));
-        LocalDate thirdDate = calculateNextRepeatDate(repeatSet, secondDate.plusDays(1));
+        LocalDate firstDate = DateUtil.getNextOccurrenceDate(repeatSet, today);
+        LocalDate secondDate = DateUtil.getNextOccurrenceDate(repeatSet, firstDate.plusDays(1));
+        LocalDate thirdDate = DateUtil.getNextOccurrenceDate(repeatSet, secondDate.plusDays(1));
 
         /**
          * 최근 알람 비활성화(OFF) 이력이 오늘의 알람에 대해 발생한 경우,
@@ -125,23 +126,6 @@ public class AlarmQueryServiceImpl implements AlarmQueryService {
             .secondUpcomingDayOfWeek(getKoreanDayOfWeek(resolvedSecondUpcomingDate))
             .remainingOffCount(remainingOffCount)
             .build();
-    }
-
-    /**
-     * 주어진 날짜(fromDate)부터 7일 이내 반복 요일 중 가장 빠른 날짜를 반환합니다.
-     *
-     * @param repeatDays 알람 반복 요일 (예: 월, 수, 금)
-     * @param fromDate 기준 날짜
-     * @return repeatDays에 해당하는 가장 가까운 알람 발생일
-     */
-    private LocalDate calculateNextRepeatDate(Set<DayOfWeek> repeatDays, LocalDate fromDate) {
-        for (int i = 0; i < 7; i++) {
-            LocalDate candidate = fromDate.plusDays(i);
-            if (repeatDays.contains(candidate.getDayOfWeek())) {
-                return candidate;
-            }
-        }
-        throw ApplicationException.from(REPEAT_DAYS_NOT_CONFIG);
     }
 
     /**

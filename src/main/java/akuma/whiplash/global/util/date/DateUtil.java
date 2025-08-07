@@ -11,6 +11,7 @@ import java.time.LocalDateTime;
 import java.time.temporal.WeekFields;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 
 public class DateUtil {
 
@@ -65,7 +66,14 @@ public class DateUtil {
         };
     }
 
-    public static LocalDate getNextOccurrenceDate(List<DayOfWeek> repeatDays, LocalDate fromDate) {
+    /**
+     * 주어진 날짜(fromDate)부터 7일 이내 반복 요일 중 가장 빠른 날짜를 반환합니다.
+     *
+     * @param repeatDays 알람 반복 요일 (예: 월, 수, 금)
+     * @param fromDate 기준 날짜
+     * @return repeatDays에 해당하는 가장 가까운 알람 발생일
+     */
+    public static LocalDate getNextOccurrenceDate(Set<DayOfWeek> repeatDays, LocalDate fromDate) {
 
         for (int i = 0; i < 7; i++) {
             LocalDate candidate = fromDate.plusDays(i);

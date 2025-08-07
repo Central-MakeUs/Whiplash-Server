@@ -37,6 +37,8 @@ import java.time.format.DateTimeFormatter;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -133,10 +135,9 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
 
         // 8. 꺼야 할 알람 날짜 계산
         LocalDate searchStartDate = isAfterRinging ? clientDate.plusDays(1) : clientDate;
-        List<DayOfWeek> repeatDays = findAlarm.getRepeatDays().stream()
+        Set<DayOfWeek> repeatDays = findAlarm.getRepeatDays().stream()
             .map(Weekday::getDayOfWeek)
-            .sorted()
-            .toList();
+            .collect(Collectors.toSet());
         LocalDate offTargetDate = DateUtil.getNextOccurrenceDate(repeatDays, searchStartDate);
 
         // 9. 같은 주인지 검증
@@ -205,10 +206,9 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
 
         // 2. 오늘 날짜 기준으로 다음 알람 발생 날짜 계산
         LocalDate today = LocalDate.now();
-        List<DayOfWeek> repeatDays = alarm.getRepeatDays().stream()
+        Set<DayOfWeek> repeatDays = alarm.getRepeatDays().stream()
             .map(Weekday::getDayOfWeek)
-            .sorted()
-            .toList();
+            .collect(Collectors.toSet());
 
         // TODO: 요청일보다 이전 날짜에 울려야할 알람을 꺼야하는 경우도 처리해야함(사용자가 알람을 안꺼서
         LocalDate targetDate = DateUtil.getNextOccurrenceDate(repeatDays, today);
