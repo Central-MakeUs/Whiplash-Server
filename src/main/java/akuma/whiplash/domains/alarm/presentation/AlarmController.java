@@ -88,14 +88,13 @@ public class AlarmController {
         authErrorCodes = {PERMISSION_DENIED}
     )
     @Operation(summary = "알람 도착 인증", description = "알람 도착 인증을 합니다. 도착 위치 반경 100m 내에 들어와야 도착 인증이 가능합니다.")
-    @PostMapping("/{alarmId}/occurrences/{occurrenceId}/checkin")
+    @PostMapping("/{alarmId}/occurrences/checkin")
     public ApplicationResponse<Void> checkin(
         @PathVariable Long alarmId,
-        @PathVariable Long occurrenceId,
         @RequestBody @Valid AlarmCheckinRequest request,
         @AuthenticationPrincipal MemberContext memberContext
     ) {
-        alarmUseCase.checkinAlarm(memberContext.memberId(), alarmId, occurrenceId, request);
+        alarmUseCase.checkinAlarm(memberContext.memberId(), alarmId, request);
         return ApplicationResponse.onSuccess();
     }
 
