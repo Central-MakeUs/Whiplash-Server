@@ -103,22 +103,7 @@ public class AlarmQueryServiceImpl implements AlarmQueryService {
         final LocalDate resolvedFirstUpcomingDate = isCurrentDeactivated ? secondDate : firstDate;
         final LocalDate resolvedSecondUpcomingDate = isCurrentDeactivated ? thirdDate : secondDate;
 
-        // TODO: 도착 인증 API 동작 방식 변경시 이 로직 수정 필요
-        // 5. AlarmOccurrence 존재 여부 확인 후 없으면 생성
-        AlarmOccurrenceEntity occurrence = alarmOccurrenceRepository
-            .findTopByAlarmIdAndDateOrderByCreatedAtDesc(alarm.getId(), resolvedFirstUpcomingDate)
-            .orElseGet(() -> {
-                AlarmOccurrenceEntity newOccurrence = AlarmMapper.mapToAlarmOccurrenceForDate(alarm, resolvedFirstUpcomingDate);
-                try {
-                    return alarmOccurrenceRepository.save(newOccurrence);
-                } catch (DataIntegrityViolationException e) {
-                    return alarmOccurrenceRepository
-                        .findTopByAlarmIdAndDateOrderByCreatedAtDesc(alarm.getId(), resolvedFirstUpcomingDate)
-                        .orElseThrow(() -> ApplicationException.from(CommonErrorCode.INTERNAL_SERVER_ERROR));
-                }
-            });
-
-        // 6. 회원의 이번 주 남은 알람 끄기 횟수 계산
+        // 5. 회원의 이번 주 남은 알람 끄기 횟수 계산
         long remainingOffCount = calculateRemainingOffCount(memberId, alarm.getId());
 
         return AlarmInfoPreviewResponse.builder()
@@ -139,7 +124,6 @@ public class AlarmQueryServiceImpl implements AlarmQueryService {
             .secondUpcomingDay(resolvedSecondUpcomingDate)
             .secondUpcomingDayOfWeek(getKoreanDayOfWeek(resolvedSecondUpcomingDate))
             .remainingOffCount(remainingOffCount)
-            .firstUpcomingAlarmOccurrenceId(occurrence.getId())
             .build();
     }
 

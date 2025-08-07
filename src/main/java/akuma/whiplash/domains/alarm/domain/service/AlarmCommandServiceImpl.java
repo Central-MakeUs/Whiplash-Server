@@ -209,9 +209,11 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
             .map(Weekday::getDayOfWeek)
             .sorted()
             .toList();
+
+        // TODO: 요청일보다 이전 날짜에 울려야할 알람을 꺼야하는 경우도 처리해야함(사용자가 알람을 안꺼서
         LocalDate targetDate = DateUtil.getNextOccurrenceDate(repeatDays, today);
 
-        // 3. 🔒 요청일과 발생일이 같은 주인지 검증
+        // 3. 요청일과 끄려고 하는 날짜가 같은 주인지 검증
         validSameWeek(targetDate, today);
 
         // 4. 해당 날짜의 발생 내역이 없으면 생성
