@@ -37,7 +37,7 @@ public record AlarmRegisterRequest(
     LocalTime time,
 
     // TODO: 월~일 요일 검증 필요
-    @Schema(description = "반복 요일 리스트 (월~일)", example = "[\"월 \", \"수\", \"금\"]")
+    @Schema(description = "반복 요일 리스트 (월~일)", example = "[\"월\", \"수\", \"금\"]")
     @NotNull(message = "반복 요일을 선택해주세요.")
     @Size(min = 1, message = "최소 한 개의 반복 요일을 선택해야 합니다.")
     List<@NotBlank(message = "요일은 비어 있을 수 없습니다.") String> repeatDays,
