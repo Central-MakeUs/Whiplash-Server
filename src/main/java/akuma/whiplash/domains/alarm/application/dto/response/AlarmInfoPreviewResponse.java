@@ -48,7 +48,7 @@ public record AlarmInfoPreviewResponse(
     @Schema(description = "그 다음 텀의 알람 요일", example = "목요일")
     String secondUpcomingDayOfWeek,
 
-    @Schema(description = "남은 알람 끄기 횟수(알람당 매주 2회 부여, 매주 월요일 초기화)", example = "1")
+    @Schema(description = "회원의 남은 알람 끄기 횟수(회원당 매주 2회 부여, 매주 월요일 초기화)", example = "1")
     Long remainingOffCount
 
 ) {}
