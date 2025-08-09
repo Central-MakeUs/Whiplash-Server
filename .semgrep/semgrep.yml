@@ -2,44 +2,23 @@ rules:
   # 1) Repository 계층: 허용된 메서드 접두어만 사용
   - id: repo-method-naming-allowed-prefixes
     languages: [java]
-    message: "Repository 메서드는 findBy*/countBy*/existsBy*/insert*/update*/delete* 접두어만 허용됩니다."
+    message: "Repository 메서드는 findBy*/findAllBy*/countBy*/existsBy*/insert*/update*/delete* 접두어만 허용됩니다."
     severity: ERROR
     patterns:
-      - pattern: |
-          class $C {
-            ... 
-            public $RET $METH(...) { ... }
-          }
-      - pattern-not: |
-          class $C {
-            ...
-            public $RET findBy$X(...) { ... }
-          }
-      - pattern-not: |
-          class $C {
-            ...
-            public $RET countBy$X(...) { ... }
-          }
-      - pattern-not: |
-          class $C {
-            ...
-            public $RET existsBy$X(...) { ... }
-          }
-      - pattern-not: |
-          class $C {
-            ...
-            public $RET insert$X(...) { ... }
-          }
-      - pattern-not: |
-          class $C {
-            ...
-            public $RET update$X(...) { ... }
-          }
-      - pattern-not: |
-          class $C {
-            ...
-            public $RET delete$X(...) { ... }
-          }
+      - pattern-either:
+          - pattern: |
+              class $C {
+                ...
+                public $RET $METH(...) { ... }
+              }
+          - pattern: |
+              interface $C {
+                ...
+                $RET $METH(...);
+              }
+      - metavariable-regex:
+          metavariable: $METH
+          regex: "^(?!(findBy|findAllBy|countBy|existsBy|insert|update|delete)).*$"
     paths:
       include:
         - "domains/**/persistence/**"
@@ -64,57 +43,22 @@ rules:
         - "domains/**/domain/**"
         - "domains/**/presentation/**"
 
-  # 3) Controller 계층: 허용된 HttpStatus만 사용
+  # 3) Controller 계층: 허용된 HttpStatus만 사용 (단일 규칙)
   - id: controller-httpstatus-whitelist
     languages: [java]
     message: "허용된 HttpStatus(400/401/403/404/409)만 사용하세요."
     severity: ERROR
     pattern: HttpStatus.$S
     pattern-not: HttpStatus.BAD_REQUEST
-    paths:
-      include:
-        - "domains/**/presentation/**"
-    # 다른 허용 상태 추가
-    # Semgrep은 동일 규칙 내 여러 pattern-not 가능
-    # (아래처럼 여러 줄로 나눠 작성)
-  - id: controller-httpstatus-whitelist-2
-    languages: [java]
-    message: "허용된 HttpStatus(400/401/403/404/409)만 사용하세요."
-    severity: ERROR
-    pattern: HttpStatus.$S
     pattern-not: HttpStatus.UNAUTHORIZED
-    paths:
-      include:
-        - "domains/**/presentation/**"
-  - id: controller-httpstatus-whitelist-3
-    languages: [java]
-    message: "허용된 HttpStatus(400/401/403/404/409)만 사용하세요."
-    severity: ERROR
-    pattern: HttpStatus.$S
     pattern-not: HttpStatus.FORBIDDEN
-    paths:
-      include:
-        - "domains/**/presentation/**"
-  - id: controller-httpstatus-whitelist-4
-    languages: [java]
-    message: "허용된 HttpStatus(400/401/403/404/409)만 사용하세요."
-    severity: ERROR
-    pattern: HttpStatus.$S
     pattern-not: HttpStatus.NOT_FOUND
-    paths:
-      include:
-        - "domains/**/presentation/**"
-  - id: controller-httpstatus-whitelist-5
-    languages: [java]
-    message: "허용된 HttpStatus(400/401/403/404/409)만 사용하세요."
-    severity: ERROR
-    pattern: HttpStatus.$S
     pattern-not: HttpStatus.CONFLICT
     paths:
       include:
         - "domains/**/presentation/**"
 
-  # 4) Controller 메서드: @CustomErrorCodes 누락 감지 (매핑이 붙은 API 메서드 기준)
+  # 4) Controller 메서드: @CustomErrorCodes 누락 감지 (애노테이션 스택 허용)
   - id: controller-must-have-customerrorcodes-on-mapped-method
     languages: [java]
     message: "매핑된 Controller 메서드에는 @CustomErrorCodes를 명시하세요."
@@ -123,37 +67,74 @@ rules:
       - pattern-either:
           - pattern: |
               @GetMapping(...)
+              ...
               public $RET $M(...){ ... }
           - pattern: |
               @PostMapping(...)
+              ...
               public $RET $M(...){ ... }
           - pattern: |
               @PutMapping(...)
+              ...
               public $RET $M(...){ ... }
           - pattern: |
               @DeleteMapping(...)
+              ...
               public $RET $M(...){ ... }
           - pattern: |
               @PatchMapping(...)
+              ...
               public $RET $M(...){ ... }
-      - pattern-not: |
-          @CustomErrorCodes(...)
-          public $RET $M(...){ ... }
+      - pattern-not-either:
+          - pattern: |
+              @GetMapping(...)
+              ...
+              @CustomErrorCodes(...)
+              ...
+              public $RET $M(...){ ... }
+          - pattern: |
+              @PostMapping(...)
+              ...
+              @CustomErrorCodes(...)
+              ...
+              public $RET $M(...){ ... }
+          - pattern: |
+              @PutMapping(...)
+              ...
+              @CustomErrorCodes(...)
+              ...
+              public $RET $M(...){ ... }
+          - pattern: |
+              @DeleteMapping(...)
+              ...
+              @CustomErrorCodes(...)
+              ...
+              public $RET $M(...){ ... }
+          - pattern: |
+              @PatchMapping(...)
+              ...
+              @CustomErrorCodes(...)
+              ...
+              public $RET $M(...){ ... }
     paths:
       include:
         - "domains/**/presentation/**"
 
-  # 5) 테스트: @Test가 붙은 메서드에 @DisplayName이 없으면 경고
+  # 5) 테스트: @Test가 있어도 @DisplayName이 애노테이션 블록 어딘가에 없으면 경고
   - id: junit-test-should-have-displayname
     languages: [java]
     message: "@Test 메서드에 @DisplayName을 추가하세요(문장형 권장)."
     severity: WARNING
     patterns:
       - pattern: |
+          @...
           @Test
+          @...
           public $RET $M(...){ ... }
       - pattern-not: |
+          @...
           @DisplayName(...)
+          @...
           public $RET $M(...){ ... }
     paths:
       include:

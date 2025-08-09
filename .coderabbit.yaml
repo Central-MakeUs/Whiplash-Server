@@ -80,15 +80,24 @@ reviews:
 
   tools:
     # 정적/보안 도구: 레포에 설정 파일이 있으면 더 강력해짐
-    pmd:          { enabled: true,  config_file: "" }
-    gitleaks:     { enabled: true }
-    hadolint:     { enabled: true }
-    yamllint:     { enabled: true }
-    markdownlint: { enabled: true }
-    sqlfluff:     { enabled: true }
-    shellcheck:   { enabled: true }
-    eslint:       { enabled: true }
-    checkov:      { enabled: true }
+    pmd:
+      enabled: true
+    gitleaks:
+      enabled: true
+    hadolint:
+      enabled: true
+    yamllint:
+      enabled: true
+    markdownlint:
+      enabled: true
+    sqlfluff:
+      enabled: true
+    shellcheck:
+      enabled: true
+    eslint:
+      enabled: true
+    checkov:
+      enabled: true
     semgrep:
       enabled: true
       config_file: ".semgrep/semgrep.yml"
