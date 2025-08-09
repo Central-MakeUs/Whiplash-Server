@@ -38,21 +38,22 @@ public class JwtProvider {
 
     private static final String ROLE = "role";
     private static final String TYPE = "type";
+    private static final String DEVICE_ID = "deviceId";
 
 
-    public String generateAccessToken(Long memberId, Role role) {
+    public String generateAccessToken(Long memberId, Role role, String deviceId) {
         SecretKey key = getSecretKey();
         Instant accessDate = getExpiration(accessExpiration);
 
         return Jwts.builder()
             .claim(ROLE, role)
             .claim(TYPE, ACCESS)
+            .claim(DEVICE_ID, deviceId)
             .setSubject(memberId.toString())
             .setExpiration(Date.from(accessDate))
             .signWith(key, SignatureAlgorithm.HS256)
             .compact();
     }
-
 
     public String generateRefreshToken(Long memberId, String deviceId, Role role) {
         SecretKey key = getSecretKey();
@@ -61,13 +62,17 @@ public class JwtProvider {
         String refreshToken = Jwts.builder()
             .claim(ROLE, role)
             .claim(TYPE, REFRESH)
+            .claim(DEVICE_ID, deviceId)
             .setSubject(memberId.toString())
             .setExpiration(Date.from(refreshDate))
             .signWith(key, SignatureAlgorithm.HS256)
             .compact();
 
+
+        String redisKey = REFRESH + ":" + memberId + ":" + deviceId;
+
         redisRepository.setValues(
-            REFRESH.toString() + ":" + memberId + ":" + deviceId,
+            redisKey,
             refreshToken,
             Duration.ofSeconds(refreshExpiration)
         );
