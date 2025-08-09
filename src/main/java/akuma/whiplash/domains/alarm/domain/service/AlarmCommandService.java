@@ -5,6 +5,7 @@ import akuma.whiplash.domains.alarm.application.dto.request.AlarmRegisterRequest
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmOffResultResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.CreateAlarmOccurrenceResponse;
 import java.time.LocalDateTime;
+import java.util.Set;
 
 public interface AlarmCommandService {
 
@@ -13,4 +14,5 @@ public interface AlarmCommandService {
     AlarmOffResultResponse alarmOff(Long memberId, Long alarmId, LocalDateTime clientNow);
     void removeAlarm(Long memberId, Long alarmId, String reason);
     void checkinAlarm(Long memberId, Long alarmId, AlarmCheckinRequest request);
+    void markReminderSent(Set<Long> occurrenceIds);
 }

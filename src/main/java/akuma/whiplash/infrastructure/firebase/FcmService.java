@@ -2,6 +2,7 @@ package akuma.whiplash.infrastructure.firebase;
 
 import akuma.whiplash.domains.alarm.application.dto.etc.PushTargetDto;
 import akuma.whiplash.domains.alarm.persistence.repository.AlarmOccurrenceRepository;
+import akuma.whiplash.infrastructure.firebase.dto.FcmSendResult;
 import akuma.whiplash.infrastructure.redis.RedisService;
 import com.google.firebase.messaging.BatchResponse;
 import com.google.firebase.messaging.FirebaseMessaging;
@@ -10,8 +11,12 @@ import com.google.firebase.messaging.MulticastMessage;
 import com.google.firebase.messaging.Notification;
 import com.google.firebase.messaging.SendResponse;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,67 +27,89 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class FcmService {
 
+    private static final int FCM_MULTICAST_LIMIT = 500;
+    private static final String TITLE = "눈 떠";
+
     private final RedisService redisService;
-    private final AlarmOccurrenceRepository alarmOccurrenceRepository;
 
     /** idempotent: 같은 토큰 재등록이어도 안전하게 동작 */
     public void registerFcmToken(Long memberId, String deviceId, String fcmToken) {
         redisService.upsertFcmToken(memberId, deviceId, fcmToken);
     }
 
-    public void sendBulkNotification(List<PushTargetDto> targets) {
-        Map<String, List<PushTargetDto>> grouped =
-            targets.stream().collect(Collectors.groupingBy(
+    public FcmSendResult sendBulkNotification(List<PushTargetDto> targets) {
+        if (targets == null || targets.isEmpty()) {
+            return FcmSendResult.builder()
+                .successOccurrenceIds(Set.of())
+                .invalidTokens(List.of())
+                .memberToTokens(Map.of())
+                .build();
+        }
+
+        // body 문구가 동일한 것끼리 묶어서 멀티캐스트 효율↑
+        Map<String, List<PushTargetDto>> groupedByBody = targets.stream()
+            .collect(Collectors.groupingBy(
                 dto -> String.format("1시간 뒤 %s에서 알림이 울릴 예정이에요!", dto.address())
             ));
 
-        for (Map.Entry<String, List<PushTargetDto>> entry : grouped.entrySet()) {
-            String body = entry.getKey();
-            List<PushTargetDto> group = entry.getValue();
+        Set<Long> successOccurrenceIds = new HashSet<>();
+        List<String> invalidTokens = new ArrayList<>();
+        Map<Long, List<String>> memberToTokens = new HashMap<>();
 
-            List<List<PushTargetDto>> batches = partition(group, 500);
-            for (List<PushTargetDto> batch : batches) {
-                sendMulticast(batch, body);
+        for (Map.Entry<String, List<PushTargetDto>> entry : groupedByBody.entrySet()) {
+            String body = entry.getKey();
+            List<PushTargetDto> group = dedupByToken(entry.getValue()); // 같은 토큰 중복 제거
+
+            for (List<PushTargetDto> batch : partition(group, FCM_MULTICAST_LIMIT)) {
+                MulticastMessage message = MulticastMessage.builder()
+                    .addAllTokens(batch.stream().map(PushTargetDto::token).toList())
+                    .setNotification(Notification.builder().setTitle(TITLE).setBody(body).build())
+                    .build();
+
+                try {
+                    BatchResponse response = FirebaseMessaging.getInstance().sendEachForMulticast(message);
+
+                    // 결과 집계
+                    handleSendResult(response.getResponses(), batch, successOccurrenceIds, invalidTokens, memberToTokens);
+
+                } catch (FirebaseMessagingException e) {
+                    log.error("FCM 전송 실패(멀티캐스트 전체). body={}", body, e);
+                }
             }
         }
-    }
 
-    private void sendMulticast(List<PushTargetDto> batch, String body) {
-        MulticastMessage message = MulticastMessage.builder()
-            .addAllTokens(batch.stream().map(PushTargetDto::token).toList())
-            .setNotification(Notification.builder()
-                .setTitle("눈 떠")
-                .setBody(body)
-                .build())
+        return FcmSendResult.builder()
+            .successOccurrenceIds(successOccurrenceIds)
+            .invalidTokens(invalidTokens)
+            .memberToTokens(memberToTokens)
             .build();
-
-        try {
-            BatchResponse response = FirebaseMessaging.getInstance().sendEachForMulticast(message);
-            handleSendResult(response.getResponses(), batch);
-        } catch (FirebaseMessagingException e) {
-            log.error("FCM 전송 실패", e);
-        }
     }
 
-    private void handleSendResult(List<SendResponse> responses, List<PushTargetDto> batch) {
+    private void handleSendResult(
+        List<SendResponse> responses,
+        List<PushTargetDto> batch,
+        Set<Long> successOccurrenceIds,
+        List<String> invalidTokens,
+        Map<Long, List<String>> memberToTokens
+    ) {
         for (int i = 0; i < responses.size(); i++) {
             SendResponse res = responses.get(i);
             PushTargetDto dto = batch.get(i);
 
             if (res.isSuccessful()) {
-                // 푸시 성공 시 occurrence 테이블에 전송 완료 처리
-                alarmOccurrenceRepository.findById(dto.occurrenceId())
-                    .ifPresent(occ -> {
-                        occ.updateReminderSent(true);
-                        // @Transactional 사용하지 않기 때문에 더티 체킹 동작 X -> 반영을 위해 save 메서드 호출
-                        alarmOccurrenceRepository.save(occ);
-                    });
+                successOccurrenceIds.add(dto.occurrenceId());
+                memberToTokens.computeIfAbsent(dto.memberId(), k -> new ArrayList<>()).add(dto.token());
             } else {
-                FirebaseMessagingException e = (FirebaseMessagingException) res.getException();
-                log.warn("FCM 실패: token={}, error={}", dto.token(), e.getErrorCode());
+                Exception ex = res.getException();
+                FirebaseMessagingException fme = (ex instanceof FirebaseMessagingException) ? (FirebaseMessagingException) ex : null;
 
-                if (isTokenInvalid(e)) {
-                    redisService.removeInvalidToken(dto.memberId(), dto.token());
+                if (fme != null) {
+                    log.warn("FCM 실패: token={}, error={}", dto.token(), fme.getErrorCode());
+                    if (isTokenInvalid(fme)) {
+                        invalidTokens.add(dto.token());
+                    }
+                } else {
+                    log.warn("FCM 실패(원인 미상): token={}, ex={}", dto.token(), ex != null ? ex.getClass().getSimpleName() : "null");
                 }
             }
         }
@@ -95,6 +122,15 @@ public class FcmService {
             "unregistered",
             "messaging/invalid-registration-token"
         ).contains(e.getErrorCode());
+    }
+
+    private List<PushTargetDto> dedupByToken(List<PushTargetDto> src) {
+        // 동일 토큰이 여러 번 들어왔을 때 1개만 전송
+        Map<String, PushTargetDto> map = new LinkedHashMap<>();
+        for (PushTargetDto d : src) {
+            map.putIfAbsent(d.token(), d);
+        }
+        return new ArrayList<>(map.values());
     }
 
     private <T> List<List<T>> partition(List<T> list, int size) {

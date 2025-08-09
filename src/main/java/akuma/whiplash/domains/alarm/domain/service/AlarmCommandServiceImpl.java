@@ -239,6 +239,13 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
         occurrence.checkin(LocalDateTime.now());
     }
 
+    @Override
+    public void markReminderSent(Set<Long> occurrenceIds) {
+        if (occurrenceIds == null || occurrenceIds.isEmpty()) return;
+        // 벌크 업데이트가 가능하면 JPQL update 사용 권장 (락/동시성 고려)
+        alarmOccurrenceRepository.markReminderSentIn(occurrenceIds);
+    }
+
     /**
      * 위치 인증 반경 내 도착 여부 계산
      *

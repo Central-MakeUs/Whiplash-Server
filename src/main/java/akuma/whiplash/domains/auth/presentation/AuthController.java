@@ -60,6 +60,8 @@ public class AuthController {
         return ApplicationResponse.onSuccess(tokenResponse);
     }
 
+    @CustomErrorCodes(commonErrorCodes = {BAD_REQUEST})
+    @Operation(summary = "FCM 토큰 등록", description = "FCM 토큰을 등록합니다.")
     @PostMapping("/fcm-token")
     public ApplicationResponse<Void> registerFcmToken(
         @AuthenticationPrincipal MemberContext memberContext,

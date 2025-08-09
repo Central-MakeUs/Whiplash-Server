@@ -5,11 +5,15 @@ import com.google.firebase.FirebaseApp;
 import com.google.firebase.FirebaseOptions;
 import jakarta.annotation.PostConstruct;
 import java.io.InputStream;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.ClassPathResource;
 
 @Configuration
 public class FirebaseConfig {
+	private static final Logger log = LoggerFactory.getLogger(FirebaseConfig.class);
+
 	@PostConstruct
     public void init(){
     	try{
@@ -20,9 +24,12 @@ public class FirebaseConfig {
                         
          	if (FirebaseApp.getApps().isEmpty()) { // FirebaseApp이 이미 초기화되어 있지 않은 경우에만 초기화 실행
             	FirebaseApp.initializeApp(options);
-            }
+				log.info("FirebaseApp initialized");
+            } else {
+				log.debug("FirebaseApp already initialized");
+			}
         } catch (Exception e){
-        	e.printStackTrace();
+			log.error("Failed to initialize FirebaseApp", e);
         }
     }
 }
