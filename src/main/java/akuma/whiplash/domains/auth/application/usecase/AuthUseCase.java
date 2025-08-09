@@ -22,8 +22,8 @@ public class AuthUseCase {
         return authCommandService.login(request);
     }
 
-    public void logout(LogoutRequest request, Long memberId) {
-        authCommandService.logout(request, memberId);
+    public void logout(MemberContext memberContext) {
+        authCommandService.logout(memberContext);
     }
 
     public TokenResponse reissueToken(MemberContext memberContext) {

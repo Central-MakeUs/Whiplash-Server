@@ -10,6 +10,6 @@ import jakarta.servlet.http.HttpServletRequest;
 public interface AuthCommandService {
 
     LoginResponse login(SocialLoginRequest request);
-    void logout(LogoutRequest request, Long memberId);
+    void logout(MemberContext memberContext);
     TokenResponse reissueToken(MemberContext memberContext);
 }
