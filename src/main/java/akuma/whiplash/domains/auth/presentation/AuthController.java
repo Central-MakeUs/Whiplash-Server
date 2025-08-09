@@ -4,7 +4,6 @@ import static akuma.whiplash.domains.auth.exception.AuthErrorCode.*;
 import static akuma.whiplash.global.response.code.CommonErrorCode.*;
 
 import akuma.whiplash.domains.auth.application.dto.etc.MemberContext;
-import akuma.whiplash.domains.auth.application.dto.request.LogoutRequest;
 import akuma.whiplash.domains.auth.application.dto.request.RegisterFcmTokenRequest;
 import akuma.whiplash.domains.auth.application.dto.request.SocialLoginRequest;
 import akuma.whiplash.domains.auth.application.dto.response.LoginResponse;

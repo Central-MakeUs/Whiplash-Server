@@ -5,7 +5,6 @@ import static akuma.whiplash.domains.auth.exception.AuthErrorCode.*;
 import akuma.whiplash.domains.auth.application.dto.etc.MemberContext;
 import akuma.whiplash.domains.auth.application.dto.response.TokenResponse;
 import akuma.whiplash.domains.auth.application.dto.etc.SocialMemberInfo;
-import akuma.whiplash.domains.auth.application.dto.request.LogoutRequest;
 import akuma.whiplash.domains.auth.application.dto.request.SocialLoginRequest;
 import akuma.whiplash.domains.auth.application.dto.response.LoginResponse;
 import akuma.whiplash.domains.auth.application.mapper.AuthMapper;
