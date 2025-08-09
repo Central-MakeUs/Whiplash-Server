@@ -48,12 +48,13 @@ rules:
     languages: [java]
     message: "허용된 HttpStatus(400/401/403/404/409)만 사용하세요."
     severity: ERROR
-    pattern: HttpStatus.$S
-    pattern-not: HttpStatus.BAD_REQUEST
-    pattern-not: HttpStatus.UNAUTHORIZED
-    pattern-not: HttpStatus.FORBIDDEN
-    pattern-not: HttpStatus.NOT_FOUND
-    pattern-not: HttpStatus.CONFLICT
+    patterns:
+      - pattern: HttpStatus.$S
+      - metavariable-regex:
+          metavariable: $S
+          # 허용된 상태만 통과시키고, 나머지는 적발
+          regex: "^(?!(BAD_REQUEST|UNAUTHORIZED|FORBIDDEN|NOT_FOUND|CONFLICT)$).*$"
+
     paths:
       include:
         - "domains/**/presentation/**"
