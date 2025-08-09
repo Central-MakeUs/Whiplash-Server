@@ -1,0 +1,97 @@
+# yaml-language-server: $schema=https://storage.googleapis.com/coderabbit_public_assets/schema.v2.json
+language: ko-KR
+early_access: false
+
+reviews:
+  profile: assertive
+  high_level_summary: true
+  review_status: true
+  collapse_walkthrough: false
+  poem: false
+
+  auto_review:
+    enabled: true
+    drafts: false
+#    ignore_title_keywords: ["WIP", "DO NOT MERGE"]
+#    base_branches: ["main", "develop"]
+
+  # 전역 리뷰 지침(맥락적/소프트 가드레일)
+  instructions: |
+    - Java 계층별 네이밍 원칙:
+      - Controller/UseCase/Service: get/create/remove/modify 또는 기능을 명확히 드러내는 동사 사용.
+      - Repository: findBy*/countBy*/existsBy*/insert*/update*/delete* 로 구분(비즈니스 로직 금지).
+    - 요청/응답 DTO:
+      - DB 필드명 기준 유지(예: status, nickname).
+      - PK는 도메인명 접미사 사용(alarmId, memberId).
+      - 동일 필드가 두 주체에 공존 시 접두어로 식별(userNickname, adminNickname).
+      - 페이지네이션 파라미터: page/size/sortType.
+      - 날짜는 ISO_LOCAL_DATE 또는 ISO_LOCAL_DATE_TIME, Enum은 name() 문자열 그대로.
+    - 에러/HTTP:
+      - 도메인별 CustomErrorCode(enum) 포맷과 ‘입니다.’ 체 준수, 트레일링 콤마 활용.
+      - HttpStatus는 400/401/403/404/409만 사용(의미 표와 일치).
+      - Swagger에 @CustomErrorCodes 기반 예외 사례 명시.
+    - 테스트:
+      - @DisplayName 문장형(“A이면 B다”), “~테스트” 지양.
+      - BDD(Given/When/Then)와 도메인 용어 사용.
+    - 디렉토리 구조:
+      - domains/* 계층 역할 준수(application/usecase: 오케스트레이션, domain/service: 비즈니스, persistence: 영속성).
+      - presentation은 REST/API만 담당(도메인 규칙 직접 보유 금지).
+    - 성능/품질:
+      - N+1 회피, 트랜잭션 경계 명확화, 캐시 적합성 검토.
+
+  # 경로별(계층별) 추가 지침
+  path_instructions:
+    - path: "domains/**/presentation/**"
+      instructions: |
+        - Request/Response DTO 네이밍 규칙, PK 접미사(alarmId 등) 확인.
+        - ISO 날짜/Enum name() 반환 확인.
+        - Swagger @CustomErrorCodes로 발생 가능 예외 노출.
+        - 도메인 규칙은 usecase/service로 위임.
+    - path: "domains/**/application/**"
+      instructions: |
+        - usecase는 시나리오 오케스트레이션에 집중.
+        - mapper를 통한 DTO ↔ 엔티티/도메인 변환 일관성.
+        - 다른 usecase 직접 참조는 가급적 지양.
+    - path: "domains/**/domain/**"
+      instructions: |
+        - service에서 비즈니스 정책 구현.
+        - 트랜잭션 경계/동시성/N+1 점검 코멘트 강화.
+    - path: "domains/**/persistence/**"
+      instructions: |
+        - Repository 메서드 네이밍: findBy*/countBy*/existsBy*/insert*/update*/delete*.
+        - 저장소 계층에서 비즈니스 로직 금지.
+    - path: "domains/**/exception/**"
+      instructions: |
+        - CustomErrorCode enum 포맷(STATUS/x/n, ‘입니다.’ 체, 트레일링 콤마) 준수.
+    - path: "global/**"
+      instructions: |
+        - 공통 예외/응답 규격 준수, HttpStatus는 400/401/403/404/409만.
+        - Swagger OperationCustomizer가 @CustomErrorCodes를 반영하는지 확인.
+    - path: "src/test/**"
+      instructions: |
+        - @DisplayName 문장형, 도메인 용어 사용.
+        - Given/When/Then BDD 스타일 유지.
+
+  finishing_touches:
+    docstrings:
+      enabled: true
+    unit_tests:
+      enabled: true
+
+  tools:
+    # 정적/보안 도구: 레포에 설정 파일이 있으면 더 강력해짐
+    pmd:          { enabled: true,  config_file: "" }
+    gitleaks:     { enabled: true }
+    hadolint:     { enabled: true }
+    yamllint:     { enabled: true }
+    markdownlint: { enabled: true }
+    sqlfluff:     { enabled: true }
+    shellcheck:   { enabled: true }
+    eslint:       { enabled: true }
+    checkov:      { enabled: true }
+    semgrep:
+      enabled: true
+      config_file: ".semgrep/semgrep.yml"
+
+chat:
+  auto_reply: true   # 공개 레포/Pro일 때 동작
