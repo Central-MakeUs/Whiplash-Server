@@ -16,6 +16,7 @@ import akuma.whiplash.global.config.security.jwt.JwtProvider;
 import akuma.whiplash.global.config.security.jwt.JwtUtils;
 import akuma.whiplash.global.exception.ApplicationException;
 import akuma.whiplash.infrastructure.redis.RedisRepository;
+import akuma.whiplash.infrastructure.redis.RedisService;
 import java.util.Map;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
@@ -34,6 +35,7 @@ public class AuthCommandServiceImpl implements AuthCommandService {
     private final RedisRepository redisRepository;
     private final JwtProvider jwtProvider;
     private final JwtUtils jwtUtils;
+    private final RedisService redisService;
 
     @Override
     public LoginResponse login(SocialLoginRequest request) {
@@ -77,8 +79,9 @@ public class AuthCommandServiceImpl implements AuthCommandService {
     }
 
     @Override
-    public void logout(LogoutRequest request, Long memberId) {
-        jwtUtils.expireRefreshToken(memberId, request.deviceId());
+    public void logout(MemberContext memberContext) {
+        jwtUtils.expireRefreshToken(memberContext.memberId(), memberContext.deviceId());
+        redisService.removeFcmTokenForDevice(memberContext.memberId(), memberContext.deviceId());
     }
 
     @Override

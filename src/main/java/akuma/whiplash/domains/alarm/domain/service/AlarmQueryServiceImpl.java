@@ -2,6 +2,7 @@ package akuma.whiplash.domains.alarm.domain.service;
 
 import static akuma.whiplash.domains.alarm.exception.AlarmErrorCode.REPEAT_DAYS_NOT_CONFIG;
 
+import akuma.whiplash.domains.alarm.application.dto.etc.OccurrencePushInfo;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmInfoPreviewResponse;
 import akuma.whiplash.domains.alarm.application.mapper.AlarmMapper;
 import akuma.whiplash.domains.alarm.domain.constant.DeactivateType;
@@ -19,6 +20,7 @@ import akuma.whiplash.global.util.date.DateUtil;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -54,6 +56,11 @@ public class AlarmQueryServiceImpl implements AlarmQueryService {
         return alarms.stream()
             .map(alarm -> buildPreviewResponse(alarm, today, memberId))
             .toList();
+    }
+
+    @Override
+    public List<OccurrencePushInfo> findPushTargetsByTimeRange(LocalDate date, LocalTime start, LocalTime end) {
+        return alarmOccurrenceRepository.findPushTargetsByTimeRange(date, start, end);
     }
 
     private AlarmInfoPreviewResponse buildPreviewResponse(AlarmEntity alarm, LocalDate today, Long memberId) {

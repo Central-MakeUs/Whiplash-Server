@@ -1,8 +1,10 @@
 package akuma.whiplash.domains.alarm.persistence.repository;
 
+import akuma.whiplash.domains.alarm.application.dto.etc.OccurrencePushInfo;
 import akuma.whiplash.domains.alarm.domain.constant.DeactivateType;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmOccurrenceEntity;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -65,4 +67,23 @@ public interface AlarmOccurrenceRepository extends JpaRepository<AlarmOccurrence
         WHERE ao.alarm.member.id = :memberId
     """)
     void deleteByMemberId(@Param("memberId") Long memberId);
+
+    @Query("""
+        SELECT new akuma.whiplash.domains.alarm.application.dto.etc.OccurrencePushInfo(
+            o.id, m.id, a.address
+        )
+        FROM AlarmOccurrenceEntity o
+        JOIN o.alarm a
+        JOIN a.member m
+        WHERE o.date = :date
+          AND o.time BETWEEN :start AND :end
+          AND o.deactivateType = 'NONE'
+          AND o.reminderSent = false
+          AND m.pushNotificationPolicy = true
+    """)
+    List<OccurrencePushInfo> findPushTargetsByTimeRange(
+        @Param("date") LocalDate date,
+        @Param("start") LocalTime start,
+        @Param("end") LocalTime end
+    );
 }
