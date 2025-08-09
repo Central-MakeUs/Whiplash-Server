@@ -11,5 +11,5 @@ public interface AuthCommandService {
 
     LoginResponse login(SocialLoginRequest request);
     void logout(LogoutRequest request, Long memberId);
-    TokenResponse reissueToken(String oldRefreshToken, MemberContext memberContext, String deviceId);
+    TokenResponse reissueToken(MemberContext memberContext);
 }

@@ -9,7 +9,8 @@ public record MemberContext(
     Long memberId,
     String socialId,
     String email,
-    String nickname
+    String nickname,
+    String deviceId
 ) {
 
 }
