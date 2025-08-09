@@ -1,9 +1,7 @@
 package akuma.whiplash.domains.alarm.domain.service;
 
-import static akuma.whiplash.domains.alarm.exception.AlarmErrorCode.REPEAT_DAYS_NOT_CONFIG;
-
+import akuma.whiplash.domains.alarm.application.dto.etc.OccurrencePushInfo;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmInfoPreviewResponse;
-import akuma.whiplash.domains.alarm.application.mapper.AlarmMapper;
 import akuma.whiplash.domains.alarm.domain.constant.DeactivateType;
 import akuma.whiplash.domains.alarm.domain.constant.Weekday;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmEntity;
@@ -14,18 +12,19 @@ import akuma.whiplash.domains.alarm.persistence.repository.AlarmRepository;
 import akuma.whiplash.domains.member.exception.MemberErrorCode;
 import akuma.whiplash.domains.member.persistence.repository.MemberRepository;
 import akuma.whiplash.global.exception.ApplicationException;
-import akuma.whiplash.global.response.code.CommonErrorCode;
 import akuma.whiplash.global.util.date.DateUtil;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -54,6 +53,36 @@ public class AlarmQueryServiceImpl implements AlarmQueryService {
         return alarms.stream()
             .map(alarm -> buildPreviewResponse(alarm, today, memberId))
             .toList();
+    }
+
+    @Override
+    public List<OccurrencePushInfo> getPreNotificationTargets(LocalDateTime startInclusive, LocalDateTime endInclusive) {
+        LocalDate startDate = startInclusive.toLocalDate();
+        LocalTime startTime = startInclusive.toLocalTime();
+        LocalDate endDate   = endInclusive.toLocalDate();
+        LocalTime endTime   = endInclusive.toLocalTime();
+
+        // startDate == endDate -> 검색 범위가 같은 날짜 안이면 단일 쿼리
+        if (startDate.equals(endDate)) {
+            return alarmOccurrenceRepository.findPreNotificationTargetsSameDay(
+                startDate, startTime, endTime, DeactivateType.NONE
+            );
+        }
+
+        //  startDate < endDate -> 검색 범위가 다음 날로 넘어가면 두 구간 합집합
+        List<OccurrencePushInfo> part1 = alarmOccurrenceRepository.findPreNotificationTargetsFromTime(
+            startDate, startTime, DeactivateType.NONE
+        ); // [startDate startTime ~ 23:59:59]
+        List<OccurrencePushInfo> part2 = alarmOccurrenceRepository.findPreNotificationTargetsUntilTime(
+            endDate, endTime, DeactivateType.NONE
+        );// [endDate 00:00:00 ~ endTime]
+
+        // 중복 제거(혹시 모를 중복 대비)
+        return Stream.concat(part1.stream(), part2.stream())
+            .collect(Collectors.collectingAndThen(
+                Collectors.toMap(OccurrencePushInfo::occurrenceId, x -> x, (a, b) -> a),
+                m -> new ArrayList<>(m.values())
+            ));
     }
 
     private AlarmInfoPreviewResponse buildPreviewResponse(AlarmEntity alarm, LocalDate today, Long memberId) {

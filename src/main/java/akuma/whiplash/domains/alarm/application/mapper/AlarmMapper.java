@@ -60,6 +60,7 @@ public class AlarmMapper {
             .alarmRinging(true)
             .deactivatedAt(null)
             .ringingCount(1)
+            .reminderSent(false)
             .build();
     }
 
@@ -73,6 +74,7 @@ public class AlarmMapper {
             .checkinTime(null)
             .alarmRinging(false)
             .ringingCount(0)
+            .reminderSent(false)
             .build();
     }
 

@@ -196,7 +196,7 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
         alarmRepository.delete(alarm);
     }
 
-
+    // TODO: 사용자가 알람이 울리는 날 알람을 끄지 않아 그 다음날로 넘어간 경우에 어떻게 처리할건지
     @Override
     public void checkinAlarm(Long memberId, Long alarmId, AlarmCheckinRequest request) {
         // 1. 알람 조회 및 소유자 검증
@@ -237,6 +237,13 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
 
         // 7. 체크인 처리
         occurrence.checkin(LocalDateTime.now());
+    }
+
+    @Override
+    public void markReminderSent(Set<Long> occurrenceIds) {
+        if (occurrenceIds == null || occurrenceIds.isEmpty()) return;
+        // 벌크 업데이트가 가능하면 JPQL update 사용 권장 (락/동시성 고려)
+        alarmOccurrenceRepository.markReminderSentIn(occurrenceIds);
     }
 
     /**

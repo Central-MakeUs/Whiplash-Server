@@ -39,3 +39,4 @@ out/
 env.properties
 env-test.properties
 google.json
+whiplash-firebase-key.json

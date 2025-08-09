@@ -23,13 +23,14 @@ public class AuthMapper {
             .build();
     }
 
-    public static MemberContext mapToMemberContext(MemberEntity memberEntity) {
+    public static MemberContext mapToMemberContext(MemberEntity memberEntity, String deviceId) {
         return MemberContext.builder()
             .role(memberEntity.getRole())
             .memberId(memberEntity.getId())
             .socialId(memberEntity.getSocialId())
             .email(memberEntity.getEmail())
             .nickname(memberEntity.getNickname())
+            .deviceId(deviceId)
             .build();
     }
 }

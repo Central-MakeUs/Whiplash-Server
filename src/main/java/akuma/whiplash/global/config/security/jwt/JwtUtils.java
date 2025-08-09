@@ -20,7 +20,6 @@ import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
-import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.Collections;
 import java.util.List;
@@ -56,6 +55,12 @@ public class JwtUtils {
             if (!claims.get(TYPE).equals(tokenType.name())) {
                 throw ApplicationException.from(INVALID_TOKEN);
             }
+
+            if (tokenType.equals(REFRESH)) {
+                Long memberId = getMemberIdFromToken(claims);
+                String deviceId = getDeviceIdFromToken(claims);
+                validateRefreshTokenExists(token, memberId, deviceId);
+            }
         } catch (ExpiredJwtException e) {
             jwtExceptionHandler(response, TOKEN_EXPIRED);
             throw ApplicationException.from(TOKEN_EXPIRED);
@@ -65,41 +70,32 @@ public class JwtUtils {
         }
     }
 
-    public void validateRefreshToken(String refreshToken, Long memberId, String deviceId) {
-        String redisToken = redisRepository
-            .getValues(REFRESH.toString() + ":" + memberId + ":" + deviceId)
+    public void validateRefreshTokenExists(String refreshTokenFromClient, Long memberId, String deviceId) {
+        String refreshTokenInRedis = redisRepository
+            .getValues(REFRESH + ":" + memberId + ":" + deviceId)
             .orElseThrow(() -> ApplicationException.from(TOKEN_NOT_FOUND));
 
-        if (!redisToken.equals(refreshToken)) {
+        // 재사용/탈취 의심 → 정책에 따라 해당 키 삭제, 전체 디바이스 무효화도 가능
+        if (!refreshTokenInRedis.equals(refreshTokenFromClient)) {
             throw ApplicationException.from(INVALID_TOKEN);
         }
     }
 
     public void expireRefreshToken(Long memberId, String deviceId) {
-        redisRepository.deleteValues(REFRESH.toString() + ":" + memberId + ":" + deviceId);
-    }
-
-    private Claims parseClaims(String token) {
-        SecretKey key = Keys.hmacShaKeyFor(Decoders.BASE64.decode(secret));
-
-        return Jwts.parserBuilder()
-            .setSigningKey(key)
-            .build()
-            .parseClaimsJws(token)
-            .getBody();
+        redisRepository.deleteValues(REFRESH + ":" + memberId + ":" + deviceId);
     }
 
     public Authentication getAuthentication(String token) throws ApplicationException {
         Claims claims = parseClaims(token);
         List<GrantedAuthority> authorities = Collections.singletonList(new SimpleGrantedAuthority(claims.get(ROLE).toString()));
 
-        Long memberId = Long.parseLong(claims.getSubject());
+        Long memberId = getMemberIdFromToken(claims);
+        String deviceId = getDeviceIdFromToken(claims);
         MemberEntity member = memberQueryService.findById(memberId);
-        MemberContext memberContext = AuthMapper.mapToMemberContext(member);
+        MemberContext memberContext = AuthMapper.mapToMemberContext(member, deviceId);
 
         return new UsernamePasswordAuthenticationToken(memberContext, "", authorities);
     }
-
 
     public void jwtExceptionHandler(HttpServletResponse response, BaseErrorCode error) {
         response.setStatus(error.getHttpStatus().value());
@@ -114,5 +110,23 @@ public class JwtUtils {
         } catch (Exception e) {
             log.error(e.getMessage());
         }
+    }
+
+    private Claims parseClaims(String token) {
+        SecretKey key = Keys.hmacShaKeyFor(Decoders.BASE64.decode(secret));
+
+        return Jwts.parserBuilder()
+            .setSigningKey(key)
+            .build()
+            .parseClaimsJws(token)
+            .getBody();
+    }
+
+    private static Long getMemberIdFromToken(Claims claims) {
+        return Long.parseLong(claims.getSubject());
+    }
+
+    private static String getDeviceIdFromToken(Claims claims) {
+        return claims.get("deviceId", String.class);
     }
 }

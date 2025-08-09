@@ -1,28 +1,21 @@
 package akuma.whiplash.domains.auth.domain.service;
 
 import static akuma.whiplash.domains.auth.exception.AuthErrorCode.*;
-import static akuma.whiplash.global.response.code.CommonErrorCode.*;
 
 import akuma.whiplash.domains.auth.application.dto.etc.MemberContext;
 import akuma.whiplash.domains.auth.application.dto.response.TokenResponse;
-import akuma.whiplash.domains.auth.application.utils.AppleVerifier;
-import akuma.whiplash.domains.auth.application.utils.GoogleVerifier;
-import akuma.whiplash.domains.auth.application.utils.KakaoVerifier;
 import akuma.whiplash.domains.auth.application.dto.etc.SocialMemberInfo;
-import akuma.whiplash.domains.auth.application.dto.request.LogoutRequest;
 import akuma.whiplash.domains.auth.application.dto.request.SocialLoginRequest;
 import akuma.whiplash.domains.auth.application.dto.response.LoginResponse;
 import akuma.whiplash.domains.auth.application.mapper.AuthMapper;
-import akuma.whiplash.domains.auth.application.utils.MockVerifier;
 import akuma.whiplash.domains.auth.application.utils.SocialVerifier;
-import akuma.whiplash.domains.auth.exception.AuthErrorCode;
 import akuma.whiplash.domains.member.persistence.entity.MemberEntity;
 import akuma.whiplash.domains.member.persistence.repository.MemberRepository;
 import akuma.whiplash.global.config.security.jwt.JwtProvider;
 import akuma.whiplash.global.config.security.jwt.JwtUtils;
 import akuma.whiplash.global.exception.ApplicationException;
 import akuma.whiplash.infrastructure.redis.RedisRepository;
-import jakarta.servlet.http.HttpServletRequest;
+import akuma.whiplash.infrastructure.redis.RedisService;
 import java.util.Map;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
@@ -41,6 +34,7 @@ public class AuthCommandServiceImpl implements AuthCommandService {
     private final RedisRepository redisRepository;
     private final JwtProvider jwtProvider;
     private final JwtUtils jwtUtils;
+    private final RedisService redisService;
 
     @Override
     public LoginResponse login(SocialLoginRequest request) {
@@ -72,7 +66,7 @@ public class AuthCommandServiceImpl implements AuthCommandService {
             .findFirst().ifPresent(redisRepository::deleteValues);
 
         // JWT 생성
-        String accessToken = jwtProvider.generateAccessToken(member.getId(), member.getRole());
+        String accessToken = jwtProvider.generateAccessToken(member.getId(), member.getRole(), request.deviceId());
         String refreshToken = jwtProvider.generateRefreshToken(member.getId(), request.deviceId(), member.getRole());
 
         return LoginResponse.builder()
@@ -84,20 +78,20 @@ public class AuthCommandServiceImpl implements AuthCommandService {
     }
 
     @Override
-    public void logout(LogoutRequest request, Long memberId) {
-        jwtUtils.expireRefreshToken(memberId, request.deviceId());
+    public void logout(MemberContext memberContext) {
+        jwtUtils.expireRefreshToken(memberContext.memberId(), memberContext.deviceId());
+        redisService.removeFcmTokenForDevice(memberContext.memberId(), memberContext.deviceId());
     }
 
     @Override
-    public TokenResponse reissueToken(String oldRefreshToken, MemberContext memberContext, String deviceId) {
-        jwtUtils.validateRefreshToken(oldRefreshToken, memberContext.memberId(), deviceId);
-        jwtUtils.expireRefreshToken(memberContext.memberId(), deviceId);
+    public TokenResponse reissueToken(MemberContext memberContext) {
+        jwtUtils.expireRefreshToken(memberContext.memberId(), memberContext.deviceId());
 
-        String accessToken = jwtProvider.generateAccessToken(memberContext.memberId(), memberContext.role());
-        String newRefreshToken = jwtProvider.generateRefreshToken(memberContext.memberId(), deviceId, memberContext.role());
+        String newAccessToken = jwtProvider.generateAccessToken(memberContext.memberId(), memberContext.role(), memberContext.deviceId());
+        String newRefreshToken = jwtProvider.generateRefreshToken(memberContext.memberId(), memberContext.deviceId(), memberContext.role());
 
         return TokenResponse.builder()
-            .accessToken(BEARER_PREFIX + accessToken)
+            .accessToken(BEARER_PREFIX + newAccessToken)
             .refreshToken(BEARER_PREFIX + newRefreshToken)
             .build();
     }
