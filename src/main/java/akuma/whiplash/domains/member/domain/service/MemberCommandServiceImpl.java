@@ -4,7 +4,8 @@ import akuma.whiplash.domains.alarm.persistence.repository.AlarmOccurrenceReposi
 import akuma.whiplash.domains.alarm.persistence.repository.AlarmOffLogRepository;
 import akuma.whiplash.domains.alarm.persistence.repository.AlarmRepository;
 import akuma.whiplash.domains.alarm.persistence.repository.AlarmRingingLogRepository;
-import akuma.whiplash.domains.member.application.dto.request.MemberTermsModifyRequest;
+import akuma.whiplash.domains.member.application.dto.request.MemberPrivacyPolicyModifyRequest;
+import akuma.whiplash.domains.member.application.dto.request.MemberPushNotificationPolicyModifyRequest;
 import akuma.whiplash.domains.member.exception.MemberErrorCode;
 import akuma.whiplash.domains.member.persistence.entity.MemberEntity;
 import akuma.whiplash.domains.member.persistence.repository.MemberRepository;
@@ -25,17 +26,19 @@ public class MemberCommandServiceImpl implements MemberCommandService {
     private final AlarmRingingLogRepository alarmRingingLogRepository;
 
     @Override
-    public void modifyMemberTermsInfo(Long memberId, MemberTermsModifyRequest request) {
+    public void modifyPrivacyPolicy(Long memberId, Boolean privacyPolicy) {
         MemberEntity member = memberRepository.findById(memberId)
             .orElseThrow(() -> ApplicationException.from(MemberErrorCode.MEMBER_NOT_FOUND));
 
-        if (request.privacyPolicy() != null) {
-            member.updatePrivacyPolicy(request.privacyPolicy());
-        }
+        member.updatePrivacyPolicy(privacyPolicy);
+    }
 
-        if (request.pushNotificationPolicy() != null) {
-            member.updatePushNotificationPolicy(request.pushNotificationPolicy());
-        }
+    @Override
+    public void modifyPushNotificationPolicy(Long memberId, Boolean pushNotificationPolicy) {
+        MemberEntity member = memberRepository.findById(memberId)
+            .orElseThrow(() -> ApplicationException.from(MemberErrorCode.MEMBER_NOT_FOUND));
+
+        member.updatePushNotificationPolicy(pushNotificationPolicy);
     }
 
     @Override
