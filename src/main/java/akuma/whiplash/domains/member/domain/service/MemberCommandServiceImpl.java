@@ -4,11 +4,12 @@ import akuma.whiplash.domains.alarm.persistence.repository.AlarmOccurrenceReposi
 import akuma.whiplash.domains.alarm.persistence.repository.AlarmOffLogRepository;
 import akuma.whiplash.domains.alarm.persistence.repository.AlarmRepository;
 import akuma.whiplash.domains.alarm.persistence.repository.AlarmRingingLogRepository;
-import akuma.whiplash.domains.member.application.dto.request.MemberTermsModifyRequest;
 import akuma.whiplash.domains.member.exception.MemberErrorCode;
 import akuma.whiplash.domains.member.persistence.entity.MemberEntity;
 import akuma.whiplash.domains.member.persistence.repository.MemberRepository;
+import akuma.whiplash.global.config.security.jwt.JwtUtils;
 import akuma.whiplash.global.exception.ApplicationException;
+import akuma.whiplash.infrastructure.redis.RedisService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,23 +24,31 @@ public class MemberCommandServiceImpl implements MemberCommandService {
     private final AlarmOccurrenceRepository alarmOccurrenceRepository;
     private final AlarmOffLogRepository alarmOffLogRepository;
     private final AlarmRingingLogRepository alarmRingingLogRepository;
+    private final JwtUtils jwtUtils;
+    private final RedisService redisService;
 
     @Override
-    public void modifyMemberTermsInfo(Long memberId, MemberTermsModifyRequest request) {
+    public void modifyPrivacyPolicy(Long memberId, boolean privacyPolicy) {
         MemberEntity member = memberRepository.findById(memberId)
             .orElseThrow(() -> ApplicationException.from(MemberErrorCode.MEMBER_NOT_FOUND));
 
-        if (request.privacyPolicy() != null) {
-            member.updatePrivacyPolicy(request.privacyPolicy());
-        }
-
-        if (request.pushNotificationPolicy() != null) {
-            member.updatePushNotificationPolicy(request.pushNotificationPolicy());
+        if (member.isPrivacyPolicy() != privacyPolicy) {
+            member.updatePrivacyPolicy(privacyPolicy);
         }
     }
 
     @Override
-    public void hardDeleteMember(Long memberId) {
+    public void modifyPushNotificationPolicy(Long memberId, boolean pushNotificationPolicy) {
+        MemberEntity member = memberRepository.findById(memberId)
+            .orElseThrow(() -> ApplicationException.from(MemberErrorCode.MEMBER_NOT_FOUND));
+
+        if (member.isPushNotificationPolicy() != pushNotificationPolicy) {
+            member.updatePushNotificationPolicy(pushNotificationPolicy);
+        }
+    }
+
+    @Override
+    public void hardDeleteMember(Long memberId, String deviceId) {
         MemberEntity member = memberRepository.findById(memberId)
             .orElseThrow(() -> ApplicationException.from(MemberErrorCode.MEMBER_NOT_FOUND));
 
@@ -58,7 +67,8 @@ public class MemberCommandServiceImpl implements MemberCommandService {
         // 6. member 삭제
         memberRepository.delete(member);
 
-
-        // TODO: 리프레시 토큰, FCM 토큰 삭제
+        // 리프레시 토큰, FCM 토큰 삭제
+        jwtUtils.expireRefreshToken(memberId, deviceId);
+        redisService.removeFcmTokenForDevice(memberId, deviceId);
     }
 }

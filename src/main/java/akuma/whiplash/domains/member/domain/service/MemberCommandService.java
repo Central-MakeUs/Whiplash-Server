@@ -1,8 +1,7 @@
 package akuma.whiplash.domains.member.domain.service;
 
-import akuma.whiplash.domains.member.application.dto.request.MemberTermsModifyRequest;
-
 public interface MemberCommandService {
-    void modifyMemberTermsInfo(Long memberId, MemberTermsModifyRequest request);
-    void hardDeleteMember(Long memberId);
+    void modifyPrivacyPolicy(Long memberId, boolean privacyPolicy);
+    void modifyPushNotificationPolicy(Long memberId, boolean pushNotificationPolicy);
+    void hardDeleteMember(Long memberId, String deviceId);
 }
