@@ -110,10 +110,10 @@ public class AlarmController {
     @CustomErrorCodes(memberErrorCodes = {MEMBER_NOT_FOUND})
     @Operation(summary = "남은 알람 끄기 횟수 조회", description = "회원의 이번 주 남은 알람 끄기 횟수를 조회합니다.")
     @GetMapping("/off-count")
-    public ApplicationResponse<AlarmRemainingOffCountResponse> getRemainingOffCount(
+    public ApplicationResponse<AlarmRemainingOffCountResponse> getWeeklyRemainingOffCount(
         @AuthenticationPrincipal MemberContext memberContext
     ) {
-        AlarmRemainingOffCountResponse response = alarmUseCase.getRemainingOffCount(memberContext.memberId());
+        AlarmRemainingOffCountResponse response = alarmUseCase.getWeeklyRemainingOffCount(memberContext.memberId());
         return ApplicationResponse.onSuccess(response);
     }
 }

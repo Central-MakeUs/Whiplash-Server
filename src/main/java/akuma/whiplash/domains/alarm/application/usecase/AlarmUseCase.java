@@ -44,7 +44,7 @@ public class AlarmUseCase {
         return alarmQueryService.getAlarms(memberId);
     }
 
-    public AlarmRemainingOffCountResponse getRemainingOffCount(Long memberId) {
-        return alarmQueryService.getRemainingOffCount(memberId);
+    public AlarmRemainingOffCountResponse getWeeklyRemainingOffCount(Long memberId) {
+        return alarmQueryService.getWeeklyRemainingOffCount(memberId);
     }
 }

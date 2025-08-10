@@ -9,5 +9,5 @@ import java.util.List;
 public interface AlarmQueryService {
     List<AlarmInfoPreviewResponse> getAlarms(Long memberId);
     List<OccurrencePushInfo> getPreNotificationTargets(LocalDateTime startInclusive, LocalDateTime endInclusive);
-    AlarmRemainingOffCountResponse getRemainingOffCount(Long memberId);
+    AlarmRemainingOffCountResponse getWeeklyRemainingOffCount(Long memberId);
 }

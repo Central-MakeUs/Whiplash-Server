@@ -40,6 +40,8 @@ public class AlarmQueryServiceImpl implements AlarmQueryService {
     private final AlarmOffLogRepository alarmOffLogRepository;
     private final MemberRepository memberRepository;
 
+    private static final int WEEKLY_OFF_LIMIT = 2;
+
     @Transactional
     @Override
     public List<AlarmInfoPreviewResponse> getAlarms(Long memberId) {
@@ -87,7 +89,7 @@ public class AlarmQueryServiceImpl implements AlarmQueryService {
     }
 
     @Override
-    public AlarmRemainingOffCountResponse getRemainingOffCount(Long memberId) {
+    public AlarmRemainingOffCountResponse getWeeklyRemainingOffCount(Long memberId) {
         memberRepository
             .findById(memberId)
             .orElseThrow(() -> ApplicationException.from(MemberErrorCode.MEMBER_NOT_FOUND));
@@ -101,7 +103,7 @@ public class AlarmQueryServiceImpl implements AlarmQueryService {
             memberId, weekStart, now
         );
 
-        long count = Math.max(0, 2 - offCount);
+        int count = (int) Math.max(0, WEEKLY_OFF_LIMIT - offCount);
 
         return AlarmRemainingOffCountResponse.builder()
             .remainingOffCount(count)
