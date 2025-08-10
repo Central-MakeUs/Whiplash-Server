@@ -2,6 +2,7 @@ package akuma.whiplash.domains.alarm.domain.service;
 
 import akuma.whiplash.domains.alarm.application.dto.etc.OccurrencePushInfo;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmInfoPreviewResponse;
+import akuma.whiplash.domains.alarm.application.dto.response.AlarmRemainingOffCountResponse;
 import akuma.whiplash.domains.alarm.domain.constant.DeactivateType;
 import akuma.whiplash.domains.alarm.domain.constant.Weekday;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmEntity;
@@ -85,6 +86,28 @@ public class AlarmQueryServiceImpl implements AlarmQueryService {
             ));
     }
 
+    @Override
+    public AlarmRemainingOffCountResponse getRemainingOffCount(Long memberId) {
+        memberRepository
+            .findById(memberId)
+            .orElseThrow(() -> ApplicationException.from(MemberErrorCode.MEMBER_NOT_FOUND));
+
+        LocalDate today = LocalDate.now();
+        LocalDate monday = today.with(DayOfWeek.MONDAY);
+        LocalDateTime weekStart = monday.atStartOfDay();
+        LocalDateTime now = LocalDateTime.now();
+
+        long offCount = alarmOffLogRepository.countByMemberIdAndCreatedAtBetween(
+            memberId, weekStart, now
+        );
+
+        long count = Math.max(0, 2 - offCount);
+
+        return AlarmRemainingOffCountResponse.builder()
+            .remainingOffCount(count)
+            .build();
+    }
+
     private AlarmInfoPreviewResponse buildPreviewResponse(AlarmEntity alarm, LocalDate today, Long memberId) {
         // 1. 가장 최근 OFF 또는 CHECKIN 이력 조회
         Optional<AlarmOccurrenceEntity> recentOccurrenceOpt =
@@ -133,9 +156,6 @@ public class AlarmQueryServiceImpl implements AlarmQueryService {
         final LocalDate resolvedFirstUpcomingDate = isCurrentDeactivated ? secondDate : firstDate;
         final LocalDate resolvedSecondUpcomingDate = isCurrentDeactivated ? thirdDate : secondDate;
 
-        // 5. 회원의 이번 주 남은 알람 끄기 횟수 계산
-        long remainingOffCount = calculateRemainingOffCount(memberId);
-
         return AlarmInfoPreviewResponse.builder()
             .alarmId(alarm.getId())
             .alarmPurpose(alarm.getAlarmPurpose())
@@ -153,24 +173,7 @@ public class AlarmQueryServiceImpl implements AlarmQueryService {
             .firstUpcomingDayOfWeek(DateUtil.getKoreanDayOfWeek(resolvedFirstUpcomingDate))
             .secondUpcomingDay(resolvedSecondUpcomingDate)
             .secondUpcomingDayOfWeek(DateUtil.getKoreanDayOfWeek(resolvedSecondUpcomingDate))
-            .remainingOffCount(remainingOffCount)
             .build();
-    }
-
-    /**
-     * 이번 주 월요일부터 현재까지의 OFF 로그를 기반으로 남은 끄기 횟수 계산
-     */
-    private long calculateRemainingOffCount(Long memberId) {
-        LocalDate today = LocalDate.now();
-        LocalDate monday = today.with(DayOfWeek.MONDAY);
-        LocalDateTime weekStart = monday.atStartOfDay();
-        LocalDateTime now = LocalDateTime.now();
-
-        long offCount = alarmOffLogRepository.countByMemberIdAndCreatedAtBetween(
-            memberId, weekStart, now
-        );
-
-        return Math.max(0, 2 - offCount);
     }
 }
 
