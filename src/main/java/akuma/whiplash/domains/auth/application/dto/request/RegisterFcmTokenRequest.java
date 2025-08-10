@@ -7,6 +7,6 @@ import jakarta.validation.constraints.NotBlank;
 public record RegisterFcmTokenRequest(
 
     @Schema(description = "FCM 토큰", example = "djkhsa01whjas")
-    @NotBlank
+    @NotBlank(message = "FCM 토큰을 입력해주세요.")
     String fcmToken
 ) {}

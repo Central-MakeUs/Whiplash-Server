@@ -67,6 +67,7 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
     private String sheetRange;
 
     private static final double CHECKIN_RADIUS_METERS = 100.0;
+    private static final int WEEKLY_OFF_LIMIT = 2;
 
     @Override
     public void createAlarm(AlarmRegisterRequest request, Long memberId) {
@@ -118,7 +119,7 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
         );
 
         // 5. 제한 초과 시 예외 발생
-        if (weeklyOffCount >= 2) {
+        if (weeklyOffCount >= WEEKLY_OFF_LIMIT) {
             throw ApplicationException.from(ALARM_OFF_LIMIT_EXCEEDED);
         }
 
@@ -162,7 +163,7 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
 
         // 13. 다음 알람 울림 날짜 계산 및 응답 구성
         LocalDate reactivateDate = DateUtil.getNextOccurrenceDate(repeatDays, offTargetDate.plusDays(1));
-        int remainingCount = (int) (2 - (weeklyOffCount + 1));
+        int remainingCount = (int) Math.max(0, WEEKLY_OFF_LIMIT - (weeklyOffCount + 1));
 
         return AlarmOffResultResponse.builder()
             .offTargetDate(offTargetDate)

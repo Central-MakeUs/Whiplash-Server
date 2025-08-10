@@ -4,6 +4,7 @@ import akuma.whiplash.domains.alarm.application.dto.request.AlarmCheckinRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmRegisterRequest;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmInfoPreviewResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmOffResultResponse;
+import akuma.whiplash.domains.alarm.application.dto.response.AlarmRemainingOffCountResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.CreateAlarmOccurrenceResponse;
 import akuma.whiplash.domains.alarm.domain.service.AlarmCommandService;
 import akuma.whiplash.domains.alarm.domain.service.AlarmQueryService;
@@ -41,5 +42,9 @@ public class AlarmUseCase {
 
     public List<AlarmInfoPreviewResponse> getAlarms(Long memberId) {
         return alarmQueryService.getAlarms(memberId);
+    }
+
+    public AlarmRemainingOffCountResponse getWeeklyRemainingOffCount(Long memberId) {
+        return alarmQueryService.getWeeklyRemainingOffCount(memberId);
     }
 }

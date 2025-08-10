@@ -10,6 +10,7 @@ import akuma.whiplash.domains.alarm.application.dto.request.AlarmRemoveRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmRegisterRequest;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmInfoPreviewResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmOffResultResponse;
+import akuma.whiplash.domains.alarm.application.dto.response.AlarmRemainingOffCountResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.CreateAlarmOccurrenceResponse;
 import akuma.whiplash.domains.alarm.application.usecase.AlarmUseCase;
 import akuma.whiplash.domains.auth.application.dto.etc.MemberContext;
@@ -104,5 +105,15 @@ public class AlarmController {
     public ApplicationResponse<List<AlarmInfoPreviewResponse>> getAlarms(@AuthenticationPrincipal MemberContext memberContext) {
         List<AlarmInfoPreviewResponse> alarms = alarmUseCase.getAlarms(memberContext.memberId());
         return ApplicationResponse.onSuccess(alarms);
+    }
+
+    @CustomErrorCodes(memberErrorCodes = {MEMBER_NOT_FOUND})
+    @Operation(summary = "남은 알람 끄기 횟수 조회", description = "회원의 이번 주 남은 알람 끄기 횟수를 조회합니다.")
+    @GetMapping("/off-count")
+    public ApplicationResponse<AlarmRemainingOffCountResponse> getWeeklyRemainingOffCount(
+        @AuthenticationPrincipal MemberContext memberContext
+    ) {
+        AlarmRemainingOffCountResponse response = alarmUseCase.getWeeklyRemainingOffCount(memberContext.memberId());
+        return ApplicationResponse.onSuccess(response);
     }
 }
