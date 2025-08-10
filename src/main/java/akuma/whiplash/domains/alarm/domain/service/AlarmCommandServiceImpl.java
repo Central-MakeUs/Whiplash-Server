@@ -163,7 +163,7 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
 
         // 13. 다음 알람 울림 날짜 계산 및 응답 구성
         LocalDate reactivateDate = DateUtil.getNextOccurrenceDate(repeatDays, offTargetDate.plusDays(1));
-        int remainingCount = (int) (2 - (weeklyOffCount + 1));
+        int remainingCount = (int) Math.max(0, WEEKLY_OFF_LIMIT - (weeklyOffCount + 1));
 
         return AlarmOffResultResponse.builder()
             .offTargetDate(offTargetDate)
