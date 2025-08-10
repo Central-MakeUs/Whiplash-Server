@@ -6,7 +6,7 @@ import lombok.Builder;
 
 @Builder
 public record MemberPushNotificationPolicyModifyRequest(
-    @Schema(description = "푸시 알림 수신 동의 여부")
+    @Schema(description = "푸시 알림 수신 동의 여부", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotNull(message = "푸시 알림 수신 동의 여부를 선택해주세요.")
     Boolean pushNotificationPolicy
 ) {

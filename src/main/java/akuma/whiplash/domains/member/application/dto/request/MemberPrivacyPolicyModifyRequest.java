@@ -6,7 +6,7 @@ import lombok.Builder;
 
 @Builder
 public record MemberPrivacyPolicyModifyRequest(
-    @Schema(description = "개인정보 수집 동의 여부")
+    @Schema(description = "개인정보 수집 동의 여부", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotNull(message = "개인정보 수집 동의 여부를 선택해주세요.")
     Boolean privacyPolicy
 ) {

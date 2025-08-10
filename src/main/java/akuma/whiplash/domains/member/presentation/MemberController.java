@@ -45,7 +45,7 @@ public class MemberController {
     @Operation(summary = "회원 탈퇴", description = "회원 정보, 관련된 알람 정보를 hard delete 합니다.")
     @DeleteMapping
     public ApplicationResponse<Void> hardDeleteMember(@AuthenticationPrincipal MemberContext memberContext) {
-        memberUseCase.hardDeleteMember(memberContext.memberId());
+        memberUseCase.hardDeleteMember(memberContext);
         return ApplicationResponse.onSuccess();
     }
 }

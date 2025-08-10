@@ -1,5 +1,6 @@
 package akuma.whiplash.domains.member.application.usecase;
 
+import akuma.whiplash.domains.auth.application.dto.etc.MemberContext;
 import akuma.whiplash.domains.member.application.dto.request.MemberPrivacyPolicyModifyRequest;
 import akuma.whiplash.domains.member.application.dto.request.MemberPushNotificationPolicyModifyRequest;
 import akuma.whiplash.domains.member.domain.service.MemberCommandService;
@@ -21,7 +22,7 @@ public class MemberUseCase {
         memberCommandService.modifyPushNotificationPolicy(memberId, request.pushNotificationPolicy());
     }
 
-    public void hardDeleteMember(Long memberId) {
-        memberCommandService.hardDeleteMember(memberId);
+    public void hardDeleteMember(MemberContext memberContext) {
+        memberCommandService.hardDeleteMember(memberContext.memberId(), memberContext.deviceId());
     }
 }
