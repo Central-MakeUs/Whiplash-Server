@@ -4,6 +4,10 @@ import akuma.whiplash.domains.alarm.application.dto.etc.PushTargetDto;
 import akuma.whiplash.domains.alarm.persistence.repository.AlarmOccurrenceRepository;
 import akuma.whiplash.infrastructure.firebase.dto.FcmSendResult;
 import akuma.whiplash.infrastructure.redis.RedisService;
+import com.google.firebase.messaging.AndroidConfig;
+import com.google.firebase.messaging.AndroidConfig.Priority;
+import com.google.firebase.messaging.ApnsConfig;
+import com.google.firebase.messaging.Aps;
 import com.google.firebase.messaging.BatchResponse;
 import com.google.firebase.messaging.FirebaseMessaging;
 import com.google.firebase.messaging.FirebaseMessagingException;
@@ -32,11 +36,20 @@ public class FcmService {
 
     private final RedisService redisService;
 
-    /** idempotent: 같은 토큰 재등록이어도 안전하게 동작 */
+    /**
+     * idempotent: 같은 토큰 재등록이어도 안전하게 동작
+     */
     public void registerFcmToken(Long memberId, String deviceId, String fcmToken) {
         redisService.upsertFcmToken(memberId, deviceId, fcmToken);
     }
 
+    /**
+     * 데이터 전용(data-only) 멀티캐스트 전송
+     * - Notification payload 제거, data만 사용
+     * - Android priority=HIGH, iOS apns-priority=10 + content-available=1
+     * - 같은 body 문구(=주소)끼리 묶어서 전송 효율화
+     * - 전송 성공한 occurrenceId 수집, 무효 토큰은 즉시 Redis에서 제거
+     */
     public FcmSendResult sendBulkNotification(List<PushTargetDto> targets) {
         if (targets == null || targets.isEmpty()) {
             return FcmSendResult.builder()
@@ -46,7 +59,7 @@ public class FcmService {
                 .build();
         }
 
-        // body 문구가 동일한 것끼리 묶어서 멀티캐스트 효율↑
+        // body 문구가 동일한 것끼리 묶어서 멀티캐스트 효율 증가
         Map<String, List<PushTargetDto>> groupedByBody = targets.stream()
             .collect(Collectors.groupingBy(
                 dto -> String.format("1시간 뒤 %s에서 알림이 울릴 예정이에요!", dto.address())
@@ -58,20 +71,38 @@ public class FcmService {
 
         for (Map.Entry<String, List<PushTargetDto>> entry : groupedByBody.entrySet()) {
             String body = entry.getKey();
-            List<PushTargetDto> group = dedupByToken(entry.getValue()); // 같은 토큰 중복 제거
+            List<PushTargetDto> group = dedupByToken(entry.getValue());
+
+            Map<String, String> data = new HashMap<>();
+            data.put("title", TITLE);
+            data.put("body", body);
 
             for (List<PushTargetDto> batch : partition(group, FCM_MULTICAST_LIMIT)) {
                 MulticastMessage message = MulticastMessage.builder()
                     .addAllTokens(batch.stream().map(PushTargetDto::token).toList())
-                    .setNotification(Notification.builder().setTitle(TITLE).setBody(body).build())
+                    .putAllData(data)
+                    .setAndroidConfig(
+                        AndroidConfig.builder()
+                        .setPriority(Priority.HIGH) // 즉시 전송
+                        .build()
+                    )
+                    .setApnsConfig( // IOS 설정
+                        ApnsConfig.builder()
+                            .putHeader("apns-priority", "10") // 즉시 전송
+                            .setAps(
+                                Aps.builder()
+                                    .setContentAvailable(true) // 백그라운드 데이터 수신 허용
+                                    .build()
+                            )
+                            .build()
+                    )
                     .build();
 
                 try {
                     BatchResponse response = FirebaseMessaging.getInstance().sendEachForMulticast(message);
-
-                    // 결과 집계
+                    log.info("FCM 전송 성공 {}개", response.getSuccessCount());
+                    log.info("FCM 전송 실패 {}개", response.getFailureCount());
                     handleSendResult(response.getResponses(), batch, successOccurrenceIds, invalidTokens, memberToTokens);
-
                 } catch (FirebaseMessagingException e) {
                     log.error("FCM 전송 실패(멀티캐스트 전체). body={}", body, e);
                 }
@@ -85,6 +116,9 @@ public class FcmService {
             .build();
     }
 
+    /**
+     * FCM 배치 전송 결과 집계
+     */
     private void handleSendResult(
         List<SendResponse> responses,
         List<PushTargetDto> batch,
@@ -124,8 +158,8 @@ public class FcmService {
         ).contains(e.getErrorCode());
     }
 
+    // 같은 FCM 토큰 중복 제거
     private List<PushTargetDto> dedupByToken(List<PushTargetDto> src) {
-        // 동일 토큰이 여러 번 들어왔을 때 1개만 전송
         Map<String, PushTargetDto> map = new LinkedHashMap<>();
         for (PushTargetDto d : src) {
             map.putIfAbsent(d.token(), d);

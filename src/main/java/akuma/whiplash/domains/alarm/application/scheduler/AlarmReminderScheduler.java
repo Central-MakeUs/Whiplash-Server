@@ -27,6 +27,7 @@ public class AlarmReminderScheduler {
 
     // @Scheduled(cron = "0 * * * * *") // 매 분
     public void sendPreAlarmNotifications() {
+        log.info("[AlarmReminderScheduler.sendPreAlarmNotifications] 알람 울리기 1시간 전 푸시 알림 전송 스케줄러 시작");
         // 0. 시간 기준 (분 단위 정렬)
         LocalDateTime now = LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES);
         LocalDateTime windowStart = now.plusMinutes(59);
@@ -69,6 +70,9 @@ public class AlarmReminderScheduler {
                 redisService.removeInvalidToken(memberId, bad);
             }
         }
+
+        log.info("[AlarmReminderScheduler.sendPreAlarmNotifications] 알람 울리기 1시간 전 푸시 알림 전송 스케줄러 종료");
+
     }
 
 }
