@@ -1,7 +1,6 @@
 package akuma.whiplash.infrastructure.firebase;
 
 import akuma.whiplash.domains.alarm.application.dto.etc.PushTargetDto;
-import akuma.whiplash.domains.alarm.persistence.repository.AlarmOccurrenceRepository;
 import akuma.whiplash.infrastructure.firebase.dto.FcmSendResult;
 import akuma.whiplash.infrastructure.redis.RedisService;
 import com.google.firebase.messaging.AndroidConfig;
@@ -12,7 +11,6 @@ import com.google.firebase.messaging.BatchResponse;
 import com.google.firebase.messaging.FirebaseMessaging;
 import com.google.firebase.messaging.FirebaseMessagingException;
 import com.google.firebase.messaging.MulticastMessage;
-import com.google.firebase.messaging.Notification;
 import com.google.firebase.messaging.SendResponse;
 import java.util.ArrayList;
 import java.util.HashMap;
