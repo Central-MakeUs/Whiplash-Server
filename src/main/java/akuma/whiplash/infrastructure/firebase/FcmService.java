@@ -7,11 +7,13 @@ import com.google.firebase.messaging.AndroidConfig;
 import com.google.firebase.messaging.AndroidConfig.Priority;
 import com.google.firebase.messaging.ApnsConfig;
 import com.google.firebase.messaging.Aps;
+import com.google.firebase.messaging.ApsAlert;
 import com.google.firebase.messaging.BatchResponse;
 import com.google.firebase.messaging.FirebaseMessaging;
 import com.google.firebase.messaging.FirebaseMessagingException;
 import com.google.firebase.messaging.MulticastMessage;
 import com.google.firebase.messaging.SendResponse;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -30,7 +32,7 @@ import org.springframework.stereotype.Service;
 public class FcmService {
 
     private static final int FCM_MULTICAST_LIMIT = 500;
-    private static final String TITLE = "눈 떠";
+    private static final String DEFAULT_TITLE = "눈 떠";
 
     private final RedisService redisService;
 
@@ -71,35 +73,27 @@ public class FcmService {
             String body = entry.getKey();
             List<PushTargetDto> group = dedupByToken(entry.getValue());
 
-            Map<String, String> data = new HashMap<>();
-            data.put("title", TITLE);
-            data.put("body", body);
+            Map<String, String> data = Map.of(
+                "title", DEFAULT_TITLE,
+                "body", body
+            );
 
             for (List<PushTargetDto> batch : partition(group, FCM_MULTICAST_LIMIT)) {
                 MulticastMessage message = MulticastMessage.builder()
                     .addAllTokens(batch.stream().map(PushTargetDto::token).toList())
                     .putAllData(data)
                     .setAndroidConfig(
-                        AndroidConfig.builder()
-                        .setPriority(Priority.HIGH) // 즉시 전송
-                        .build()
+                        buildAndroidConfig(Duration.ofMinutes(60), Priority.HIGH)
                     )
                     .setApnsConfig( // IOS 설정
-                        ApnsConfig.builder()
-                            .putHeader("apns-priority", "10") // 즉시 전송
-                            .setAps(
-                                Aps.builder()
-                                    .setContentAvailable(true) // 백그라운드 데이터 수신 허용
-                                    .build()
-                            )
-                            .build()
+                        buildApnsConfigAlert(DEFAULT_TITLE, body, Duration.ofMinutes(60))
                     )
                     .build();
 
                 try {
                     BatchResponse response = FirebaseMessaging.getInstance().sendEachForMulticast(message);
-                    log.info("FCM 전송 성공 {}개", response.getSuccessCount());
-                    log.info("FCM 전송 실패 {}개", response.getFailureCount());
+                    log.info("FCM 멀티캐스트 결과: success={}, failure={}", response.getSuccessCount(), response.getFailureCount());
+
                     handleSendResult(response.getResponses(), batch, successOccurrenceIds, invalidTokens, memberToTokens);
                 } catch (FirebaseMessagingException e) {
                     log.error("FCM 전송 실패(멀티캐스트 전체). body={}", body, e);
@@ -130,7 +124,9 @@ public class FcmService {
 
             if (res.isSuccessful()) {
                 successOccurrenceIds.add(dto.occurrenceId());
-                memberToTokens.computeIfAbsent(dto.memberId(), k -> new ArrayList<>()).add(dto.token());
+                memberToTokens.computeIfAbsent(dto.memberId(),
+                    k -> new ArrayList<>()
+                ).add(dto.token());
             } else {
                 Exception ex = res.getException();
                 FirebaseMessagingException fme = (ex instanceof FirebaseMessagingException) ? (FirebaseMessagingException) ex : null;
@@ -145,6 +141,34 @@ public class FcmService {
                 }
             }
         }
+    }
+
+    private AndroidConfig buildAndroidConfig(Duration ttl, Priority priority) {
+        AndroidConfig.Builder builder = AndroidConfig.builder().setPriority(priority);
+        if (ttl != null && !ttl.isZero() && !ttl.isNegative()) {
+            builder.setTtl(ttl.toMillis());
+        }
+        return builder.build();
+    }
+
+    // iOS 알림(백그라운드 알림 X, UI에 표시되는 알림)
+    private ApnsConfig buildApnsConfigAlert(String title, String body, Duration ttl) {
+        ApnsConfig.Builder apns = ApnsConfig.builder()
+            .putHeader("apns-push-type", "alert")
+            .putHeader("apns-priority", "10")
+            .setAps(Aps.builder()
+                .setAlert(ApsAlert.builder()
+                    .setTitle(title != null ? title : DEFAULT_TITLE)
+                    .setBody(body)
+                    .build())
+                .setSound("default") // IOS 기본 알림 소리
+                .build());
+
+        if (ttl != null && !ttl.isZero() && !ttl.isNegative()) {
+            long epochSec = (System.currentTimeMillis() + ttl.toMillis()) / 1000;
+            apns.putHeader("apns-expiration", String.valueOf(epochSec));
+        }
+        return apns.build();
     }
 
     private boolean isTokenInvalid(FirebaseMessagingException e) {
