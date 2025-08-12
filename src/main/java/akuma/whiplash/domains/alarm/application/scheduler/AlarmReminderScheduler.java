@@ -9,8 +9,10 @@ import akuma.whiplash.infrastructure.firebase.dto.FcmSendResult;
 import akuma.whiplash.infrastructure.redis.RedisService;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -64,12 +66,13 @@ public class AlarmReminderScheduler {
                 alarmCommandService.markReminderSent(result.getSuccessOccurrenceIds());
             }
 
-            // 4. 무효 토큰 정리(멤버 매핑 정보가 있으면 거기서 제거)
+            // 4. 무효 토큰 정리: 각 회원의 토큰 중 무효한 것만 제거
+            Set<String> invalidTokenSet = new HashSet<>(result.getInvalidTokens());
             for (Map.Entry<Long, List<String>> e : result.getMemberToTokens().entrySet()) {
                 Long memberId = e.getKey();
-                for (String invalidToken : result.getInvalidTokens()) {
-                    redisService.removeInvalidToken(memberId, invalidToken);
-                }
+                e.getValue().stream()
+                    .filter(invalidTokenSet::contains)
+                    .forEach(token -> redisService.removeInvalidToken(memberId, token));
             }
 
         } finally {
