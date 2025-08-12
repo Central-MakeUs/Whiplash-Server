@@ -76,6 +76,9 @@ dependencies {
 	testImplementation 'org.springframework.security:spring-security-test'
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 
+	testCompileOnly 'org.projectlombok:lombok'
+	testAnnotationProcessor 'org.projectlombok:lombok'
+
 	// Test Container
 	// Testcontainers BOM으로 버전 일관성 유지
 	testImplementation platform("org.testcontainers:testcontainers-bom:1.21.3")
