@@ -63,8 +63,9 @@ dependencies {
 	testImplementation 'org.springframework.security:spring-security-test'
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 
-	// Mockito (inline 별도 불필요; JUnit 연동만)
-	testImplementation 'org.mockito:mockito-junit-jupiter' // 버전 명시 X (BOM 관리)
+	// Mockito
+	testImplementation 'org.mockito:mockito-junit-jupiter:5.14.2' // 버전 명시 X (BOM 관리)
+	testImplementation 'org.mockito:mockito-inline:5.14.2'   // final/static 모킹 지원
 
 	// H2 (test 기본 DB)
 	testImplementation 'com.h2database:h2'
@@ -75,7 +76,7 @@ dependencies {
 	testImplementation 'org.testcontainers:mysql'
 
 	// (선택) 일부 CI 환경에서 필요한 경우만 사용
-	// testRuntimeOnly 'net.bytebuddy:byte-buddy-agent:1.14.17'
+	testRuntimeOnly 'net.bytebuddy:byte-buddy-agent:1.14.17'
 }
 
 tasks.withType(Test).configureEach {

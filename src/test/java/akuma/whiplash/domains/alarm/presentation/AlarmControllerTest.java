@@ -93,8 +93,6 @@ class AlarmControllerTest {
         securityContext.setAuthentication(auth);
         SecurityContextHolder.setContext(securityContext);
 
-        doNothing().when(jwtUtils)
-            .validateToken(any(HttpServletResponse.class), anyString(), eq(TokenType.ACCESS));
         when(jwtUtils.getAuthentication(anyString())).thenReturn(auth);
         doNothing().when(alarmUseCase).createAlarm(any(), eq(MEMBER_3.getId()));
 
@@ -135,8 +133,6 @@ class AlarmControllerTest {
         securityContext.setAuthentication(auth);
         SecurityContextHolder.setContext(securityContext);
 
-        doNothing().when(jwtUtils)
-            .validateToken(any(HttpServletResponse.class), anyString(), eq(TokenType.ACCESS));
         when(jwtUtils.getAuthentication(anyString())).thenReturn(auth);
         doThrow(ApplicationException.from(MemberErrorCode.MEMBER_NOT_FOUND))
             .when(alarmUseCase).createAlarm(any(), eq(MEMBER_4.getId()));
