@@ -6,6 +6,7 @@ import akuma.whiplash.domains.alarm.application.dto.request.AlarmCheckinRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmRegisterRequest;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmOffResultResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.CreateAlarmOccurrenceResponse;
+import akuma.whiplash.domains.alarm.application.dto.response.CreateAlarmResponse;
 import akuma.whiplash.domains.alarm.application.mapper.AlarmMapper;
 import akuma.whiplash.domains.alarm.domain.constant.DeactivateType;
 import akuma.whiplash.domains.alarm.domain.constant.Weekday;
@@ -70,11 +71,15 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
     private static final int WEEKLY_OFF_LIMIT = 2;
 
     @Override
-    public void createAlarm(AlarmRegisterRequest request, Long memberId) {
+    public CreateAlarmResponse createAlarm(AlarmRegisterRequest request, Long memberId) {
         MemberEntity memberEntity = findMemberById(memberId);
 
         AlarmEntity alarm = AlarmMapper.mapToAlarmEntity(request, memberEntity);
         alarmRepository.save(alarm);
+
+        return CreateAlarmResponse.builder()
+            .alarmId(alarm.getId())
+            .build();
     }
 
     @Override

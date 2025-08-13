@@ -6,6 +6,7 @@ import akuma.whiplash.domains.alarm.application.dto.response.AlarmInfoPreviewRes
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmOffResultResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmRemainingOffCountResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.CreateAlarmOccurrenceResponse;
+import akuma.whiplash.domains.alarm.application.dto.response.CreateAlarmResponse;
 import akuma.whiplash.domains.alarm.domain.service.AlarmCommandService;
 import akuma.whiplash.domains.alarm.domain.service.AlarmQueryService;
 import akuma.whiplash.global.annotation.architecture.UseCase;
@@ -20,8 +21,8 @@ public class AlarmUseCase {
     private final AlarmCommandService alarmCommandService;
     private final AlarmQueryService alarmQueryService;
 
-    public void createAlarm(AlarmRegisterRequest request, Long memberId) {
-        alarmCommandService.createAlarm(request, memberId);
+    public CreateAlarmResponse createAlarm(AlarmRegisterRequest request, Long memberId) {
+        return alarmCommandService.createAlarm(request, memberId);
     }
 
     public CreateAlarmOccurrenceResponse createAlarmOccurrence(Long memberId, Long alarmId) {

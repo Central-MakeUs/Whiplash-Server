@@ -12,6 +12,7 @@ import akuma.whiplash.domains.alarm.application.dto.response.AlarmInfoPreviewRes
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmOffResultResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmRemainingOffCountResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.CreateAlarmOccurrenceResponse;
+import akuma.whiplash.domains.alarm.application.dto.response.CreateAlarmResponse;
 import akuma.whiplash.domains.alarm.application.usecase.AlarmUseCase;
 import akuma.whiplash.domains.auth.application.dto.etc.MemberContext;
 import akuma.whiplash.global.annotation.swagger.CustomErrorCodes;
@@ -41,9 +42,9 @@ public class AlarmController {
     @CustomErrorCodes(memberErrorCodes = {MEMBER_NOT_FOUND})
     @Operation(summary = "알람 등록", description = "사용자가 알람을 등록합니다.")
     @PostMapping
-    public ApplicationResponse<Void> createAlarm(@AuthenticationPrincipal MemberContext memberContext, @RequestBody @Valid AlarmRegisterRequest request) {
-        alarmUseCase.createAlarm(request, memberContext.memberId());
-        return ApplicationResponse.onSuccess();
+    public ApplicationResponse<CreateAlarmResponse> createAlarm(@AuthenticationPrincipal MemberContext memberContext, @RequestBody @Valid AlarmRegisterRequest request) {
+        CreateAlarmResponse response = alarmUseCase.createAlarm(request, memberContext.memberId());
+        return ApplicationResponse.onSuccess(response);
     }
 
     // @CustomErrorCodes(
