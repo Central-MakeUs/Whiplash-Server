@@ -79,6 +79,9 @@ dependencies {
 	testCompileOnly 'org.projectlombok:lombok'
 	testAnnotationProcessor 'org.projectlombok:lombok'
 
+	// H2
+	testImplementation 'com.h2database:h2'
+
 	// Test Container
 	// Testcontainers BOM으로 버전 일관성 유지
 	testImplementation platform("org.testcontainers:testcontainers-bom:1.21.3")

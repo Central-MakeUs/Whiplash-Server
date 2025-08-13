@@ -1,3 +1,45 @@
+---
+spring.config.activate.on-profile: local
+
+oauth:
+  google:
+    client-id:
+      android: ${GOOGLE_CLIENT_ID_ANDROID}
+      ios: ${GOOGLE_CLIENT_ID_IOS}
+    sheet:
+      id: ${GOOGLE_SHEET_ID}
+      credentials-path: ${GOOGLE_SHEET_CREDENTIALS}
+      range: "알람 삭제 이유!A:C"
+
+  apple:
+    client-id: ${APPLE_CLIENT_ID}
+#  kakao:
+#    client-id: ${KAKAO_CLIENT_ID}
+
+---
+spring.config.activate.on-profile: dev
+
+oauth:
+  google:
+    client-id:
+      android: ${GOOGLE_CLIENT_ID_ANDROID}
+      ios: ${GOOGLE_CLIENT_ID_IOS}
+    sheet:
+      id: ${GOOGLE_SHEET_ID}
+      credentials-path: ${GOOGLE_SHEET_CREDENTIALS}
+      range: "알람 삭제 이유!A:C"
+
+  apple:
+    client-id: ${APPLE_CLIENT_ID}
+#  kakao:
+#    client-id: ${KAKAO_CLIENT_ID}
+
+---
+spring.config.activate.on-profile: prod
+
+---
+spring.config.activate.on-profile: test
+
 oauth:
   google:
     client-id:
