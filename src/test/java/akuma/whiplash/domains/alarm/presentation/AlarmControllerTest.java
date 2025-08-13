@@ -2,17 +2,14 @@ package akuma.whiplash.domains.alarm.presentation;
 
 import static akuma.whiplash.common.fixture.MemberFixture.*;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import akuma.whiplash.common.fixture.AlarmFixture;
-import akuma.whiplash.common.fixture.MemberFixture;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmRegisterRequest;
 import akuma.whiplash.domains.alarm.application.usecase.AlarmUseCase;
 import akuma.whiplash.domains.alarm.domain.constant.Weekday;
@@ -20,11 +17,8 @@ import akuma.whiplash.domains.auth.application.dto.etc.MemberContext;
 import akuma.whiplash.domains.member.exception.MemberErrorCode;
 import akuma.whiplash.global.config.security.SecurityConfig;
 import akuma.whiplash.global.config.security.jwt.JwtAuthenticationFilter;
-import akuma.whiplash.global.config.security.jwt.JwtUtils;
-import akuma.whiplash.global.config.security.jwt.constants.TokenType;
 import akuma.whiplash.global.exception.ApplicationException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import jakarta.servlet.http.HttpServletResponse;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -91,7 +85,7 @@ class AlarmControllerTest {
         securityContext.setAuthentication(auth);
         SecurityContextHolder.setContext(securityContext);
 
-        doNothing().when(alarmUseCase).createAlarm(any(), eq(MEMBER_3.getId()));
+        doNothing().when(alarmUseCase).createAlarm(any(), any(Long.class));
 
         // when & then
         mockMvc.perform(post("/api/alarms")
@@ -131,7 +125,7 @@ class AlarmControllerTest {
         SecurityContextHolder.setContext(securityContext);
 
         doThrow(ApplicationException.from(MemberErrorCode.MEMBER_NOT_FOUND))
-            .when(alarmUseCase).createAlarm(any(), eq(MEMBER_4.getId()));
+            .when(alarmUseCase).createAlarm(any(), any(Long.class));
 
         // when & then
         mockMvc.perform(post("/api/alarms")
