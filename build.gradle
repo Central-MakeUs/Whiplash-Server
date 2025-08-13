@@ -64,8 +64,7 @@ dependencies {
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 
 	// Mockito
-	testImplementation 'org.mockito:mockito-junit-jupiter:5.14.2' // 버전 명시 X (BOM 관리)
-	testImplementation 'org.mockito:mockito-inline:5.14.2'   // final/static 모킹 지원
+	testImplementation 'org.mockito:mockito-junit-jupiter' // 버전 명시 X (BOM 관리)
 
 	// H2 (test 기본 DB)
 	testImplementation 'com.h2database:h2'
