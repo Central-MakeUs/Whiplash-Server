@@ -3,7 +3,6 @@ package akuma.whiplash.domains.alarm.persistence.repository;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import akuma.whiplash.common.config.PersistenceTest;
-import akuma.whiplash.common.config.TestDatabaseConfig;
 import akuma.whiplash.common.fixture.AlarmFixture;
 import akuma.whiplash.common.fixture.MemberFixture;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmEntity;

@@ -9,6 +9,7 @@ import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabas
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.ContextConfiguration;
 
 @Target(ElementType.TYPE)
 @Retention(RetentionPolicy.RUNTIME)
@@ -19,6 +20,9 @@ import org.springframework.test.context.ActiveProfiles;
     }
 )
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import({TestDatabaseConfig.class, JpaAuditingConfig.class})
+@ContextConfiguration(initializers = {
+    MySQLContainerInitializer.class
+})
+@Import({JpaAuditingConfig.class})
 public @interface PersistenceTest {
 }
