@@ -60,8 +60,6 @@ class AlarmControllerTest {
     private ObjectMapper objectMapper;
     @MockitoBean
     private AlarmUseCase alarmUseCase;
-    @MockitoBean
-    private JwtUtils jwtUtils;
 
     @DisplayName("알람 등록 요청이 성공하면 200을 반환한다")
     @Test
@@ -93,7 +91,6 @@ class AlarmControllerTest {
         securityContext.setAuthentication(auth);
         SecurityContextHolder.setContext(securityContext);
 
-        when(jwtUtils.getAuthentication(anyString())).thenReturn(auth);
         doNothing().when(alarmUseCase).createAlarm(any(), eq(MEMBER_3.getId()));
 
         // when & then
@@ -133,7 +130,6 @@ class AlarmControllerTest {
         securityContext.setAuthentication(auth);
         SecurityContextHolder.setContext(securityContext);
 
-        when(jwtUtils.getAuthentication(anyString())).thenReturn(auth);
         doThrow(ApplicationException.from(MemberErrorCode.MEMBER_NOT_FOUND))
             .when(alarmUseCase).createAlarm(any(), eq(MEMBER_4.getId()));
 
