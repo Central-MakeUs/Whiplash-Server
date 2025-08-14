@@ -23,6 +23,7 @@ import akuma.whiplash.global.config.security.jwt.JwtAuthenticationFilter;
 import akuma.whiplash.global.exception.ApplicationException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.List;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -58,6 +59,35 @@ class AlarmControllerTest {
     @MockitoBean
     private AlarmUseCase alarmUseCase;
 
+    private void setSecurityContext(MemberContext context) {
+        UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
+            context,
+            null,
+            List.of(new SimpleGrantedAuthority(context.getRole().name()))
+        );
+
+        // Filter exclude 했으므로 @AuthenticationPrincipal MemberContext를 가져오기 위해 SecurityContext 설정
+        SecurityContext securityContext = SecurityContextHolder.createEmptyContext();
+        securityContext.setAuthentication(auth);
+        SecurityContextHolder.setContext(securityContext);
+    }
+
+    private MemberContext buildContextFromFixture(MemberFixture fixture) {
+        return MemberContext.builder()
+            .memberId(fixture.getId())
+            .role(fixture.getRole())
+            .socialId(fixture.getSocialId())
+            .email(fixture.getEmail())
+            .nickname(fixture.getNickname())
+            .deviceId("mock_device_id")
+            .build();
+    }
+
+    @AfterEach
+    void clearSecurityContext() {
+        SecurityContextHolder.clearContext();
+    }
+    
     @DisplayName("알람 등록 요청이 성공하면 200을 반환한다")
     @Test
     void createAlarm_returnsOk_whenRequestValid() throws Exception {
@@ -72,23 +102,8 @@ class AlarmControllerTest {
             fixture.getRepeatDays().stream().map(Weekday::getDescription).toList(),
             fixture.getSoundType().getDescription()
         );
-        
-        MemberContext context = MemberContext.builder()
-            .memberId(MEMBER_3.getId())
-            .role(MEMBER_3.getRole())
-            .socialId(MEMBER_3.getSocialId())
-            .email(MEMBER_3.getEmail())
-            .nickname(MEMBER_3.getNickname())
-            .deviceId("mock_device_id")
-            .build();
-        
-        UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
-            context, null, List.of(new SimpleGrantedAuthority(MEMBER_3.getRole().name())));
 
-        // Filter exclude 했으므로 @AuthenticationPrincipal MemberContext를 가져오기 위해 SecurityContext 설정
-        // SecurityContext securityContext = SecurityContextHolder.createEmptyContext();
-        // securityContext.setAuthentication(auth);
-        // SecurityContextHolder.setContext(securityContext);
+        setSecurityContext(buildContextFromFixture(MEMBER_3));
 
         CreateAlarmResponse response = CreateAlarmResponse.builder()
             .alarmId(123L)   
@@ -122,20 +137,8 @@ class AlarmControllerTest {
             fixture.getRepeatDays().stream().map(Weekday::getDescription).toList(),
             fixture.getSoundType().getDescription()
         );
-        MemberContext context = MemberContext.builder()
-            .memberId(MEMBER_4.getId())
-            .role(MEMBER_4.getRole())
-            .socialId(MEMBER_4.getSocialId())
-            .email(MEMBER_4.getEmail())
-            .nickname(MEMBER_4.getNickname())
-            .deviceId("mock_device_id")
-            .build();
-        UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
-            context, null, List.of(new SimpleGrantedAuthority(MEMBER_4.getRole().name())));
 
-        // SecurityContext securityContext = SecurityContextHolder.createEmptyContext();
-        // securityContext.setAuthentication(auth);
-        // SecurityContextHolder.setContext(securityContext);
+        setSecurityContext(buildContextFromFixture(MEMBER_4));
 
         when(alarmUseCase.createAlarm(any(AlarmRegisterRequest.class), anyLong()))
             .thenThrow(ApplicationException.from(MemberErrorCode.MEMBER_NOT_FOUND));
