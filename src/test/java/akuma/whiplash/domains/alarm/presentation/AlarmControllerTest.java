@@ -7,11 +7,11 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.times;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import akuma.whiplash.common.fixture.AlarmFixture;
+import akuma.whiplash.common.fixture.MemberFixture;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmRegisterRequest;
 import akuma.whiplash.domains.alarm.application.dto.response.CreateAlarmResponse;
 import akuma.whiplash.domains.alarm.application.usecase.AlarmUseCase;
@@ -114,7 +114,6 @@ class AlarmControllerTest {
 
         // when & then
         mockMvc.perform(post("/api/alarms")
-                .with(authentication(auth))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
             .andExpect(status().isOk());
@@ -145,7 +144,6 @@ class AlarmControllerTest {
 
         // when & then
         mockMvc.perform(post("/api/alarms")
-                .with(authentication(auth))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
             .andExpect(status().isNotFound());
