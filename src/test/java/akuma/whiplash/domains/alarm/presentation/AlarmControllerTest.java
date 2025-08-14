@@ -63,7 +63,7 @@ class AlarmControllerTest {
         UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
             context,
             null,
-            List.of(new SimpleGrantedAuthority(context.getRole().name()))
+            List.of(new SimpleGrantedAuthority(context.role().name()))
         );
 
         // Filter exclude 했으므로 @AuthenticationPrincipal MemberContext를 가져오기 위해 SecurityContext 설정
