@@ -3,14 +3,16 @@ package akuma.whiplash.domains.alarm.presentation;
 import static akuma.whiplash.common.fixture.MemberFixture.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.Mockito.doNothing;
-import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.times;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import akuma.whiplash.common.fixture.AlarmFixture;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmRegisterRequest;
+import akuma.whiplash.domains.alarm.application.dto.response.CreateAlarmResponse;
 import akuma.whiplash.domains.alarm.application.usecase.AlarmUseCase;
 import akuma.whiplash.domains.alarm.domain.constant.Weekday;
 import akuma.whiplash.domains.auth.application.dto.etc.MemberContext;
@@ -69,6 +71,7 @@ class AlarmControllerTest {
             fixture.getRepeatDays().stream().map(Weekday::getDescription).toList(),
             fixture.getSoundType().getDescription()
         );
+        
         MemberContext context = MemberContext.builder()
             .memberId(MEMBER_3.getId())
             .role(MEMBER_3.getRole())
@@ -77,6 +80,7 @@ class AlarmControllerTest {
             .nickname(MEMBER_3.getNickname())
             .deviceId("mock_device_id")
             .build();
+        
         UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
             context, null, List.of(new SimpleGrantedAuthority(MEMBER_3.getRole().name())));
 
@@ -85,7 +89,12 @@ class AlarmControllerTest {
         securityContext.setAuthentication(auth);
         SecurityContextHolder.setContext(securityContext);
 
-        doNothing().when(alarmUseCase).createAlarm(any(), any(Long.class));
+        CreateAlarmResponse response = CreateAlarmResponse.builder()
+            .alarmId(123L)   
+            .build();
+
+        when(alarmUseCase.createAlarm(any(AlarmRegisterRequest.class), anyLong()))
+            .thenReturn(response);
 
         // when & then
         mockMvc.perform(post("/api/alarms")
@@ -93,6 +102,9 @@ class AlarmControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
             .andExpect(status().isOk());
+
+        verify(alarmUseCase, times(1))
+            .createAlarm(any(AlarmRegisterRequest.class), eq(MEMBER_3.getId()));
     }
 
     @DisplayName("회원이 존재하지 않으면 404를 반환한다")
@@ -124,8 +136,8 @@ class AlarmControllerTest {
         securityContext.setAuthentication(auth);
         SecurityContextHolder.setContext(securityContext);
 
-        doThrow(ApplicationException.from(MemberErrorCode.MEMBER_NOT_FOUND))
-            .when(alarmUseCase).createAlarm(any(), any(Long.class));
+        when(alarmUseCase.createAlarm(any(AlarmRegisterRequest.class), anyLong()))
+            .thenThrow(ApplicationException.from(MemberErrorCode.MEMBER_NOT_FOUND));
 
         // when & then
         mockMvc.perform(post("/api/alarms")
