@@ -86,9 +86,9 @@ class AlarmControllerTest {
             context, null, List.of(new SimpleGrantedAuthority(MEMBER_3.getRole().name())));
 
         // Filter exclude 했으므로 @AuthenticationPrincipal MemberContext를 가져오기 위해 SecurityContext 설정
-        SecurityContext securityContext = SecurityContextHolder.createEmptyContext();
-        securityContext.setAuthentication(auth);
-        SecurityContextHolder.setContext(securityContext);
+        // SecurityContext securityContext = SecurityContextHolder.createEmptyContext();
+        // securityContext.setAuthentication(auth);
+        // SecurityContextHolder.setContext(securityContext);
 
         CreateAlarmResponse response = CreateAlarmResponse.builder()
             .alarmId(123L)   
@@ -133,9 +133,9 @@ class AlarmControllerTest {
         UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
             context, null, List.of(new SimpleGrantedAuthority(MEMBER_4.getRole().name())));
 
-        SecurityContext securityContext = SecurityContextHolder.createEmptyContext();
-        securityContext.setAuthentication(auth);
-        SecurityContextHolder.setContext(securityContext);
+        // SecurityContext securityContext = SecurityContextHolder.createEmptyContext();
+        // securityContext.setAuthentication(auth);
+        // SecurityContextHolder.setContext(securityContext);
 
         when(alarmUseCase.createAlarm(any(AlarmRegisterRequest.class), anyLong()))
             .thenThrow(ApplicationException.from(MemberErrorCode.MEMBER_NOT_FOUND));
