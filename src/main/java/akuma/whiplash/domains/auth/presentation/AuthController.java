@@ -41,7 +41,7 @@ public class AuthController {
     }
 
     @CustomErrorCodes(commonErrorCodes = {BAD_REQUEST})
-    @Operation(summary = "로그아웃", description = "리프레시 토큰을 삭제합니다.")
+    @Operation(summary = "로그아웃", description = "리프레시 토큰을 삭제합니다. Authorization 헤더에는 리프레시 토큰을 담아서 요청합니다.")
     @PostMapping("/logout")
     public ApplicationResponse<Void> logout(@AuthenticationPrincipal MemberContext memberContext) {
         authUseCase.logout(memberContext);
@@ -52,7 +52,7 @@ public class AuthController {
         commonErrorCodes = {BAD_REQUEST},
         authErrorCodes = {INVALID_TOKEN}
     )
-    @Operation(summary = "토큰 재발급", description = "액세스, 리프레시 토큰을 재발급합니다.")
+    @Operation(summary = "토큰 재발급", description = "액세스, 리프레시 토큰을 재발급합니다. Authorization 헤더에는 리프레시 토큰을 담아서 요청합니다.")
     @PostMapping("/reissue")
     public ApplicationResponse<TokenResponse> reissueToken(@AuthenticationPrincipal MemberContext memberContext) {
 

@@ -36,17 +36,19 @@ jobs:
       - name: Grant execute permission
         run: chmod +x ./gradlew
 
-      # 5. 테스트 실행
-#      - name: Run tests
-#        run: ./gradlew test --no-daemon
-
-      # 6. env.properties, google.json, firebase-key.json 생성
-      - name: Generate env.properties,
+      # 5. env.properties, google.json, firebase-key.json 생성
+      - name: Generate config files
         run: |
           mkdir -p src/main/resources
+          mkdir -p src/test/resources
           echo "${{ secrets.DEV_ENV_PROPERTIES }}" > src/main/resources/env.properties
+          echo "${{ secrets.TEST_ENV_PROPERTIES }}" > src/test/resources/env-test.properties
           echo "${{ secrets.GOOGLE_JSON }}" | base64 -d > src/main/resources/google.json
           echo "${{ secrets.FIREBASE_KEY_JSON }}" | base64 -d > src/main/resources/whiplash-firebase-key.json
+
+      # 6. 테스트 실행
+      - name: Run tests
+        run: ./gradlew test --no-daemon
 
       # 7. 빌드
       - name: Build JAR
