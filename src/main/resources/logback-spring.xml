@@ -1,0 +1,20 @@
+<configuration scan="true">
+
+  <!-- 로그 레벨 설정 -->
+  <springProperty scope="context" name="LOG_LEVEL" source="logging.level.root" defaultValue="INFO"/>
+
+  <!-- 콘솔 출력 Appender -->
+  <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+    <encoder>
+      <!-- 날짜, requestId(MDC), 로그레벨, 로거명, 메시지 -->
+      <pattern>%d{yyyy-MM-dd HH:mm:ss} [%X{requestId}] %-5level %logger{36} - %msg%n</pattern>
+      <charset>UTF-8</charset>
+    </encoder>
+  </appender>
+
+  <!-- root 로거 -->
+  <root level="${LOG_LEVEL}">
+    <appender-ref ref="CONSOLE"/>
+  </root>
+
+</configuration>
