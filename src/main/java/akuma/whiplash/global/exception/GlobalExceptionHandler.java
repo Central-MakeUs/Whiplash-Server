@@ -3,6 +3,7 @@ package akuma.whiplash.global.exception;
 import akuma.whiplash.global.response.ApplicationResponse;
 import akuma.whiplash.global.response.code.BaseErrorCode;
 import akuma.whiplash.global.response.code.CommonErrorCode;
+import io.sentry.Sentry;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
@@ -45,6 +46,8 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                     (existingErrorMessage, newErrorMessage) -> existingErrorMessage + ", " + newErrorMessage);
             });
 
+        Sentry.captureException(e);
+
         return handleExceptionInternalArgs(
             e,
             request,
@@ -58,6 +61,8 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             .map(ConstraintViolation::getMessage)
             .findFirst()
             .orElseThrow(() -> new RuntimeException("ConstraintViolationException Error"));
+
+        Sentry.captureException(e);
 
         return handleExceptionInternalConstraint(e, CommonErrorCode.valueOf(errorMessage), request);
     }
@@ -74,12 +79,17 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             CommonErrorCode.METHOD_ARGUMENT_NOT_VALID.getCustomCode(),
             CommonErrorCode.METHOD_ARGUMENT_NOT_VALID.getMessage()
         );
+
+        Sentry.captureException(ex);
+
         return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
     }
 
     @ExceptionHandler
     public ResponseEntity<Object> exception(Exception e, WebRequest request) {
         log.error("Unexpected error: ", e);
+
+        Sentry.captureException(e);
 
         return handleExceptionInternalFalse(
             e,
@@ -92,6 +102,8 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler(value = ApplicationException.class)
     public ResponseEntity<Object> onThrowException(ApplicationException applicationException, HttpServletRequest request) {
         BaseErrorCode baseErrorCode = applicationException.getCode();
+
+        Sentry.captureException(applicationException);
 
         return handleExceptionInternal(applicationException, baseErrorCode, null, request);
     }
