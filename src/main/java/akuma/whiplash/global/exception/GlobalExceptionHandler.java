@@ -8,8 +8,10 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -46,7 +48,12 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                     (existingErrorMessage, newErrorMessage) -> existingErrorMessage + ", " + newErrorMessage);
             });
 
-        Sentry.captureException(e);
+        sendErrorToSentry(
+            e,
+            request.getDescription(false), // ex: "uri=/api/alarms/100/checkin"
+            request.getParameterMap().toString(), // 쿼리 스트링 (없으면 빈 Map)
+            e.getBody().getTitle()
+        );
 
         return handleExceptionInternalArgs(
             e,
@@ -62,7 +69,14 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             .findFirst()
             .orElseThrow(() -> new RuntimeException("ConstraintViolationException Error"));
 
-        Sentry.captureException(e);
+        sendErrorToSentry(
+            e,
+            request.getDescription(false),
+            e.getConstraintViolations().stream()
+                .map(v -> v.getPropertyPath() + "=" + v.getInvalidValue())
+                .collect(Collectors.joining(", ")),
+            errorMessage
+            );
 
         return handleExceptionInternalConstraint(e, CommonErrorCode.valueOf(errorMessage), request);
     }
@@ -80,7 +94,12 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             CommonErrorCode.METHOD_ARGUMENT_NOT_VALID.getMessage()
         );
 
-        Sentry.captureException(ex);
+        sendErrorToSentry(
+            ex,
+            request.getDescription(false),
+            request.getParameterMap().toString(),
+            CommonErrorCode.METHOD_ARGUMENT_NOT_VALID.getCustomCode()
+        );
 
         return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
     }
@@ -89,7 +108,12 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     public ResponseEntity<Object> exception(Exception e, WebRequest request) {
         log.error("Unexpected error: ", e);
 
-        Sentry.captureException(e);
+        sendErrorToSentry(
+            e,
+            request.getDescription(false),
+            request.getParameterMap().toString(),
+            CommonErrorCode.INTERNAL_SERVER_ERROR.getCustomCode()
+        );
 
         return handleExceptionInternalFalse(
             e,
@@ -100,12 +124,17 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     }
 
     @ExceptionHandler(value = ApplicationException.class)
-    public ResponseEntity<Object> onThrowException(ApplicationException applicationException, HttpServletRequest request) {
-        BaseErrorCode baseErrorCode = applicationException.getCode();
+    public ResponseEntity<Object> onThrowException(ApplicationException ex, HttpServletRequest request) {
+        BaseErrorCode baseErrorCode = ex.getCode();
 
-        Sentry.captureException(applicationException);
+        sendErrorToSentry(
+            ex,
+            request.getRequestURI(),
+            request.getQueryString(),
+            baseErrorCode.getCustomCode()
+        );
 
-        return handleExceptionInternal(applicationException, baseErrorCode, null, request);
+        return handleExceptionInternal(ex, baseErrorCode, null, request);
     }
 
     private ResponseEntity<Object> handleExceptionInternal(
@@ -190,5 +219,25 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             baseErrorCode.getHttpStatus(),
             request
         );
+    }
+
+    private static void sendErrorToSentry(Exception ex, String requestUri, String queryString, String errorCode) {
+        Sentry.withScope(scope -> {
+            // Sentry에서 트랜잭션 이름을 요청 URI로 설정
+            scope.setTransaction(requestUri);
+
+            scope.setTag("path", requestUri);
+            if (errorCode != null && !errorCode.isBlank()) {
+                scope.setTag("error.code", errorCode);
+                // 같은 에러코드면 같은 이슈로 그룹핑, Sentry에서 표시되는 이슈 제목을 에러 코드 자체로 표시
+                scope.setFingerprint(List.of(errorCode));
+            }
+
+            if (queryString != null && !queryString.isBlank()) {
+                scope.setExtra("query", queryString);
+            }
+
+            Sentry.captureException(ex);
+        });
     }
 }
