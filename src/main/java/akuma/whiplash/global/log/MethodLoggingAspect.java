@@ -1,5 +1,7 @@
 package akuma.whiplash.global.log;
 
+import static akuma.whiplash.global.log.LogConst.MDC_REQUEST_ID_KEY;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Duration;
 import java.time.Instant;
@@ -44,6 +46,8 @@ public class MethodLoggingAspect {
             String methodName = joinPoint.getSignature().getName();
             Object[] methodArguments = joinPoint.getArgs();
             String methodArgumentsJson = LogUtils.toJson(objectMapper, methodArguments);
+            String maskedParams = LogUtils.maskSensitiveJson(objectMapper, methodArgumentsJson);
+            String truncatedParams = LogUtils.truncate(maskedParams, LogConst.MAX_BODY_LEN);
 
             String clientIpAddress = null;
             ServletRequestAttributes requestAttributes = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
@@ -58,9 +62,9 @@ public class MethodLoggingAspect {
             logDataMap.put("clientIp", clientIpAddress); 
             logDataMap.put("class", declaringClassName); 
             logDataMap.put("method", methodName); 
-            logDataMap.put("params", methodArgumentsJson); 
+            logDataMap.put("params", truncatedParams);
             logDataMap.put("durationMs", executionTimeMillis); 
-            logDataMap.put("requestId", MDC.get("requestId")); // 필터가 설정한 requestId를 함께 남겨 상관관계 분석 용이
+            logDataMap.put("requestId", MDC.get(MDC_REQUEST_ID_KEY)); // 필터가 설정한 requestId를 함께 남겨 상관관계 분석 용이
 
             if (caughtException != null) {
                 // 예외 발생시 예외 정보 로깅
