@@ -23,14 +23,6 @@
     <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
       <level>ERROR</level>
     </filter>
-    <!-- MethodLoggingAspect에서 발생하는 로그는 Sentry로 전송하지 않음 -->
-    <filter class="ch.qos.logback.core.filter.EvaluatorFilter">
-      <evaluator>
-        <expression>logger.contains("MethodLoggingAspect")</expression>
-      </evaluator>
-      <onMatch>DENY</onMatch>
-      <onMismatch>NEUTRAL</onMismatch>
-    </filter>
   </appender>
 
   <!-- root 로거 -->
