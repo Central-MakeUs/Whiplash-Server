@@ -38,7 +38,12 @@ public class HttpLoggingFilter extends OncePerRequestFilter {
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String requestUri = request.getRequestURI();
         // 모니터링 불필요한 경로 제외
-        return requestUri.startsWith("/actuator/") || requestUri.startsWith("/health");
+        return requestUri.startsWith("/actuator/")
+            || requestUri.startsWith("/health")
+            || requestUri.startsWith("/v3/api-docs")
+            || requestUri.startsWith("/swagger")
+            || requestUri.startsWith("/favicon.ico")
+            || requestUri.startsWith("/error");
     }
 
     @Override
@@ -72,13 +77,41 @@ public class HttpLoggingFilter extends OncePerRequestFilter {
 
             // 요청 본문 읽기 + 민감정보 마스킹 + 길이 제한
             String requestBody = getRequestBodyFromCache(cachedRequestWrapper);
-            String maskedRequestBody = LogUtils.maskSensitiveJson(objectMapper, requestBody);
-            String truncatedRequestBody = LogUtils.truncate(maskedRequestBody, LogConst.MAX_BODY_LEN);
+            String contentType = httpServletRequest.getContentType();
+            String truncatedRequestBody = null;
+
+            if (contentType != null) {
+                String ct = contentType.toLowerCase();
+                boolean loggable = ct.startsWith("application/json")
+                    || ct.startsWith("text/")
+                    || ct.startsWith("application/problem+json")
+                    || ct.startsWith("application/x-www-form-urlencoded");
+                boolean isMultipart = ct.startsWith("multipart/");
+
+                if (loggable && !isMultipart) {
+                    String maskedRequestBody = LogUtils.maskSensitiveJson(objectMapper, requestBody);
+                    truncatedRequestBody = LogUtils.truncate(maskedRequestBody, LogConst.MAX_BODY_LEN);
+                }
+            }
 
             // 응답 본문 읽기 + 민감정보 마스킹
             String responseBody = getResponseBodyFromCache(cachedResponseWrapper);
-            String maskedResponseBody = LogUtils.maskSensitiveJson(objectMapper, responseBody);
-            Map<String, Object> responseFieldMap = extractResponseFields(maskedResponseBody); 
+            String responseContentType = httpServletResponse.getContentType();
+            String maskedResponseBody = null;
+            if (responseContentType != null) {
+                String ct = responseContentType.toLowerCase();
+                boolean loggable = ct.startsWith("application/json")
+                    || ct.startsWith("text/")
+                    || ct.startsWith("application/problem+json");
+
+                if (loggable) {
+                    maskedResponseBody = LogUtils.maskSensitiveJson(objectMapper, responseBody);
+                    // 전체 응답 본문은 로그에 포함하지 않지만,
+                    // 파싱 비용 경감을 위해 너무 큰 경우 잘라서 파싱하는 것도 고려 가능
+                    maskedResponseBody = LogUtils.truncate(maskedResponseBody, LogConst.MAX_BODY_LEN);
+                }
+            }
+            Map<String, Object> responseFieldMap = extractResponseFields(maskedResponseBody);
 
             // HTTP 상태 코드, 총 처리 시간 계산 
             int httpStatusCode = cachedResponseWrapper.getStatus(); 
