@@ -1,5 +1,6 @@
 package akuma.whiplash.global.exception;
 
+import akuma.whiplash.global.log.LogUtils;
 import akuma.whiplash.global.response.ApplicationResponse;
 import akuma.whiplash.global.response.code.BaseErrorCode;
 import akuma.whiplash.global.response.code.CommonErrorCode;
@@ -50,9 +51,9 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
         sendErrorToSentry(
             e,
-            request.getDescription(false), // ex: "uri=/api/alarms/100/checkin"
-            request.getParameterMap().toString(), // 쿼리 스트링 (없으면 빈 Map)
-            e.getBody().getTitle()
+            extractRequestUri(request),
+            LogUtils.maskSensitiveQuery(extractQueryString(request)),
+            CommonErrorCode.METHOD_ARGUMENT_NOT_VALID.getCustomCode()
         );
 
         return handleExceptionInternalArgs(
@@ -71,10 +72,12 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
         sendErrorToSentry(
             e,
-            request.getDescription(false),
-            e.getConstraintViolations().stream()
-                .map(v -> v.getPropertyPath() + "=" + v.getInvalidValue())
-                .collect(Collectors.joining(", ")),
+            extractRequestUri(request),
+            LogUtils.maskSensitiveQuery(
+                e.getConstraintViolations().stream()
+                    .map(v -> v.getPropertyPath() + "=" + v.getInvalidValue())
+                    .collect(Collectors.joining(", "))
+            ),
             errorMessage
             );
 
@@ -96,8 +99,8 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
         sendErrorToSentry(
             ex,
-            request.getDescription(false),
-            request.getParameterMap().toString(),
+            extractRequestUri(request),
+            LogUtils.maskSensitiveQuery(extractQueryString(request)),
             CommonErrorCode.METHOD_ARGUMENT_NOT_VALID.getCustomCode()
         );
 
@@ -130,7 +133,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         sendErrorToSentry(
             ex,
             request.getRequestURI(),
-            request.getQueryString(),
+            LogUtils.maskSensitiveQuery(request.getQueryString()),
             baseErrorCode.getCustomCode()
         );
 
@@ -219,6 +222,22 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             baseErrorCode.getHttpStatus(),
             request
         );
+    }
+
+    private static String extractRequestUri(WebRequest request) {
+        if (request instanceof ServletWebRequest servletWebRequest) {
+            return servletWebRequest.getRequest().getRequestURI();
+        }
+        String desc = request.getDescription(false); // ex: "uri=/api/alarms/100/checkin"
+        if (desc != null && desc.startsWith("uri=")) return desc.substring(4);
+        return desc;
+    }
+
+    private static String extractQueryString(WebRequest request) {
+        if (request instanceof ServletWebRequest servletWebRequest) {
+            return servletWebRequest.getRequest().getQueryString();
+        }
+        return null;
     }
 
     private static void sendErrorToSentry(Exception ex, String requestUri, String queryString, String errorCode) {

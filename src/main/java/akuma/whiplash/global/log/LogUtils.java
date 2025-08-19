@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import org.springframework.web.servlet.HandlerMapping;
@@ -16,7 +17,9 @@ public final class LogUtils {
     private LogUtils() {}
 
     private static final Set<String> SENSITIVE_KEYS = Set.of(
-        "password", "passwd", "pwd", "authorization", "accessToken", "refreshToken", "token", "secret"
+        "password", "passwd", "pwd", "authorization", "accessToken", "refreshToken",
+        "token", "secret", "apiKey", "privateKey", "email", "phone", "ssn", "address",
+        "deviceId", "clientId", "sessionId"
     );
 
     public static String nowIso() {
@@ -74,6 +77,30 @@ public final class LogUtils {
             return om.writeValueAsString(masked);
         } catch (Exception ignore) {
             return json;
+        }
+    }
+
+    public static String maskSensitiveQuery(String query) {
+        if (query == null || query.isBlank()) return query;
+        try {
+            String[] parts = query.split("&");
+            StringBuilder sb = new StringBuilder(query.length());
+            for (int i = 0; i < parts.length; i++) {
+                String p = parts[i];
+                int eq = p.indexOf('=');
+                if (eq < 0) {
+                    sb.append(p);
+                } else {
+                    String key = p.substring(0, eq);
+                    String val = p.substring(eq + 1);
+                    String masked = SENSITIVE_KEYS.contains(key.toLowerCase(Locale.ROOT)) ? "****" : val;
+                    sb.append(key).append('=').append(masked);
+                }
+                if (i + 1 < parts.length) sb.append('&');
+            }
+            return sb.toString();
+        } catch (Exception ignore) {
+            return query;
         }
     }
 
