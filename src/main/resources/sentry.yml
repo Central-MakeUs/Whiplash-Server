@@ -4,8 +4,9 @@ spring.config.activate.on-profile: local
 sentry:
   dsn: ${SENTRY_DSN}
   send-default-pii: false # 민감정보 수집 X
-  logs:
-    enabled: true
+  logging:
+    minimum-event-level: error
+    minimum-breadcrumb-level: info
   traces-sample-rate: 0.0
   environment: local
 
@@ -15,8 +16,9 @@ spring.config.activate.on-profile: dev
 sentry:
   dsn: ${SENTRY_DSN}
   send-default-pii: true
-  logs:
-    enabled: true
+  logging:
+    minimum-event-level: error
+    minimum-breadcrumb-level: info
   traces-sample-rate: 1.0 # 트랜잭션 100% 수집
   environment: dev
 
@@ -26,8 +28,9 @@ spring.config.activate.on-profile: prod
 sentry:
   dsn: ${SENTRY_DSN}
   send-default-pii: true
-  logs:
-    enabled: true
+  logging:
+    minimum-event-level: error
+    minimum-breadcrumb-level: info
   traces-sample-rate: 1.0 # 트랜잭션 100% 수집
   environment: prod
 
