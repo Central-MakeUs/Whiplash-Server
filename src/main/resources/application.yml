@@ -11,6 +11,7 @@ spring:
       - redis.yml
       - oauth.yml
       - naver.yml
+      - sentry.yml
 
 
 ---

@@ -1,14 +1,18 @@
 package akuma.whiplash.global.exception;
 
+import akuma.whiplash.global.log.LogUtils;
 import akuma.whiplash.global.response.ApplicationResponse;
 import akuma.whiplash.global.response.code.BaseErrorCode;
 import akuma.whiplash.global.response.code.CommonErrorCode;
+import io.sentry.Sentry;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -45,6 +49,14 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                     (existingErrorMessage, newErrorMessage) -> existingErrorMessage + ", " + newErrorMessage);
             });
 
+        sendErrorToSentry(
+            e,
+            extractRequestUri(request),
+            LogUtils.maskSensitiveQuery(extractQueryString(request)),
+            CommonErrorCode.METHOD_ARGUMENT_NOT_VALID.getCustomCode(),
+            CommonErrorCode.METHOD_ARGUMENT_NOT_VALID.getHttpStatus()
+        );
+
         return handleExceptionInternalArgs(
             e,
             request,
@@ -58,6 +70,18 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             .map(ConstraintViolation::getMessage)
             .findFirst()
             .orElseThrow(() -> new RuntimeException("ConstraintViolationException Error"));
+
+        sendErrorToSentry(
+            e,
+            extractRequestUri(request),
+            LogUtils.maskSensitiveQuery(
+                e.getConstraintViolations().stream()
+                    .map(v -> v.getPropertyPath() + "=" + v.getInvalidValue())
+                    .collect(Collectors.joining(", "))
+            ),
+            errorMessage,
+            CommonErrorCode.METHOD_ARGUMENT_NOT_VALID.getHttpStatus()
+            );
 
         return handleExceptionInternalConstraint(e, CommonErrorCode.valueOf(errorMessage), request);
     }
@@ -74,12 +98,29 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             CommonErrorCode.METHOD_ARGUMENT_NOT_VALID.getCustomCode(),
             CommonErrorCode.METHOD_ARGUMENT_NOT_VALID.getMessage()
         );
+
+        sendErrorToSentry(
+            ex,
+            extractRequestUri(request),
+            LogUtils.maskSensitiveQuery(extractQueryString(request)),
+            CommonErrorCode.METHOD_ARGUMENT_NOT_VALID.getCustomCode(),
+            CommonErrorCode.METHOD_ARGUMENT_NOT_VALID.getHttpStatus()
+        );
+
         return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
     }
 
     @ExceptionHandler
     public ResponseEntity<Object> exception(Exception e, WebRequest request) {
         log.error("Unexpected error: ", e);
+
+        sendErrorToSentry(
+            e,
+            request.getDescription(false),
+            request.getParameterMap().toString(),
+            CommonErrorCode.INTERNAL_SERVER_ERROR.getCustomCode(),
+            CommonErrorCode.INTERNAL_SERVER_ERROR.getHttpStatus()
+        );
 
         return handleExceptionInternalFalse(
             e,
@@ -90,10 +131,18 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     }
 
     @ExceptionHandler(value = ApplicationException.class)
-    public ResponseEntity<Object> onThrowException(ApplicationException applicationException, HttpServletRequest request) {
-        BaseErrorCode baseErrorCode = applicationException.getCode();
+    public ResponseEntity<Object> onThrowException(ApplicationException ex, HttpServletRequest request) {
+        BaseErrorCode baseErrorCode = ex.getCode();
 
-        return handleExceptionInternal(applicationException, baseErrorCode, null, request);
+        sendErrorToSentry(
+            ex,
+            request.getRequestURI(),
+            LogUtils.maskSensitiveQuery(request.getQueryString()),
+            baseErrorCode.getCustomCode(),
+            baseErrorCode.getHttpStatus()
+        );
+
+        return handleExceptionInternal(ex, baseErrorCode, null, request);
     }
 
     private ResponseEntity<Object> handleExceptionInternal(
@@ -178,5 +227,41 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             baseErrorCode.getHttpStatus(),
             request
         );
+    }
+
+    private static String extractRequestUri(WebRequest request) {
+        if (request instanceof ServletWebRequest servletWebRequest) {
+            return servletWebRequest.getRequest().getRequestURI();
+        }
+        String desc = request.getDescription(false); // ex: "uri=/api/alarms/100/checkin"
+        if (desc != null && desc.startsWith("uri=")) return desc.substring(4);
+        return desc;
+    }
+
+    private static String extractQueryString(WebRequest request) {
+        if (request instanceof ServletWebRequest servletWebRequest) {
+            return servletWebRequest.getRequest().getQueryString();
+        }
+        return null;
+    }
+
+    private static void sendErrorToSentry(Exception ex, String requestUri, String queryString, String errorCode, HttpStatus status) {
+        if (status.is5xxServerError()) {
+            Sentry.withScope(scope -> {
+                scope.setTransaction(requestUri);
+                scope.setTag("path", requestUri);
+
+                if (errorCode != null && !errorCode.isBlank()) {
+                    scope.setTag("error.code", errorCode);
+                    scope.setFingerprint(List.of(errorCode));
+                }
+
+                if (queryString != null && !queryString.isBlank()) {
+                    scope.setExtra("query", queryString);
+                }
+
+                Sentry.captureException(ex);
+            });
+        }
     }
 }

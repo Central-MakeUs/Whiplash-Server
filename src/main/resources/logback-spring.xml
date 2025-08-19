@@ -1,0 +1,35 @@
+<configuration scan="true">
+
+  <!-- 로그 레벨 설정 -->
+  <springProperty scope="context" name="LOG_LEVEL" source="logging.level.root" defaultValue="INFO"/>
+
+  <!-- 콘솔 출력 Appender -->
+  <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+    <encoder>
+      <!-- 날짜, requestId(MDC), 로그레벨, 로거명, 메시지 -->
+      <pattern>%d{yyyy-MM-dd HH:mm:ss} [%X{requestId}] %-5level %logger{36} - %msg%n</pattern>
+      <charset>UTF-8</charset>
+    </encoder>
+  </appender>
+
+  <!-- MethodLoggingAspect의 로그가 Sentry로 전송되지 않도록 설정 -->
+  <logger name="akuma.whiplash.global.log.MethodLoggingAspect" level="INFO" additivity="false">
+    <appender-ref ref="CONSOLE"/>
+  </logger>
+
+  <!-- Sentry Appender -->
+  <appender name="SENTRY" class="io.sentry.logback.SentryAppender">
+    <!-- ERROR 레벨 이상의 로그만 Sentry로 전송 -->
+    <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
+      <level>ERROR</level>
+    </filter>
+  </appender>
+
+  <!-- root 로거 -->
+  <root level="${LOG_LEVEL}">
+    <appender-ref ref="CONSOLE"/>
+    <!-- Sentry Appender 참조 추가 -->
+    <appender-ref ref="SENTRY"/>
+  </root>
+
+</configuration>
