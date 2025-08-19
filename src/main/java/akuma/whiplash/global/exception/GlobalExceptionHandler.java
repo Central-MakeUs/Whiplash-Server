@@ -53,7 +53,8 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             e,
             extractRequestUri(request),
             LogUtils.maskSensitiveQuery(extractQueryString(request)),
-            CommonErrorCode.METHOD_ARGUMENT_NOT_VALID.getCustomCode()
+            CommonErrorCode.METHOD_ARGUMENT_NOT_VALID.getCustomCode(),
+            CommonErrorCode.METHOD_ARGUMENT_NOT_VALID.getHttpStatus()
         );
 
         return handleExceptionInternalArgs(
@@ -78,7 +79,8 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                     .map(v -> v.getPropertyPath() + "=" + v.getInvalidValue())
                     .collect(Collectors.joining(", "))
             ),
-            errorMessage
+            errorMessage,
+            CommonErrorCode.METHOD_ARGUMENT_NOT_VALID.getHttpStatus()
             );
 
         return handleExceptionInternalConstraint(e, CommonErrorCode.valueOf(errorMessage), request);
@@ -101,7 +103,8 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             ex,
             extractRequestUri(request),
             LogUtils.maskSensitiveQuery(extractQueryString(request)),
-            CommonErrorCode.METHOD_ARGUMENT_NOT_VALID.getCustomCode()
+            CommonErrorCode.METHOD_ARGUMENT_NOT_VALID.getCustomCode(),
+            CommonErrorCode.METHOD_ARGUMENT_NOT_VALID.getHttpStatus()
         );
 
         return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
@@ -115,7 +118,8 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             e,
             request.getDescription(false),
             request.getParameterMap().toString(),
-            CommonErrorCode.INTERNAL_SERVER_ERROR.getCustomCode()
+            CommonErrorCode.INTERNAL_SERVER_ERROR.getCustomCode(),
+            CommonErrorCode.INTERNAL_SERVER_ERROR.getHttpStatus()
         );
 
         return handleExceptionInternalFalse(
@@ -134,7 +138,8 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             ex,
             request.getRequestURI(),
             LogUtils.maskSensitiveQuery(request.getQueryString()),
-            baseErrorCode.getCustomCode()
+            baseErrorCode.getCustomCode(),
+            baseErrorCode.getHttpStatus()
         );
 
         return handleExceptionInternal(ex, baseErrorCode, null, request);
@@ -240,23 +245,23 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return null;
     }
 
-    private static void sendErrorToSentry(Exception ex, String requestUri, String queryString, String errorCode) {
-        Sentry.withScope(scope -> {
-            // Sentry에서 트랜잭션 이름을 요청 URI로 설정
-            scope.setTransaction(requestUri);
+    private static void sendErrorToSentry(Exception ex, String requestUri, String queryString, String errorCode, HttpStatus status) {
+        if (status.is5xxServerError()) {
+            Sentry.withScope(scope -> {
+                scope.setTransaction(requestUri);
+                scope.setTag("path", requestUri);
 
-            scope.setTag("path", requestUri);
-            if (errorCode != null && !errorCode.isBlank()) {
-                scope.setTag("error.code", errorCode);
-                // 같은 에러코드면 같은 이슈로 그룹핑, Sentry에서 표시되는 이슈 제목을 에러 코드 자체로 표시
-                scope.setFingerprint(List.of(errorCode));
-            }
+                if (errorCode != null && !errorCode.isBlank()) {
+                    scope.setTag("error.code", errorCode);
+                    scope.setFingerprint(List.of(errorCode));
+                }
 
-            if (queryString != null && !queryString.isBlank()) {
-                scope.setExtra("query", queryString);
-            }
+                if (queryString != null && !queryString.isBlank()) {
+                    scope.setExtra("query", queryString);
+                }
 
-            Sentry.captureException(ex);
-        });
+                Sentry.captureException(ex);
+            });
+        }
     }
 }
