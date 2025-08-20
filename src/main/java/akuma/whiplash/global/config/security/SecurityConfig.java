@@ -7,6 +7,7 @@ import akuma.whiplash.global.config.security.jwt.JwtAuthenticationFilter;
 import akuma.whiplash.global.config.security.jwt.JwtUtils;
 import java.util.Arrays;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -26,6 +27,9 @@ public class SecurityConfig {
 
     private final JwtUtils jwtUtils;
     private final RequestMatcherHolder requestMatcherHolder;
+
+    @Value("${swagger.server.url}")
+    private String serverUrl;
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -62,7 +66,8 @@ public class SecurityConfig {
 
             // 로컬 네트워크 (안드로이드 에뮬레이터에서 PC 서버 접속 시 IP 필요)
             "http://192.168.0.100:8080",  // 본인 PC의 IP 주소로 교체
-            "http://10.0.2.2:8080"       // Android 에뮬레이터에서 Host PC를 가리키는 특별 주소
+            "http://10.0.2.2:8080",       // Android 에뮬레이터에서 Host PC를 가리키는 특별 주소
+            serverUrl
         ));
 
         configuration.setAllowedHeaders(Arrays.asList("*"));

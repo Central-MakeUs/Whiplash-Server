@@ -35,10 +35,10 @@ public class RequestMatcherHolder {
         new RequestInfo(POST, "/api/auth/reissue", USER),
 
         // swagger
-        new RequestInfo(GET, "/api/noonddu/swagger-ui.html", null),              // 진입점
-        new RequestInfo(GET, "/api/noonddu/swagger-ui/**", null),              // UI 리소스들
-        new RequestInfo(GET, "/api/noonddu/v3/api-docs/**", null),              // API docs
-        new RequestInfo(GET, "/api/noonddu/swagger-ui.html", null),              // 진입점
+        new RequestInfo(GET, "/api/nuntteo/swagger-ui.html", null),              // 진입점
+        new RequestInfo(GET, "/api/nuntteo/swagger-ui/**", null),              // UI 리소스들
+        new RequestInfo(GET, "/api/nuntteo/v3/api-docs/**", null),              // API docs
+        new RequestInfo(GET, "/api/nuntteo/swagger-ui.html", null),              // 진입점
         new RequestInfo(GET, "/swagger-ui/**",null),
         new RequestInfo(GET, "/swagger-ui/index.html",null),
         new RequestInfo(GET, "/v3/api-docs/**",null), // 예비 (경로 누락 방지)
@@ -64,7 +64,6 @@ public class RequestMatcherHolder {
         // 빌드 에러 방지를 위해 각 권한에 대한 RequestInfo가 최소 1개씩은 리스트에 있어야함
         new RequestInfo(GET, "/api/admin/**", ADMIN)
     );
-    private final ConcurrentHashMap<String, RequestMatcher> reqMatcherCacheMap = new ConcurrentHashMap<>();
 
     /**
      * 최소 권한이 주어진 요청에 대한 RequestMatcher 반환
