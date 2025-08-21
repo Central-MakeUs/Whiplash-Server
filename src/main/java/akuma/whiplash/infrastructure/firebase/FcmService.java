@@ -96,7 +96,7 @@ public class FcmService {
 
                 try {
                     BatchResponse response = FirebaseMessaging.getInstance().sendEachForMulticast(message);
-                    log.info("FCM 멀티캐스트 결과: success={}, failure={}", response.getSuccessCount(), response.getFailureCount());
+                    log.info("사전 알림 FCM 멀티캐스트 결과: success={}, failure={}", response.getSuccessCount(), response.getFailureCount());
 
                     handleSendResult(response.getResponses(), batch, successOccurrenceIds, invalidTokens, memberToTokens);
                 } catch (FirebaseMessagingException e) {
@@ -145,6 +145,7 @@ public class FcmService {
 
                 try {
                     BatchResponse response = FirebaseMessaging.getInstance().sendEachForMulticast(message);
+                    log.info("알람 울림 FCM 멀티캐스트 결과: success={}, failure={}", response.getSuccessCount(), response.getFailureCount());
                     handleRingingSendResult(response.getResponses(), batch);
                 } catch (FirebaseMessagingException e) {
                     log.error("FCM 전송 실패(알람 울림)", e);
