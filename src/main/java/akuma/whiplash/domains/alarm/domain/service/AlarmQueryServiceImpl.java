@@ -1,6 +1,7 @@
 package akuma.whiplash.domains.alarm.domain.service;
 
 import akuma.whiplash.domains.alarm.application.dto.etc.OccurrencePushInfo;
+import akuma.whiplash.domains.alarm.application.dto.etc.RingingPushInfo;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmInfoPreviewResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmRemainingOffCountResponse;
 import akuma.whiplash.domains.alarm.domain.constant.DeactivateType;
@@ -176,6 +177,11 @@ public class AlarmQueryServiceImpl implements AlarmQueryService {
             .secondUpcomingDay(resolvedSecondUpcomingDate)
             .secondUpcomingDayOfWeek(DateUtil.getKoreanDayOfWeek(resolvedSecondUpcomingDate))
             .build();
+    }
+
+    @Override
+    public List<RingingPushInfo> getRingingNotificationTargets() {
+        return alarmOccurrenceRepository.findRingingNotificationTargets(DeactivateType.NONE);
     }
 }
 

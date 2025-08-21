@@ -21,6 +21,7 @@ sentry:
     minimum-breadcrumb-level: info
   traces-sample-rate: 1.0 # 트랜잭션 100% 수집
   environment: dev
+  release: nuntteo-api@1.0.0
 
 ---
 spring.config.activate.on-profile: prod

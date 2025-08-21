@@ -1,6 +1,7 @@
 package akuma.whiplash.infrastructure.firebase;
 
 import akuma.whiplash.domains.alarm.application.dto.etc.PushTargetDto;
+import akuma.whiplash.domains.alarm.application.dto.etc.RingingPushTargetDto;
 import akuma.whiplash.infrastructure.firebase.dto.FcmSendResult;
 import akuma.whiplash.infrastructure.redis.RedisService;
 import com.google.firebase.messaging.AndroidConfig;
@@ -21,6 +22,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -33,6 +35,7 @@ public class FcmService {
 
     private static final int FCM_MULTICAST_LIMIT = 500;
     private static final String DEFAULT_TITLE = "눈 떠";
+    private static final String RINGING_BODY = "알람이 울리고 있어요! 앱으로 접속해서 알람을 꺼주세요!";
 
     private final RedisService redisService;
 
@@ -71,11 +74,12 @@ public class FcmService {
 
         for (Map.Entry<String, List<PushTargetDto>> entry : groupedByBody.entrySet()) {
             String body = entry.getKey();
-            List<PushTargetDto> group = dedupByToken(entry.getValue());
+            List<PushTargetDto> group = dedupByToken(entry.getValue(), PushTargetDto::token);
 
             Map<String, String> data = Map.of(
                 "title", DEFAULT_TITLE,
-                "body", body
+                "body", body,
+                "route", "MAIN_VIEW"
             );
 
             for (List<PushTargetDto> batch : partition(group, FCM_MULTICAST_LIMIT)) {
@@ -106,6 +110,67 @@ public class FcmService {
             .invalidTokens(invalidTokens)
             .memberToTokens(memberToTokens)
             .build();
+    }
+
+    /**
+     * 알람 울릴 때 FCM 푸시 알림 전송
+      * @param targets
+     */
+    public void sendRingingNotifications(List<RingingPushTargetDto> targets) {
+        if (targets == null || targets.isEmpty()) {
+            return;
+        }
+
+        Map<Long, List<RingingPushTargetDto>> groupedByAlarm = targets.stream()
+            .collect(Collectors.groupingBy(RingingPushTargetDto::alarmId));
+
+        for (Map.Entry<Long, List<RingingPushTargetDto>> entry : groupedByAlarm.entrySet()) {
+            Long alarmId = entry.getKey();
+            List<RingingPushTargetDto> group = dedupByToken(entry.getValue(), RingingPushTargetDto::token);
+
+            Map<String, String> data = Map.of(
+                "title", DEFAULT_TITLE,
+                "body", RINGING_BODY,
+                "route", "ALARM_LINGING_VIEW",
+                "alarm_id", alarmId.toString()
+            );
+
+            for (List<RingingPushTargetDto> batch : partition(group, FCM_MULTICAST_LIMIT)) {
+                MulticastMessage message = MulticastMessage.builder()
+                    .addAllTokens(batch.stream().map(RingingPushTargetDto::token).toList())
+                    .putAllData(data)
+                    .setAndroidConfig(buildAndroidConfig(Duration.ofSeconds(30), Priority.HIGH))
+                    .setApnsConfig(buildApnsConfigAlert(DEFAULT_TITLE, RINGING_BODY, Duration.ofSeconds(30)))
+                    .build();
+
+                try {
+                    BatchResponse response = FirebaseMessaging.getInstance().sendEachForMulticast(message);
+                    handleRingingSendResult(response.getResponses(), batch);
+                } catch (FirebaseMessagingException e) {
+                    log.error("FCM 전송 실패(알람 울림)", e);
+                }
+            }
+        }
+    }
+
+    private void handleRingingSendResult(
+        List<SendResponse> responses,
+        List<RingingPushTargetDto> batch
+    ) {
+        for (int i = 0; i < responses.size(); i++) {
+            SendResponse res = responses.get(i);
+            RingingPushTargetDto dto = batch.get(i);
+
+            if (!res.isSuccessful()) {
+                Exception ex = res.getException();
+                FirebaseMessagingException fme = (ex instanceof FirebaseMessagingException) ? (FirebaseMessagingException) ex : null;
+                if (fme != null && isTokenInvalid(fme)) {
+                    redisService.removeInvalidToken(dto.memberId(), dto.token());
+                } else {
+                    log.warn("FCM 실패(알람 울림): token={}, ex={}", dto.token(), ex != null ? ex.getClass().getSimpleName() : "null");
+                }
+            }
+        }
     }
 
     /**
@@ -181,10 +246,10 @@ public class FcmService {
     }
 
     // 같은 FCM 토큰 중복 제거
-    private List<PushTargetDto> dedupByToken(List<PushTargetDto> src) {
-        Map<String, PushTargetDto> map = new LinkedHashMap<>();
-        for (PushTargetDto d : src) {
-            map.putIfAbsent(d.token(), d);
+    private <T> List<T> dedupByToken(List<T> src, Function<T, String> tokenFn) {
+        Map<String, T> map = new LinkedHashMap<>();
+        for (T d : src) {
+            map.putIfAbsent(tokenFn.apply(d), d);
         }
         return new ArrayList<>(map.values());
     }
