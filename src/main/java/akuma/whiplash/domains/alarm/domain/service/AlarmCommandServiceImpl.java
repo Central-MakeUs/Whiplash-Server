@@ -13,6 +13,7 @@ import akuma.whiplash.domains.alarm.domain.constant.Weekday;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmEntity;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmOccurrenceEntity;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmOffLogEntity;
+import akuma.whiplash.domains.alarm.persistence.entity.AlarmRingingLogEntity;
 import akuma.whiplash.domains.alarm.persistence.repository.AlarmOccurrenceRepository;
 import akuma.whiplash.domains.alarm.persistence.repository.AlarmOffLogRepository;
 import akuma.whiplash.domains.alarm.persistence.repository.AlarmRepository;
@@ -243,6 +244,36 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
 
         // 7. 체크인 처리
         occurrence.checkin(LocalDateTime.now());
+    }
+
+    @Override
+    public void ringAlarm(Long memberId, Long alarmId) {
+        AlarmEntity alarm = findAlarmById(alarmId);
+        validAlarmOwner(memberId, alarm.getMember().getId());
+
+        AlarmOccurrenceEntity occurrence = alarmOccurrenceRepository
+            .findTopByAlarmIdAndDeactivateTypeInOrderByDateDescTimeDesc(
+                alarmId,
+                List.of(DeactivateType.NONE)
+            )
+            .orElseThrow(() -> ApplicationException.from(ALARM_OCCURRENCE_NOT_FOUND));
+
+        if (occurrence.getDeactivateType() != DeactivateType.NONE) {
+            throw ApplicationException.from(ALREADY_DEACTIVATED);
+        }
+
+        LocalDateTime scheduledDateTime = LocalDateTime.of(occurrence.getDate(), occurrence.getTime());
+        if (LocalDateTime.now().isBefore(scheduledDateTime)) {
+            throw ApplicationException.from(NOT_ALARM_TIME);
+        }
+
+        int ringIndex = occurrence.ring();
+        AlarmRingingLogEntity log = AlarmMapper.mapToAlarmRingingLogEntity(
+            occurrence,
+            ringIndex,
+            LocalDateTime.now()
+        );
+        alarmRingingLogRepository.save(log);
     }
 
     @Override

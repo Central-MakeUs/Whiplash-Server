@@ -41,6 +41,10 @@ public class AlarmUseCase {
         alarmCommandService.checkinAlarm(memberId, alarmId, request);
     }
 
+    public void ringAlarm(Long memberId, Long alarmId) {
+        alarmCommandService.ringAlarm(memberId, alarmId);
+    }
+
     public List<AlarmInfoPreviewResponse> getAlarms(Long memberId) {
         return alarmQueryService.getAlarms(memberId);
     }

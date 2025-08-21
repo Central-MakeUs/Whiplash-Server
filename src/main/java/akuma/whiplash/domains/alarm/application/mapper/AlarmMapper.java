@@ -10,10 +10,12 @@ import akuma.whiplash.domains.alarm.exception.AlarmErrorCode;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmEntity;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmOccurrenceEntity;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmOffLogEntity;
+import akuma.whiplash.domains.alarm.persistence.entity.AlarmRingingLogEntity;
 import akuma.whiplash.domains.member.persistence.entity.MemberEntity;
 import akuma.whiplash.global.exception.ApplicationException;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Objects;
@@ -75,6 +77,18 @@ public class AlarmMapper {
             .alarmRinging(false)
             .ringingCount(0)
             .reminderSent(false)
+            .build();
+    }
+
+    public static AlarmRingingLogEntity mapToAlarmRingingLogEntity(
+        AlarmOccurrenceEntity occurrence,
+        int ringIndex,
+        LocalDateTime ringedAt
+    ) {
+        return AlarmRingingLogEntity.builder()
+            .alarmOccurrence(occurrence)
+            .ringIndex(ringIndex)
+            .ringedAt(ringedAt)
             .build();
     }
 

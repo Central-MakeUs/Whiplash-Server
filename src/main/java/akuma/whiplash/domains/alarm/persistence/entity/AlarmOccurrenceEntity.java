@@ -83,6 +83,11 @@ public class AlarmOccurrenceEntity extends BaseTimeEntity {
         this.checkinTime = now;
     }
 
+    public int ring() {
+        this.alarmRinging = true;
+        return ++this.ringingCount;
+    }
+
     public void updateReminderSent(boolean reminderSent) {
         this.reminderSent = reminderSent;
     }
