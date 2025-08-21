@@ -32,6 +32,10 @@ repositories {
 	mavenCentral()
 }
 
+tasks.withType(Test).configureEach {
+	useJUnitPlatform()
+}
+
 dependencies {
 	// --- Spring starters ---
 	implementation 'org.springframework.boot:spring-boot-starter-web'
