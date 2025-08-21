@@ -27,15 +27,43 @@ public final class LogUtils {
     }
 
     public static String clientIp(HttpServletRequest req) {
-        String xf = req.getHeader("X-Forwarded-For");
-        if (xf != null && !xf.isBlank()) {
-            return xf.split(",")[0].trim();
+        // 1) RFC 7239 Forwarded: for=192.0.2.60;proto=https;by=203.0.113.43
+        String fwd = req.getHeader("Forwarded");
+        if (hasText(fwd)) {
+            String ip = parseForwardedFor(fwd); // for="1.2.3.4" 추출 (쌍따옴표/[] 제거)
+            if (hasText(ip)) return ip;
         }
-        String xr = req.getHeader("X-Real-IP");
-        if (xr != null && !xr.isBlank()) {
-            return xr;
+
+        // 2) X-Forwarded-For: client, proxy1, proxy2...
+        String xff = req.getHeader("X-Forwarded-For");
+        if (hasText(xff)) {
+            String ip = xff.split(",")[0].trim();
+            if (hasText(ip)) return ip;
         }
+
+        // 3) X-Real-IP
+        String xri = req.getHeader("X-Real-IP");
+        if (hasText(xri)) return xri;
+
+        // 4) fallback
         return req.getRemoteAddr();
+    }
+
+    private static boolean hasText(String s) { return s != null && !s.isBlank(); }
+
+    private static String parseForwardedFor(String forwarded) {
+        // 아주 단순한 파서 (필요시 정교화)
+        for (String part : forwarded.split(";")) {
+            String p = part.trim();
+            if (p.toLowerCase().startsWith("for=")) {
+                String v = p.substring(4).trim();
+                // for="1.2.3.4" or for=1.2.3.4 or for="[2001:db8::1]"
+                v = v.replaceAll("^\"|\"$", "");          // 양끝 따옴표 제거
+                v = v.replaceAll("^\\[|\\]$", "");        // IPv6 대괄호 제거
+                return v;
+            }
+        }
+        return null;
     }
 
     @SuppressWarnings("unchecked")

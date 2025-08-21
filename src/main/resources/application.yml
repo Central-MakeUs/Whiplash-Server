@@ -13,6 +13,8 @@ spring:
       - naver.yml
       - sentry.yml
 
+server:
+  forward-headers-strategy: framework
 
 ---
 spring.config.activate.on-profile: local
