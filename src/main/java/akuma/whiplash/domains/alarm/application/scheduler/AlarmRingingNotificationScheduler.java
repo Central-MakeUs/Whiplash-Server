@@ -8,6 +8,7 @@ import akuma.whiplash.infrastructure.redis.RedisService;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 @Slf4j
@@ -20,7 +21,7 @@ public class AlarmRingingNotificationScheduler {
     private final FcmService fcmService;
 
     // 10초 간격으로 실행
-    // @Scheduled(fixedRate = 10000)
+    @Scheduled(fixedRate = 10000)
     public void sendRingingAlarmNotifications() {
         log.info("[AlarmRingingNotificationScheduler.sendRingingAlarmNotifications] 알람 울림 푸시 알림 전송 스케줄러 시작");
         try {
