@@ -2,6 +2,7 @@ package akuma.whiplash.domains.alarm.presentation;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -14,6 +15,7 @@ import akuma.whiplash.common.fixture.MemberFixture;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmCheckinRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmOffRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmRegisterRequest;
+import akuma.whiplash.domains.alarm.application.dto.request.AlarmRemoveRequest;
 import akuma.whiplash.domains.alarm.application.mapper.AlarmMapper;
 import akuma.whiplash.domains.alarm.domain.constant.DeactivateType;
 import akuma.whiplash.domains.alarm.domain.constant.SoundType;
@@ -175,12 +177,23 @@ class AlarmControllerIntegrationTest {
     class RingAlarmTest {
 
         @Test
-        @DisplayName("성공: 알람 울림 요청이 성공한다")
         void success() throws Exception {
             // given
             MemberEntity member = memberRepository.save(MemberFixture.MEMBER_1.toEntity());
             var alarm = alarmRepository.save(AlarmFixture.ALARM_01.toEntity(member));
-            alarmOccurrenceRepository.save(AlarmOccurrenceFixture.ALARM_OCCURRENCE_01.toEntity(alarm));
+
+            var now = LocalDateTime.now();
+            var occurrence = AlarmOccurrenceEntity.builder()
+                .alarm(alarm)
+                .date(now.toLocalDate())
+                .time(now.toLocalTime().minusMinutes(1)) // ← now보다 과거
+                .deactivateType(DeactivateType.NONE)
+                .alarmRinging(false)
+                .ringingCount(0)
+                .reminderSent(false)
+                .build();
+            alarmOccurrenceRepository.save(occurrence);
+
             String accessToken = jwtProvider.generateAccessToken(member.getId(), member.getRole(), "mock_device_id");
 
             // when & then
@@ -254,7 +267,6 @@ class AlarmControllerIntegrationTest {
             // given
             MemberEntity member = memberRepository.save(MemberFixture.MEMBER_1.toEntity());
             var alarm = alarmRepository.save(AlarmFixture.ALARM_01.toEntity(member));
-            // Set alarm time to a future time to simulate "not alarm time"
             alarmOccurrenceRepository.save(AlarmOccurrenceFixture.ALARM_OCCURRENCE_FUTURE_TIME.toEntity(alarm));
             String accessToken = jwtProvider.generateAccessToken(member.getId(), member.getRole(), "mock_device_id");
 
@@ -519,6 +531,82 @@ class AlarmControllerIntegrationTest {
             // when & then
             mockMvc.perform(post(BASE + "/" + alarm.getId() + "/off")
                     .header(HttpHeaders.AUTHORIZATION, authHeader(member))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest());
+        }
+    }
+
+    @Nested
+    @DisplayName("[DELETE] /api/alarms/{alarmId} - 알람 삭제")
+    class RemoveAlarmTest {
+
+        @Test
+        @DisplayName("성공: 알람 삭제 요청이 성공하면 알람이 제거된다")
+        void success() throws Exception {
+            // given
+            MemberEntity member = memberRepository.save(MemberFixture.MEMBER_3.toEntity());
+            AlarmEntity alarm = alarmRepository.save(AlarmFixture.ALARM_03.toEntity(member));
+            AlarmRemoveRequest request = new AlarmRemoveRequest("필요 없어졌어요");
+            String accessToken = jwtProvider.generateAccessToken(member.getId(), member.getRole(), "mock_device_id");
+
+            // when
+            mockMvc.perform(delete("/api/alarms/{alarmId}", alarm.getId())
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk());
+
+            // then
+            assertThat(alarmRepository.findById(alarm.getId())).isEmpty();
+        }
+
+        @Test
+        @DisplayName("실패: 알람이 존재하지 않으면 404를 반환한다")
+        void fail_alarmNotFound() throws Exception {
+            // given
+            MemberEntity member = memberRepository.save(MemberFixture.MEMBER_4.toEntity());
+            AlarmRemoveRequest request = new AlarmRemoveRequest("사유");
+            String accessToken = jwtProvider.generateAccessToken(member.getId(), member.getRole(), "mock_device_id");
+
+            // when & then
+            mockMvc.perform(delete("/api/alarms/{alarmId}", 999L)
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isNotFound());
+        }
+
+        @Test
+        @DisplayName("실패: 소유자가 아니면 403을 반환한다")
+        void fail_permissionDenied() throws Exception {
+            // given
+            MemberEntity owner = memberRepository.save(MemberFixture.MEMBER_5.toEntity());
+            AlarmEntity alarm = alarmRepository.save(AlarmFixture.ALARM_05.toEntity(owner));
+            MemberEntity other = memberRepository.save(MemberFixture.MEMBER_6.toEntity());
+            AlarmRemoveRequest request = new AlarmRemoveRequest("사유");
+            String accessToken = jwtProvider.generateAccessToken(other.getId(), other.getRole(), "mock_device_id");
+
+            // when & then
+            mockMvc.perform(delete("/api/alarms/{alarmId}", alarm.getId())
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isForbidden());
+        }
+
+        @Test
+        @DisplayName("실패: 삭제 사유가 비어 있으면 400을 반환한다")
+        void fail_reasonBlank() throws Exception {
+            // given
+            MemberEntity member = memberRepository.save(MemberFixture.MEMBER_7.toEntity());
+            AlarmEntity alarm = alarmRepository.save(AlarmFixture.ALARM_07.toEntity(member));
+            AlarmRemoveRequest request = new AlarmRemoveRequest("");
+            String accessToken = jwtProvider.generateAccessToken(member.getId(), member.getRole(), "mock_device_id");
+
+            // when & then
+            mockMvc.perform(delete("/api/alarms/{alarmId}", alarm.getId())
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest());

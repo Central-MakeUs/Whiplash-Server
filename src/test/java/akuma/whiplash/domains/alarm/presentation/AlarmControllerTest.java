@@ -3,11 +3,13 @@ package akuma.whiplash.domains.alarm.presentation;
 import static akuma.whiplash.common.fixture.MemberFixture.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.times;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -18,6 +20,7 @@ import akuma.whiplash.common.fixture.MemberFixture;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmCheckinRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmOffRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmRegisterRequest;
+import akuma.whiplash.domains.alarm.application.dto.request.AlarmRemoveRequest;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmOffResultResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmRemainingOffCountResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.CreateAlarmResponse;
@@ -488,6 +491,74 @@ class AlarmControllerTest {
 
             // then
             result.andExpect(status().isNotFound());
+        }
+    }
+
+    @Nested
+    @DisplayName("[DELETE] /api/alarms/{alarmId} - 알람 삭제")
+    class RemoveAlarmTest {
+
+        @Test
+        @DisplayName("성공: 알람 삭제 요청이 성공하면 200을 반환한다")
+        void success() throws Exception {
+            // given
+            AlarmRemoveRequest request = new AlarmRemoveRequest("사유");
+            setSecurityContext(buildContext(MEMBER_5));
+
+            // when & then
+            mockMvc.perform(delete("/api/alarms/{alarmId}", 1L)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk());
+
+            verify(alarmUseCase, times(1))
+                .removeAlarm(eq(MEMBER_5.getId()), eq(1L), anyString());
+        }
+
+        @Test
+        @DisplayName("실패: 알람이 존재하지 않으면 404를 반환한다")
+        void fail_alarmNotFound() throws Exception {
+            // given
+            AlarmRemoveRequest request = new AlarmRemoveRequest("사유");
+            setSecurityContext(buildContext(MEMBER_6));
+            org.mockito.Mockito.doThrow(ApplicationException.from(akuma.whiplash.domains.alarm.exception.AlarmErrorCode.ALARM_NOT_FOUND))
+                .when(alarmUseCase).removeAlarm(anyLong(), anyLong(), anyString());
+
+            // when & then
+            mockMvc.perform(delete("/api/alarms/{alarmId}", 1L)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isNotFound());
+        }
+
+        @Test
+        @DisplayName("실패: 소유자가 아니면 403을 반환한다")
+        void fail_permissionDenied() throws Exception {
+            // given
+            AlarmRemoveRequest request = new AlarmRemoveRequest("사유");
+            setSecurityContext(buildContext(MEMBER_7));
+            org.mockito.Mockito.doThrow(ApplicationException.from(AuthErrorCode.PERMISSION_DENIED))
+                .when(alarmUseCase).removeAlarm(anyLong(), anyLong(), anyString());
+
+            // when & then
+            mockMvc.perform(delete("/api/alarms/{alarmId}", 1L)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isForbidden());
+        }
+
+        @Test
+        @DisplayName("실패: 삭제 사유가 비어 있으면 400을 반환한다")
+        void fail_reasonBlank() throws Exception {
+            // given
+            AlarmRemoveRequest request = new AlarmRemoveRequest("");
+            setSecurityContext(buildContext(MEMBER_8));
+
+            // when & then
+            mockMvc.perform(delete("/api/alarms/{alarmId}", 1L)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest());
         }
     }
 }

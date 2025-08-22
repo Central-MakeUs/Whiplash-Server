@@ -70,4 +70,38 @@ class AlarmOffLogRepositoryTest {
             assertThat(count).isZero();
         }
     }
+
+    @Nested
+    @DisplayName("deleteAllByAlarmId - 알람 끈 로그 삭제")
+    class DeleteAllByAlarmIdTest {
+
+        @Test
+        @DisplayName("성공: 알람 ID로 끈 로그를 삭제한다")
+        void success() {
+            // given
+            MemberEntity member = memberRepository.save(MemberFixture.MEMBER_8.toEntity());
+            AlarmEntity alarm = alarmRepository.save(AlarmFixture.ALARM_08.toEntity(member));
+            AlarmOffLogEntity log = AlarmOffLogEntity.builder()
+                .alarm(alarm)
+                .member(member)
+                .build();
+            alarmOffLogRepository.save(log);
+
+            // when
+            alarmOffLogRepository.deleteAllByAlarmId(alarm.getId());
+
+            // then
+            assertThat(alarmOffLogRepository.findAll()).isEmpty();
+        }
+
+        @Test
+        @DisplayName("성공: 존재하지 않는 알람 ID로 요청해도 예외 없이 처리된다")
+        void success_whenAlarmIdNotExists() {
+            // when
+            alarmOffLogRepository.deleteAllByAlarmId(999L);
+
+            // then
+            assertThat(alarmOffLogRepository.findAll()).isEmpty();
+        }
+    }
 }

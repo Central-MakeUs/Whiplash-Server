@@ -452,6 +452,86 @@ class AlarmCommandServiceTest {
         }
     }
 
+    @Nested
+    @DisplayName("removeAlarm - 알람 삭제")
+    class RemoveAlarmTest {
+
+        @Test
+        @DisplayName("성공: 알람을 삭제한다")
+        void success() {
+            // given
+            MemberEntity member = MemberFixture.MEMBER_7.toMockEntity();
+            AlarmFixture fixture = AlarmFixture.ALARM_07;
+            AlarmEntity alarm = AlarmEntity.builder()
+                .id(fixture.getId())
+                .alarmPurpose(fixture.getAlarmPurpose())
+                .time(fixture.getTime())
+                .repeatDays(fixture.getRepeatDays())
+                .soundType(fixture.getSoundType())
+                .latitude(fixture.getLatitude())
+                .longitude(fixture.getLongitude())
+                .address(fixture.getAddress())
+                .member(member)
+                .build();
+            AlarmOccurrenceEntity occurrence = AlarmOccurrenceEntity.builder()
+                .id(1L)
+                .alarm(alarm)
+                .date(LocalDate.now())
+                .time(LocalTime.NOON)
+                .deactivateType(DeactivateType.NONE)
+                .alarmRinging(false)
+                .ringingCount(0)
+                .reminderSent(false)
+                .build();
+            given(alarmRepository.findById(alarm.getId())).willReturn(Optional.of(alarm));
+            given(alarmOccurrenceRepository.findAllByAlarmId(alarm.getId())).willReturn(List.of(occurrence));
+
+            // when
+            alarmCommandService.removeAlarm(member.getId(), alarm.getId(), "사유");
+
+            // then
+            verify(alarmRingingLogRepository).deleteAllByAlarmOccurrenceId(occurrence.getId());
+            verify(alarmOccurrenceRepository).deleteAll(List.of(occurrence));
+            verify(alarmOffLogRepository).deleteAllByAlarmId(alarm.getId());
+            verify(alarmRepository).delete(alarm);
+        }
+
+        @Test
+        @DisplayName("실패: 알람이 존재하지 않으면 예외를 던진다")
+        void fail_alarmNotFound() {
+            // given
+            given(alarmRepository.findById(1L)).willReturn(Optional.empty());
+
+            // when & then
+            assertThatThrownBy(() -> alarmCommandService.removeAlarm(1L, 1L, "사유"))
+                .isInstanceOf(ApplicationException.class);
+        }
+
+        @Test
+        @DisplayName("실패: 소유자가 아니면 예외를 던진다")
+        void fail_invalidOwner() {
+            // given
+            MemberEntity owner = MemberFixture.MEMBER_9.toMockEntity();
+            AlarmFixture fixture = AlarmFixture.ALARM_09;
+            AlarmEntity alarm = AlarmEntity.builder()
+                .id(fixture.getId())
+                .alarmPurpose(fixture.getAlarmPurpose())
+                .time(fixture.getTime())
+                .repeatDays(fixture.getRepeatDays())
+                .soundType(fixture.getSoundType())
+                .latitude(fixture.getLatitude())
+                .longitude(fixture.getLongitude())
+                .address(fixture.getAddress())
+                .member(owner)
+                .build();
+            given(alarmRepository.findById(alarm.getId())).willReturn(Optional.of(alarm));
+
+            // when & then
+            assertThatThrownBy(() -> alarmCommandService.removeAlarm(MemberFixture.MEMBER_10.getId(), alarm.getId(), "사유"))
+                .isInstanceOf(ApplicationException.class);
+        }
+    }
+
 /*    @Nested
     @DisplayName("ringAlarm - 알람 울림")
     class RingAlarmTest {
