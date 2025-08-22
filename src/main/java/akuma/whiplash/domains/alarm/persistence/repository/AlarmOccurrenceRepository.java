@@ -131,6 +131,7 @@ public interface AlarmOccurrenceRepository extends JpaRepository<AlarmOccurrence
     JOIN a.member m
     WHERE o.alarmRinging = true
       AND o.deactivateType = :status
+      AND m.pushNotificationPolicy = true
     """)
     List<RingingPushInfo> findRingingNotificationTargets(@Param("status") DeactivateType status);
 }
