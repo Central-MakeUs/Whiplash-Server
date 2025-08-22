@@ -25,7 +25,7 @@ public class AlarmRingingNotificationScheduler {
     @Scheduled(fixedRate = 10000, zone = "Asia/Seoul")
     @NoMethodLog
     public void sendRingingAlarmNotifications() {
-        log.info("[AlarmRingingNotificationScheduler.sendRingingAlarmNotifications] 알람 울림 푸시 알림 전송 스케줄러 시작");
+        log.info("알람 울림 푸시 알림 전송 스케줄러 시작");
         try {
             List<RingingPushInfo> infos = alarmQueryService.getRingingNotificationTargets();
             if (infos.isEmpty()) {
@@ -47,7 +47,7 @@ public class AlarmRingingNotificationScheduler {
 
             fcmService.sendRingingNotifications(targets);
         } finally {
-            log.info("[AlarmRingingNotificationScheduler.sendRingingAlarmNotifications] 알람 울림 푸시 알림 전송 스케줄러 종료");
+            log.info("알람 울림 푸시 알림 전송 스케줄러 종료");
         }
     }
 }

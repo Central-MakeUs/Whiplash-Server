@@ -41,7 +41,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         boolean isLocal = Arrays.asList(activeProfiles).contains("local");
         boolean isTest  = Arrays.asList(activeProfiles).contains("test");
 
-        if (isLocal) {
+        if (isLocal || isTest) {
             log.info("요청 IP: {}", clientIp);
         }
 
@@ -49,7 +49,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         if (token != null) {
 
-            if (isLocal) {
+            if (isLocal || isTest) {
                 log.info("토큰 함께 요청 : {}", token);
             }
 
@@ -68,11 +68,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 Authentication authentication = jwtUtils.getAuthentication(token);
                 SecurityContextHolder.getContext().setAuthentication(authentication);
 
-                if (isLocal) {
+                if (isLocal || isTest) {
                     log.info("context 인증 정보 저장 : {}", authentication.getName());
                 }
 
             } catch (ApplicationException e) {
+                jwtUtils.jwtExceptionHandler(response, e.getCode());
                 return;
             }
         } else {

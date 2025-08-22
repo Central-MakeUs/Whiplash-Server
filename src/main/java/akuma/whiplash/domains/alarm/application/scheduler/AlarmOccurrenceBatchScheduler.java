@@ -21,9 +21,9 @@ public class AlarmOccurrenceBatchScheduler {
     // 매일 자정에 실행
     @Scheduled(cron = "0 0 0 * * *", zone = "Asia/Seoul") // 00:00:00
     public void scheduleDailyAlarmOccurrenceCreation() {
-        log.info("[AlarmOccurrence Create Batch] 스케줄 시작");
+        log.info("알람 발생 내역 배치 생성 스케줄러 시작");
         runWithRetry(1);
-        log.info("[AlarmOccurrence Create Batch] 스케줄 종료");
+        log.info("알람 발생 내역 배치 생성 스케줄러 종료");
     }
 
     /**
