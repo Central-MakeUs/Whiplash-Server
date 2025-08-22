@@ -84,7 +84,6 @@
     <appender-ref ref="CONSOLE"/>
     <appender-ref ref="ASYNC_APP_FILE"/>   <!-- [ADD] 일반 로그 파일 -->
     <appender-ref ref="ERROR_FILE"/>       <!-- [ADD] 에러 전용 파일 -->
-    <appender-ref ref="SENTRY"/>           <!-- [KEEP] Sentry ERROR↑ -->
   </root>
 
 </configuration>
