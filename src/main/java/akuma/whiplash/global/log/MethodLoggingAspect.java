@@ -1,6 +1,9 @@
 package akuma.whiplash.global.log;
 
 import static akuma.whiplash.global.log.LogConst.MDC_REQUEST_ID_KEY;
+import akuma.whiplash.global.log.MethodLogSuppressor; 
+import akuma.whiplash.global.log.NoMethodLog;         
+
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Duration;
@@ -28,6 +31,12 @@ public class MethodLoggingAspect {
     // Controller, Service 메서드 실행 전후 로깅
     @Around("within(@org.springframework.web.bind.annotation.RestController *) || within(@org.springframework.stereotype.Service *)")
     public Object logAroundMethodExecution(ProceedingJoinPoint joinPoint) throws Throwable {
+        // Suppress 모드면 로깅하지 않고 바로 실행(로깅 X)
+        if (MethodLogSuppressor.isSuppressed()) {
+            return joinPoint.proceed();
+        }
+
+        
         Instant methodStartTime = Instant.now();
 
         Object methodReturnValue = null;
@@ -73,6 +82,27 @@ public class MethodLoggingAspect {
                 log.error(LogUtils.toJson(objectMapper, logDataMap)); 
             } else {
                 log.info(LogUtils.toJson(objectMapper, logDataMap)); 
+            }
+        }
+    }
+
+
+    /**
+     * @NoMethodLog 가 붙은 메서드/클래스의 실행 구간 동안
+     * 같은 스레드 체인에서 Method 로깅을 억제한다.
+     */
+    @Around("@within(akuma.whiplash.global.log.NoMethodLog) || @annotation(akuma.whiplash.global.log.NoMethodLog)")
+    public Object suppressByAnnotation(ProceedingJoinPoint pjp) throws Throwable {
+        boolean prev = MethodLogSuppressor.isSuppressed();
+        MethodLogSuppressor.enable();
+        try {
+            return pjp.proceed();
+        } finally {
+            // 중첩 억제에 대비: 이전 상태 복원
+            if (prev) {
+                MethodLogSuppressor.enable();
+            } else {
+                MethodLogSuppressor.disable();
             }
         }
     }
