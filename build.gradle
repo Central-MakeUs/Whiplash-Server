@@ -71,6 +71,7 @@ dependencies {
 	implementation "io.sentry:sentry-spring-boot-starter-jakarta"
 
 	// cloudwatch
+	implementation("org.springframework.boot:spring-boot-starter-actuator")
 	implementation("io.micrometer:micrometer-registry-cloudwatch2")
 	implementation("software.amazon.awssdk:cloudwatch")
 
