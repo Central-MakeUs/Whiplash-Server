@@ -7,6 +7,7 @@ import akuma.whiplash.domains.alarm.domain.service.AlarmQueryService;
 import akuma.whiplash.infrastructure.firebase.FcmService;
 import akuma.whiplash.infrastructure.firebase.dto.FcmSendResult;
 import akuma.whiplash.infrastructure.redis.RedisService;
+import akuma.whiplash.global.log.NoMethodLog;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.HashSet;
@@ -30,6 +31,7 @@ public class AlarmReminderScheduler {
 
     // 매 분 마다 실행
     @Scheduled(cron = "0 * * * * *")
+    @NoMethodLog
     public void sendPreAlarmNotifications() {
         log.info("[AlarmReminderScheduler.sendPreAlarmNotifications] 알람 울리기 1시간 전 푸시 알림 전송 스케줄러 시작");
         try {
