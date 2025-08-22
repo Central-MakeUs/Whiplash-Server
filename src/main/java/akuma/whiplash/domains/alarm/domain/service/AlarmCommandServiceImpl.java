@@ -258,12 +258,9 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
             )
             .orElseThrow(() -> ApplicationException.from(ALARM_OCCURRENCE_NOT_FOUND));
 
-        if (occurrence.getDeactivateType() != DeactivateType.NONE) {
-            throw ApplicationException.from(ALREADY_DEACTIVATED);
-        }
-
+        LocalDateTime now = LocalDateTime.now();
         LocalDateTime scheduledDateTime = LocalDateTime.of(occurrence.getDate(), occurrence.getTime());
-        if (LocalDateTime.now().isBefore(scheduledDateTime)) {
+        if (now.isBefore(scheduledDateTime)) {
             throw ApplicationException.from(NOT_ALARM_TIME);
         }
 
@@ -271,7 +268,7 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
         AlarmRingingLogEntity log = AlarmMapper.mapToAlarmRingingLogEntity(
             occurrence,
             ringIndex,
-            LocalDateTime.now()
+            now
         );
         alarmRingingLogRepository.save(log);
     }
