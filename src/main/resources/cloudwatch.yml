@@ -21,3 +21,7 @@ management:
     # numThreads: 2
     # connect-timeout: 1s
     # read-timeout: 10s
+
+logging:
+  level:
+    io.micrometer.cloudwatch2: DEBUG
