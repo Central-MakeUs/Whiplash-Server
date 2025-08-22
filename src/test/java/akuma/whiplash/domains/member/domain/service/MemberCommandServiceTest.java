@@ -2,7 +2,9 @@ package akuma.whiplash.domains.member.domain.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 
 import akuma.whiplash.common.fixture.MemberFixture;
@@ -71,6 +73,40 @@ class MemberCommandServiceTest {
                 .isInstanceOf(ApplicationException.class)
                 .satisfies(e -> assertThat(((ApplicationException) e).getCode())
                     .isEqualTo(MemberErrorCode.MEMBER_NOT_FOUND));
+        }
+    }
+
+    @Nested
+    @DisplayName("modifyPrivacyPolicy - 개인정보 수집 동의 변경")
+    class ModifyPrivacyPolicyTest {
+
+        @Test
+        @DisplayName("성공: 개인정보 수집 동의를 변경한다")
+        void success() {
+            // given
+            MemberEntity member = MemberFixture.MEMBER_1.toMockEntity();
+            member.updatePrivacyPolicy(false);
+            MemberEntity spyMember = spy(member);
+            given(memberRepository.findById(member.getId())).willReturn(Optional.of(spyMember));
+
+            // when
+            memberCommandService.modifyPrivacyPolicy(member.getId(), true);
+
+            // then
+            verify(spyMember).updatePrivacyPolicy(true);
+            assertThat(spyMember.isPrivacyPolicy()).isTrue();
+        }
+
+        @Test
+        @DisplayName("실패: 회원이 없으면 예외를 던진다")
+        void fail_memberNotFound() {
+            // given
+            given(memberRepository.findById(anyLong())).willReturn(Optional.empty());
+
+            // when & then
+            assertThatThrownBy(() -> memberCommandService.modifyPrivacyPolicy(999L, true))
+                .isInstanceOf(ApplicationException.class)
+                .hasMessage(MemberErrorCode.MEMBER_NOT_FOUND.getMessage());
         }
     }
 }

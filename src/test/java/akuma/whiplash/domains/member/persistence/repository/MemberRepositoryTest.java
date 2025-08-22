@@ -7,6 +7,7 @@ import akuma.whiplash.common.fixture.MemberFixture;
 import akuma.whiplash.domains.member.persistence.entity.MemberEntity;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
@@ -40,5 +41,37 @@ class MemberRepositoryTest {
 
         // then
         assertThat(member).isEmpty();
+    }
+
+    @Nested
+    @DisplayName("updatePrivacyPolicy - 개인정보 수집 동의 업데이트")
+    class UpdatePrivacyPolicyTest {
+
+        @Test
+        @DisplayName("성공: 개인정보 수집 동의를 변경하면 저장된다")
+        void success() {
+            // given
+            MemberEntity member = MemberFixture.MEMBER_7.toEntity();
+            member.updatePrivacyPolicy(false);
+            member = memberRepository.save(member);
+
+            // when
+            member.updatePrivacyPolicy(true);
+            memberRepository.save(member);
+
+            // then
+            MemberEntity found = memberRepository.findById(member.getId()).orElseThrow();
+            assertThat(found.isPrivacyPolicy()).isTrue();
+        }
+
+        @Test
+        @DisplayName("실패: 존재하지 않는 회원이면 빈 값을 반환한다")
+        void fail_memberNotFound() {
+            // when
+            Optional<MemberEntity> result = memberRepository.findById(999L);
+
+            // then
+            assertThat(result).isEmpty();
+        }
     }
 }

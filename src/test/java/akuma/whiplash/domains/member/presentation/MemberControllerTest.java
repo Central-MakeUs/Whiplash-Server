@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -13,6 +14,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import akuma.whiplash.common.fixture.MemberFixture;
 import akuma.whiplash.domains.auth.application.dto.etc.MemberContext;
+import akuma.whiplash.domains.member.application.dto.request.MemberPrivacyPolicyModifyRequest;
 import akuma.whiplash.domains.member.application.dto.request.MemberPushNotificationPolicyModifyRequest;
 import akuma.whiplash.domains.member.application.usecase.MemberUseCase;
 import akuma.whiplash.domains.member.exception.MemberErrorCode;
@@ -140,6 +142,65 @@ class MemberControllerTest {
                 .andExpect(jsonPath("$.code").value(CommonErrorCode.BAD_REQUEST.getCustomCode()));
 
             verify(memberUseCase, never()).modifyMemberPushNotificationPolicy(anyLong(), any());
+        }
+    }
+
+    @Nested
+    @DisplayName("[PUT] /api/members/terms/privacy - 개인정보 수집 동의 변경")
+    class ModifyPrivacyPolicyTest {
+
+        @Test
+        @DisplayName("성공: 개인정보 수집 동의 변경 후 200 OK를 반환한다")
+        void success() throws Exception {
+            // given
+            MemberContext context = buildContextFromFixture(MemberFixture.MEMBER_1);
+            setSecurityContext(context);
+            MemberPrivacyPolicyModifyRequest request = MemberPrivacyPolicyModifyRequest.builder()
+                .privacyPolicy(true)
+                .build();
+
+            // when & then
+            mockMvc.perform(put("/api/members/terms/privacy")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk());
+
+            verify(memberUseCase, times(1))
+                .modifyMemberPrivacyPolicy(eq(context.memberId()), any(MemberPrivacyPolicyModifyRequest.class));
+        }
+
+        @Test
+        @DisplayName("실패: 회원이 없으면 404와 에러 코드를 반환한다")
+        void fail_memberNotFound() throws Exception {
+            // given
+            MemberContext context = buildContextFromFixture(MemberFixture.MEMBER_2);
+            setSecurityContext(context);
+            MemberPrivacyPolicyModifyRequest request = MemberPrivacyPolicyModifyRequest.builder()
+                .privacyPolicy(true)
+                .build();
+            doThrow(ApplicationException.from(MemberErrorCode.MEMBER_NOT_FOUND))
+                .when(memberUseCase)
+                .modifyMemberPrivacyPolicy(eq(context.memberId()), any(MemberPrivacyPolicyModifyRequest.class));
+
+            // when & then
+            mockMvc.perform(put("/api/members/terms/privacy")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isNotFound());
+        }
+
+        @Test
+        @DisplayName("실패: 요청 값이 null이면 400과 에러 코드를 반환한다")
+        void fail_invalidRequest() throws Exception {
+            // given
+            MemberContext context = buildContextFromFixture(MemberFixture.MEMBER_3);
+            setSecurityContext(context);
+
+            // when & then
+            mockMvc.perform(put("/api/members/terms/privacy")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{}"))
+                .andExpect(status().isBadRequest());
         }
     }
 }
