@@ -1,11 +1,8 @@
 management:
   endpoints:
-    web:
-      exposure:
-        include: health,metrics
-  endpoint:
-    health:
-      show-details: always
+    web.exposure.include: health,metrics   # (선택)
+  endpoint.health.show-details: never      # 필요 시 always
+
   metrics:
     tags:
       application: nuntteo-api
@@ -15,7 +12,12 @@ management:
       percentiles:
         http.server.requests: 0.5,0.95
 
-cloudwatch:
-  namespace: Nuntteo/Dev
-  step: 5m   # 5분 주기 (프리티어 안전)
-
+  metrics.export.cloudwatch:
+    enabled: true
+    namespace: Nuntteo/Dev
+    step: 5m          # 프리티어 안전(5분)
+    # 선택 옵션(필요 시)
+    # batchSize: 20
+    # numThreads: 2
+    # connect-timeout: 1s
+    # read-timeout: 10s
