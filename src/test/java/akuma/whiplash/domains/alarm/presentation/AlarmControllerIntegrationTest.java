@@ -26,6 +26,7 @@ import akuma.whiplash.domains.alarm.persistence.entity.AlarmOffLogEntity;
 import akuma.whiplash.domains.alarm.persistence.repository.AlarmOccurrenceRepository;
 import akuma.whiplash.domains.alarm.persistence.repository.AlarmOffLogRepository;
 import akuma.whiplash.domains.alarm.persistence.repository.AlarmRepository;
+import akuma.whiplash.domains.member.exception.MemberErrorCode;
 import akuma.whiplash.domains.member.persistence.entity.MemberEntity;
 import akuma.whiplash.domains.member.persistence.repository.MemberRepository;
 import akuma.whiplash.global.config.security.jwt.JwtProvider;
@@ -611,6 +612,41 @@ class AlarmControllerIntegrationTest {
                     .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest());
         }
+    }
+
+    @Nested
+    @DisplayName("[GET] /api/alarms - 알람 목록 조회")
+    class GetAlarmsTest {
+
+        @Test
+        @DisplayName("성공: 200 OK와 알람 목록을 반환한다")
+        void success() throws Exception {
+            // given
+            MemberEntity member = memberRepository.save(MemberFixture.MEMBER_3.toEntity());
+            AlarmFixture fixture = AlarmFixture.ALARM_03;
+            alarmRepository.save(fixture.toEntity(member));
+            String accessToken = jwtProvider.generateAccessToken(member.getId(), member.getRole(), "mock_device_id");
+
+            // when & then
+            mockMvc.perform(get(BASE)
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result[0].alarmPurpose").value(fixture.getAlarmPurpose()));
+        }
+
+/*        @Test
+        @DisplayName("실패: 회원이 없으면 404와 에러 코드를 반환한다")
+        void fail_memberNotFound() throws Exception {
+            // given
+            Long memberId = 999L;
+            String accessToken = jwtProvider.generateAccessToken(memberId, MemberFixture.MEMBER_3.getRole(), "mock_device_id");
+
+            // when & then
+            mockMvc.perform(get(BASE)
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value(MemberErrorCode.MEMBER_NOT_FOUND.getCustomCode()));
+        }*/
     }
 
     @Nested

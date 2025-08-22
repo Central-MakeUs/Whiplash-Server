@@ -21,6 +21,7 @@ import akuma.whiplash.domains.alarm.application.dto.request.AlarmCheckinRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmOffRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmRegisterRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmRemoveRequest;
+import akuma.whiplash.domains.alarm.application.dto.response.AlarmInfoPreviewResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmOffResultResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmRemainingOffCountResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.CreateAlarmResponse;
@@ -559,6 +560,56 @@ class AlarmControllerTest {
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest());
+        }
+    }
+
+    @Nested
+    @DisplayName("[GET] /api/alarms - 알람 목록 조회")
+    class GetAlarmsTest {
+
+        @Test
+        @DisplayName("성공: 200 OK와 알람 목록을 반환한다")
+        void success() throws Exception {
+            // given
+            setSecurityContext(buildContext(MEMBER_3));
+            AlarmInfoPreviewResponse response = AlarmInfoPreviewResponse.builder()
+                .alarmId(1L)
+                .alarmPurpose("출근")
+                .repeatsDays(List.of("월"))
+                .time("07:00")
+                .address("서울")
+                .latitude(0.0)
+                .longitude(0.0)
+                .isToggleOn(true)
+                .firstUpcomingDay(LocalDate.now())
+                .firstUpcomingDayOfWeek("월요일")
+                .secondUpcomingDay(LocalDate.now().plusDays(1))
+                .secondUpcomingDayOfWeek("화요일")
+                .build();
+
+            when(alarmUseCase.getAlarms(anyLong()))
+                .thenReturn(List.of(response));
+
+            // when & then
+            mockMvc.perform(get(BASE))
+                .andExpect(status().isOk());
+
+            verify(alarmUseCase, times(1)).getAlarms(eq(MEMBER_3.getId()));
+        }
+
+        @Test
+        @DisplayName("실패: 회원이 없으면 404와 에러 코드를 반환한다")
+        void fail_memberNotFound() throws Exception {
+            // given
+            setSecurityContext(buildContext(MEMBER_4));
+
+            when(alarmUseCase.getAlarms(anyLong()))
+                .thenThrow(ApplicationException.from(MemberErrorCode.MEMBER_NOT_FOUND));
+
+            // when & then
+            mockMvc.perform(get(BASE))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value(MemberErrorCode.MEMBER_NOT_FOUND.getCustomCode()));
         }
     }
 }
