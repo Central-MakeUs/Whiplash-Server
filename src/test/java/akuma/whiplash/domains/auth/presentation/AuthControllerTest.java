@@ -1,7 +1,11 @@
 package akuma.whiplash.domains.auth.presentation;
 
+import static akuma.whiplash.common.fixture.MemberFixture.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -10,12 +14,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import akuma.whiplash.common.fixture.MemberFixture;
 import akuma.whiplash.domains.auth.application.dto.etc.MemberContext;
+import akuma.whiplash.domains.auth.application.dto.request.RegisterFcmTokenRequest;
 import akuma.whiplash.domains.auth.application.dto.response.TokenResponse;
 import akuma.whiplash.domains.auth.application.usecase.AuthUseCase;
 import akuma.whiplash.domains.auth.exception.AuthErrorCode;
 import akuma.whiplash.global.config.security.SecurityConfig;
 import akuma.whiplash.global.config.security.jwt.JwtAuthenticationFilter;
 import akuma.whiplash.global.exception.ApplicationException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
@@ -47,10 +53,9 @@ import org.springframework.test.web.servlet.MockMvc;
 @AutoConfigureMockMvc(addFilters = false)
 class AuthControllerTest {
 
-    @Autowired
-    private MockMvc mockMvc;
-    @MockitoBean
-    private AuthUseCase authUseCase;
+    @Autowired private MockMvc mockMvc;
+    @Autowired private ObjectMapper objectMapper;
+    @MockitoBean private AuthUseCase authUseCase;
 
     private static final String BASE = "/api/auth";
 
@@ -89,7 +94,7 @@ class AuthControllerTest {
         @DisplayName("성공: 200 OK를 반환한다")
         void success() throws Exception {
             // given
-            MemberContext context = buildContext(MemberFixture.MEMBER_4);
+            MemberContext context = buildContext(MEMBER_4);
             setSecurityContext(context);
 
             // when & then
@@ -104,7 +109,7 @@ class AuthControllerTest {
         @DisplayName("실패: 유효하지 않은 토큰이면 401과 에러 코드를 반환한다")
         void fail_invalidToken() throws Exception {
             // given
-            MemberContext context = buildContext(MemberFixture.MEMBER_5);
+            MemberContext context = buildContext(MEMBER_5);
             setSecurityContext(context);
             doThrow(ApplicationException.from(AuthErrorCode.INVALID_TOKEN))
                 .when(authUseCase).logout(context);
@@ -119,7 +124,7 @@ class AuthControllerTest {
         @DisplayName("실패: 만료된 토큰이면 401과 에러 코드를 반환한다")
         void fail_tokenExpired() throws Exception {
             // given
-            MemberContext context = buildContext(MemberFixture.MEMBER_6);
+            MemberContext context = buildContext(MEMBER_6);
             setSecurityContext(context);
             doThrow(ApplicationException.from(AuthErrorCode.TOKEN_EXPIRED))
                 .when(authUseCase).logout(context);
@@ -134,7 +139,7 @@ class AuthControllerTest {
         @DisplayName("실패: 저장되지 않은 토큰이면 401와 에러 코드를 반환한다")
         void fail_tokenNotFound() throws Exception {
             // given
-            MemberContext context = buildContext(MemberFixture.MEMBER_7);
+            MemberContext context = buildContext(MEMBER_7);
             setSecurityContext(context);
             doThrow(ApplicationException.from(AuthErrorCode.INVALID_TOKEN))
                 .when(authUseCase).logout(context);
@@ -154,7 +159,7 @@ class AuthControllerTest {
         @DisplayName("성공: 200 OK와 새로운 토큰을 반환한다")
         void success() throws Exception {
             // given
-            setSecurityContext(buildContext(MemberFixture.MEMBER_1));
+            setSecurityContext(buildContext(MEMBER_1));
             TokenResponse response = TokenResponse.builder()
                 .accessToken("Bearer newAccess")
                 .refreshToken("Bearer newRefresh")
@@ -173,7 +178,7 @@ class AuthControllerTest {
         @DisplayName("실패: 토큰이 유효하지 않으면 401과 에러 코드를 반환한다")
         void fail_invalidToken() throws Exception {
             // given
-            setSecurityContext(buildContext(MemberFixture.MEMBER_2));
+            setSecurityContext(buildContext(MEMBER_2));
             org.mockito.Mockito.when(authUseCase.reissueToken(any(MemberContext.class)))
                 .thenThrow(ApplicationException.from(AuthErrorCode.INVALID_TOKEN));
 
@@ -187,13 +192,13 @@ class AuthControllerTest {
         @DisplayName("실패: 리프레시 토큰이 존재하지 않으면 401와 에러 코드를 반환한다")
         void fail_tokenNotFound() throws Exception {
             // given
-            setSecurityContext(buildContext(MemberFixture.MEMBER_3));
+            setSecurityContext(buildContext(MEMBER_3));
             org.mockito.Mockito.when(authUseCase.reissueToken(any(MemberContext.class)))
                 .thenThrow(ApplicationException.from(AuthErrorCode.INVALID_TOKEN));
 
             // when & then
             mockMvc.perform(post("/api/auth/reissue"))
-                .andExpect(status().isNotFound())
+                .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value(AuthErrorCode.INVALID_TOKEN.getCustomCode()));
         }
 
@@ -201,7 +206,7 @@ class AuthControllerTest {
         @DisplayName("실패: 만료된 리프레시 토큰이면 401과 에러 코드를 반환한다")
         void fail_tokenExpired() throws Exception {
             // given
-            setSecurityContext(buildContext(MemberFixture.MEMBER_4));
+            setSecurityContext(buildContext(MEMBER_4));
             org.mockito.Mockito.when(authUseCase.reissueToken(any(MemberContext.class)))
                 .thenThrow(ApplicationException.from(AuthErrorCode.TOKEN_EXPIRED));
 
@@ -209,6 +214,45 @@ class AuthControllerTest {
             mockMvc.perform(post("/api/auth/reissue"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value(AuthErrorCode.TOKEN_EXPIRED.getCustomCode()));
+        }
+    }
+
+    @Nested
+    @DisplayName("[POST] /api/auth/fcm-token - FCM 토큰 등록")
+    class RegisterFcmTokenTest {
+
+        @Test
+        @DisplayName("성공: 토큰 등록 후 200 OK를 반환한다")
+        void success() throws Exception {
+            // given
+            RegisterFcmTokenRequest request = new RegisterFcmTokenRequest("token-123");
+            setSecurityContext(buildContext(MEMBER_1)); // ✅ 통일
+
+            // when & then
+            mockMvc.perform(post(BASE + "/fcm-token")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk());
+
+            // then
+            verify(authUseCase, times(1))
+                .registerFcmToken(eq(MEMBER_1.getId()), eq("mock_device"), eq("token-123"));
+        }
+        @Test
+        @DisplayName("실패: FCM 토큰이 비어 있으면 400과 에러 코드를 반환한다")
+        void fail_blankToken() throws Exception {
+            // given
+            RegisterFcmTokenRequest request = new RegisterFcmTokenRequest("");
+            setSecurityContext(buildContext(MEMBER_2));
+
+            // when & then
+            mockMvc.perform(post(BASE + "/fcm-token")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest());
+
+            // then
+            verify(authUseCase, never()).registerFcmToken(anyLong(), eq("mock_device_id"), eq(""));
         }
     }
 }

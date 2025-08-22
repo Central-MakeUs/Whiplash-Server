@@ -7,6 +7,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import akuma.whiplash.common.config.IntegrationTest;
 import akuma.whiplash.common.fixture.MemberFixture;
+import akuma.whiplash.domains.auth.application.dto.request.RegisterFcmTokenRequest;
 import akuma.whiplash.domains.auth.exception.AuthErrorCode;
 import akuma.whiplash.domains.member.persistence.entity.MemberEntity;
 import akuma.whiplash.domains.member.persistence.repository.MemberRepository;
@@ -30,6 +31,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
@@ -207,6 +209,59 @@ class AuthControllerIntegrationTest {
                     .header("Authorization", "Bearer " + expiredToken))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value(AuthErrorCode.TOKEN_EXPIRED.getCustomCode()));
+        }
+    }
+
+    @Nested
+    @DisplayName("[POST] /api/auth/fcm-token - FCM 토큰 등록")
+    class RegisterFcmTokenTest {
+
+        @Test
+        @DisplayName("성공: FCM 토큰을 등록하면 Redis에 저장된다")
+        void success() throws Exception {
+            // given
+            MemberEntity member = memberRepository.save(MemberFixture.MEMBER_1.toEntity());
+            RegisterFcmTokenRequest request = new RegisterFcmTokenRequest("token-abc");
+            String accessToken = jwtProvider.generateAccessToken(member.getId(), member.getRole(), "device-1");
+
+            // when
+            mockMvc.perform(post("/api/auth/fcm-token")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk());
+
+            // then
+            assertThat(redisService.getFcmTokens(member.getId())).contains("token-abc");
+        }
+
+        @Test
+        @DisplayName("실패: FCM 토큰이 비어 있으면 400을 반환한다")
+        void fail_blankToken() throws Exception {
+            // given
+            MemberEntity member = memberRepository.save(MemberFixture.MEMBER_2.toEntity());
+            RegisterFcmTokenRequest request = new RegisterFcmTokenRequest("");
+            String accessToken = jwtProvider.generateAccessToken(member.getId(), member.getRole(), "device-2");
+
+            // when & then
+            mockMvc.perform(post("/api/auth/fcm-token")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest());
+        }
+
+        @Test
+        @DisplayName("실패: 인증 정보가 없으면 401을 반환한다")
+        void fail_unauthorized() throws Exception {
+            // given
+            RegisterFcmTokenRequest request = new RegisterFcmTokenRequest("token-xyz");
+
+            // when & then
+            mockMvc.perform(post("/api/auth/fcm-token")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isUnauthorized());
         }
     }
 }
