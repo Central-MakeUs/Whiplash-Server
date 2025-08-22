@@ -16,9 +16,13 @@ public enum SoundType {
     private final String description;
 
     public static SoundType from(String description) {
+        if (description == null) {
+            return NONE;
+        }
+
         return Arrays.stream(values())
             .filter(s -> s.description.equals(description))
             .findFirst()
-            .orElse(null);
+            .orElse(NONE);
     }
 }

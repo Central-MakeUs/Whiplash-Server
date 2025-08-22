@@ -20,6 +20,8 @@ import jakarta.persistence.Table;
 import java.time.LocalTime;
 import java.util.List;
 import lombok.AccessLevel;
+import lombok.Builder;
+import lombok.Builder.Default;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.experimental.SuperBuilder;
@@ -51,9 +53,10 @@ public class AlarmEntity extends BaseTimeEntity {
     @Column(name = "repeat_days", columnDefinition = "TEXT", nullable = false)
     private List<Weekday> repeatDays;
 
+    @Builder.Default
     @Enumerated(EnumType.STRING)
     @Column(name = "sound_type", length = 20, nullable = false)
-    private SoundType soundType;
+    private SoundType soundType = SoundType.NONE;
 
     @Column(nullable = false)
     private Double latitude;
