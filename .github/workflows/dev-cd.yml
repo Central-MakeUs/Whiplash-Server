@@ -82,9 +82,6 @@ jobs:
             echo "Deploying image: $IMAGE"
 
             echo ${{ secrets.DOCKERHUB_TOKEN }} | docker login --username ${{ secrets.DOCKERHUB_USERNAME }} --password-stdin
-
-            # 호스트 로그 디렉터리 준비 (권한 이슈 있으면 sudo 사용)
-            mkdir -p /var/log/nuntteo-was || true
             
             docker stop noonddu-was || true
             docker rm noonddu-was || true
