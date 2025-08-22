@@ -131,7 +131,7 @@ public class FcmService {
             Map<String, String> data = Map.of(
                 "title", DEFAULT_TITLE,
                 "body", RINGING_BODY,
-                "route", "ALARM_LINGING_VIEW",
+                "route", "ALARM_RINGING_VIEW",
                 "alarm_id", alarmId.toString()
             );
 
@@ -168,7 +168,7 @@ public class FcmService {
                 if (fme != null && isTokenInvalid(fme)) {
                     redisService.removeInvalidToken(dto.memberId(), dto.token());
                 } else {
-                    log.warn("FCM 실패(알람 울림): token={}, ex={}", dto.token(), ex != null ? ex.getClass().getSimpleName() : "null");
+                    log.warn("FCM 실패(알람 울림): token={}, ex={}", maskToken(dto.token()), ex != null ? ex.getClass().getSimpleName() : "null");
                 }
             }
         }
@@ -261,5 +261,13 @@ public class FcmService {
             result.add(list.subList(i, Math.min(i + size, list.size())));
         }
         return result;
+    }
+
+    // helper: 토큰 마스킹 (앞 6 + 뒤 4만 노출)
+    private String maskToken(String token) {
+        if (token == null) return "null";
+        int len = token.length();
+        if (len <= 10) return "***";
+        return token.substring(0, 6) + "..." + token.substring(len - 4);
     }
 }
