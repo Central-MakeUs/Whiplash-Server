@@ -1,6 +1,7 @@
 package akuma.whiplash.domains.alarm.persistence.repository;
 
 import akuma.whiplash.domains.alarm.application.dto.etc.OccurrencePushInfo;
+import akuma.whiplash.domains.alarm.application.dto.etc.RingingPushInfo;
 import akuma.whiplash.domains.alarm.domain.constant.DeactivateType;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmOccurrenceEntity;
 import java.time.LocalDate;
@@ -122,4 +123,15 @@ public interface AlarmOccurrenceRepository extends JpaRepository<AlarmOccurrence
         WHERE o.id IN :ids AND o.reminderSent = false
     """)
     void markReminderSentIn(@Param("ids") Set<Long> ids);
+
+    @Query("""
+    SELECT new akuma.whiplash.domains.alarm.application.dto.etc.RingingPushInfo(a.id, m.id)
+    FROM AlarmOccurrenceEntity o
+    JOIN o.alarm a
+    JOIN a.member m
+    WHERE o.alarmRinging = true
+      AND o.deactivateType = :status
+      AND m.pushNotificationPolicy = true
+    """)
+    List<RingingPushInfo> findRingingNotificationTargets(@Param("status") DeactivateType status);
 }

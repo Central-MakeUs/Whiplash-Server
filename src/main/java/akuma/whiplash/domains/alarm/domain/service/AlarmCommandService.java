@@ -15,5 +15,6 @@ public interface AlarmCommandService {
     AlarmOffResultResponse alarmOff(Long memberId, Long alarmId, LocalDateTime clientNow);
     void removeAlarm(Long memberId, Long alarmId, String reason);
     void checkinAlarm(Long memberId, Long alarmId, AlarmCheckinRequest request);
+    void ringAlarm(Long memberId, Long alarmId);
     void markReminderSent(Set<Long> occurrenceIds);
 }

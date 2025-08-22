@@ -10,6 +10,7 @@ import akuma.whiplash.domains.member.persistence.entity.MemberEntity;
 import akuma.whiplash.domains.member.persistence.repository.MemberRepository;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
@@ -21,27 +22,33 @@ class AlarmRepositoryTest {
     @Autowired
     private MemberRepository memberRepository;
 
-    @DisplayName("회원 ID로 알람을 조회하면 해당 알람이 반환된다")
-    @Test
-    void findAllByMemberId_returnsAlarms() {
-        // given
-        MemberEntity member = memberRepository.save(MemberFixture.MEMBER_7.toEntity());
-        alarmRepository.save(AlarmFixture.ALARM_07.toEntity(member));
+    @Nested
+    @DisplayName("findAllByMemberId - 회원 ID로 알람 조회")
+    class FindAllByMemberIdTest {
 
-        // when
-        List<AlarmEntity> alarms = alarmRepository.findAllByMemberId(member.getId());
+        @Test
+        @DisplayName("성공: 회원 ID로 알람을 조회하면 해당 알람이 반환된다")
+        void success() {
+            // given
+            MemberEntity member = memberRepository.save(MemberFixture.MEMBER_7.toEntity());
+            alarmRepository.save(AlarmFixture.ALARM_07.toEntity(member));
 
-        // then
-        assertThat(alarms).hasSize(1);
+            // when
+            List<AlarmEntity> alarms = alarmRepository.findAllByMemberId(member.getId());
+
+            // then
+            assertThat(alarms).hasSize(1);
+        }
+
+        @Test
+        @DisplayName("실패: 등록되지 않은 회원 ID로 알람을 조회하면 비어있는 목록이 반환된다")
+        void fail_memberNotFound() {
+            // when
+            List<AlarmEntity> alarms = alarmRepository.findAllByMemberId(999L);
+
+            // then
+            assertThat(alarms).isEmpty();
+        }
     }
 
-    @DisplayName("등록되지 않은 회원 ID로 알람을 조회하면 비어있는 목록이 반환된다")
-    @Test
-    void findAllByMemberId_returnsEmpty_whenMemberNotExists() {
-        // when
-        List<AlarmEntity> alarms = alarmRepository.findAllByMemberId(999L);
-
-        // then
-        assertThat(alarms).isEmpty();
-    }
 }

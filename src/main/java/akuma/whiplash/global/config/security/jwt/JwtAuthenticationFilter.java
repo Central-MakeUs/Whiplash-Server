@@ -11,8 +11,10 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.util.Arrays;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.env.Environment;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
@@ -26,6 +28,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtUtils jwtUtils;
     private final RequestMatcherHolder requestMatcherHolder;
+    private final Environment env;
 
     private static final String AUTHORIZATION = "Authorization";
     private static final String BEARER = "Bearer";
@@ -33,12 +36,23 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
         String clientIp = getClientIp(request);
-        log.info("요청 IP: {}", clientIp);
+
+        String[] activeProfiles = env.getActiveProfiles();
+        boolean isLocal = Arrays.asList(activeProfiles).contains("local");
+        boolean isTest  = Arrays.asList(activeProfiles).contains("test");
+
+        if (isLocal) {
+            log.info("요청 IP: {}", clientIp);
+        }
 
         String token = extractToken(request);
 
         if (token != null) {
-            log.info("토큰 함께 요청 : {}", token);
+
+            if (isLocal) {
+                log.info("토큰 함께 요청 : {}", token);
+            }
+
             try {
                 if (request.getRequestURI().contains("/reissue")) {
                     log.info("재발급 진행");
@@ -53,7 +67,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
                 Authentication authentication = jwtUtils.getAuthentication(token);
                 SecurityContextHolder.getContext().setAuthentication(authentication);
-                log.info("context 인증 정보 저장 : {}", authentication.getName());
+
+                if (isLocal) {
+                    log.info("context 인증 정보 저장 : {}", authentication.getName());
+                }
+
             } catch (ApplicationException e) {
                 return;
             }

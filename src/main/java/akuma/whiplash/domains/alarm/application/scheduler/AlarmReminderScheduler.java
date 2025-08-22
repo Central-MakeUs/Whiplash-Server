@@ -15,6 +15,7 @@ import java.util.Map;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 @Slf4j
@@ -27,7 +28,8 @@ public class AlarmReminderScheduler {
     private final FcmService fcmService;
     private final AlarmCommandService alarmCommandService;
 
-    // @Scheduled(cron = "0 * * * * *") // 매 분
+    // 매 분 마다 실행
+    @Scheduled(cron = "0 * * * * *")
     public void sendPreAlarmNotifications() {
         log.info("[AlarmReminderScheduler.sendPreAlarmNotifications] 알람 울리기 1시간 전 푸시 알림 전송 스케줄러 시작");
         try {

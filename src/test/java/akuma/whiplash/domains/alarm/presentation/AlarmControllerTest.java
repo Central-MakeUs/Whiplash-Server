@@ -4,6 +4,7 @@ import static akuma.whiplash.common.fixture.MemberFixture.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.times;
@@ -16,6 +17,7 @@ import akuma.whiplash.domains.alarm.application.dto.request.AlarmRegisterRequest
 import akuma.whiplash.domains.alarm.application.dto.response.CreateAlarmResponse;
 import akuma.whiplash.domains.alarm.application.usecase.AlarmUseCase;
 import akuma.whiplash.domains.alarm.domain.constant.Weekday;
+import akuma.whiplash.domains.alarm.exception.AlarmErrorCode;
 import akuma.whiplash.domains.auth.application.dto.etc.MemberContext;
 import akuma.whiplash.domains.member.exception.MemberErrorCode;
 import akuma.whiplash.global.config.security.SecurityConfig;
@@ -25,6 +27,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -50,6 +53,7 @@ import org.springframework.test.web.servlet.MockMvc;
     }
 )
 @AutoConfigureMockMvc(addFilters = false)
+@DisplayName("AlarmController Slice Test")
 class AlarmControllerTest {
 
     @Autowired
@@ -87,65 +91,104 @@ class AlarmControllerTest {
     void clearSecurityContext() {
         SecurityContextHolder.clearContext();
     }
-    
-    @DisplayName("알람 등록 요청이 성공하면 200을 반환한다")
-    @Test
-    void createAlarm_returnsOk_whenRequestValid() throws Exception {
-        // given
-        AlarmFixture fixture = AlarmFixture.ALARM_03;
-        AlarmRegisterRequest request = new AlarmRegisterRequest(
-            fixture.getAddress(),
-            fixture.getLatitude(),
-            fixture.getLongitude(),
-            fixture.getAlarmPurpose(),
-            fixture.getTime(),
-            fixture.getRepeatDays().stream().map(Weekday::getDescription).toList(),
-            fixture.getSoundType().getDescription()
-        );
 
-        setSecurityContext(buildContextFromFixture(MEMBER_3));
 
-        CreateAlarmResponse response = CreateAlarmResponse.builder()
-            .alarmId(123L)   
-            .build();
+    @Nested
+    @DisplayName("[POST] /api/alarms - 알람 등록")
+    class CreateAlarmTest {
 
-        when(alarmUseCase.createAlarm(any(AlarmRegisterRequest.class), anyLong()))
-            .thenReturn(response);
+        @Test
+        @DisplayName("성공: 알람 등록 요청이 성공하면 200을 반환한다")
+        void success() throws Exception {
 
-        // when & then
-        mockMvc.perform(post("/api/alarms")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
-            .andExpect(status().isOk());
+            // given
+            AlarmFixture fixture = AlarmFixture.ALARM_03;
+            AlarmRegisterRequest request = new AlarmRegisterRequest(
+                fixture.getAddress(),
+                fixture.getLatitude(),
+                fixture.getLongitude(),
+                fixture.getAlarmPurpose(),
+                fixture.getTime(),
+                fixture.getRepeatDays().stream().map(Weekday::getDescription).toList(),
+                fixture.getSoundType().getDescription()
+            );
+            setSecurityContext(buildContextFromFixture(MEMBER_3));
+            CreateAlarmResponse response = CreateAlarmResponse.builder().alarmId(123L).build();
 
-        verify(alarmUseCase, times(1))
-            .createAlarm(any(AlarmRegisterRequest.class), eq(MEMBER_3.getId()));
+            // when
+            when(alarmUseCase.createAlarm(any(AlarmRegisterRequest.class), anyLong())).thenReturn(response);
+
+            mockMvc.perform(post("/api/alarms")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk());
+
+            // then
+            verify(alarmUseCase, times(1)).createAlarm(any(AlarmRegisterRequest.class), eq(MEMBER_3.getId()));
+        }
+
+        @Test
+        @DisplayName("실패: 회원이 존재하지 않으면 404를 반환한다")
+        void fail_memberNotFound() throws Exception {
+
+            // given
+            AlarmFixture fixture = AlarmFixture.ALARM_04;
+            AlarmRegisterRequest request = new AlarmRegisterRequest(
+                fixture.getAddress(),
+                fixture.getLatitude(),
+                fixture.getLongitude(),
+                fixture.getAlarmPurpose(),
+                fixture.getTime(),
+                fixture.getRepeatDays().stream().map(Weekday::getDescription).toList(),
+                fixture.getSoundType().getDescription()
+            );
+            setSecurityContext(buildContextFromFixture(MEMBER_4));
+
+            // when & then
+            when(alarmUseCase.createAlarm(any(AlarmRegisterRequest.class), anyLong()))
+                .thenThrow(ApplicationException.from(MemberErrorCode.MEMBER_NOT_FOUND));
+
+            mockMvc.perform(post("/api/alarms")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isNotFound());
+        }
     }
 
-    @DisplayName("회원이 존재하지 않으면 404를 반환한다")
-    @Test
-    void createAlarm_returnsNotFound_whenMemberNotExists() throws Exception {
-        // given
-        AlarmFixture fixture = AlarmFixture.ALARM_04;
-        AlarmRegisterRequest request = new AlarmRegisterRequest(
-            fixture.getAddress(),
-            fixture.getLatitude(),
-            fixture.getLongitude(),
-            fixture.getAlarmPurpose(),
-            fixture.getTime(),
-            fixture.getRepeatDays().stream().map(Weekday::getDescription).toList(),
-            fixture.getSoundType().getDescription()
-        );
+    @Nested
+    @DisplayName("[POST] /api/alarms/{id}/ring - 알람 울림")
+    class RingAlarmTest {
 
-        setSecurityContext(buildContextFromFixture(MEMBER_4));
+        @Test
+        @DisplayName("성공: 알람이 울리면 200을 반환한다")
+        void success() throws Exception {
 
-        when(alarmUseCase.createAlarm(any(AlarmRegisterRequest.class), anyLong()))
-            .thenThrow(ApplicationException.from(MemberErrorCode.MEMBER_NOT_FOUND));
+            // given
+            setSecurityContext(buildContextFromFixture(MEMBER_3));
 
-        // when & then
-        mockMvc.perform(post("/api/alarms")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
-            .andExpect(status().isNotFound());
+            // when
+            mockMvc.perform(post("/api/alarms/{alarmId}/ring", 1L))
+                .andExpect(status().isOk());
+
+            // then
+            verify(alarmUseCase, times(1)).ringAlarm(eq(MEMBER_3.getId()), eq(1L));
+        }
+
+        @Test
+        @DisplayName("실패: 알람 시간이 아니면 400을 반환한다")
+        void fail_notAlarmTime() throws Exception {
+
+            // given
+            setSecurityContext(buildContextFromFixture(MEMBER_3));
+
+            // when
+            doThrow(ApplicationException.from(AlarmErrorCode.NOT_ALARM_TIME))
+                .when(alarmUseCase)
+                .ringAlarm(eq(MEMBER_3.getId()), eq(1L));
+
+            // then
+            mockMvc.perform(post("/api/alarms/{alarmId}/ring", 1L))
+                .andExpect(status().isBadRequest());
+        }
     }
 }

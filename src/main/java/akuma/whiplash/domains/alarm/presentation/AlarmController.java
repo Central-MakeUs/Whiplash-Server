@@ -63,7 +63,7 @@ public class AlarmController {
         alarmErrorCodes = {ALARM_NOT_FOUND, ALARM_OFF_LIMIT_EXCEEDED, ALREADY_DEACTIVATED, INVALID_CLIENT_DATE},
         authErrorCodes = {PERMISSION_DENIED}
     )
-    @Operation(summary = "알람 끄기", description = "알람을 끕니다.")
+    @Operation(summary = "알람 끄기", description = "알람 목록에 있는 토글을 이용하여 알람을 끌 때, 알람 울림 화면에서 [봐주세요] 버튼을 눌러서 알람을 끌 때 호출하는 API입니다.")
     @PostMapping("/{alarmId}/off")
     public ApplicationResponse<AlarmOffResultResponse> alarmOff(@AuthenticationPrincipal MemberContext memberContext, @PathVariable Long alarmId, @RequestBody @Valid AlarmOffRequest request) {
         AlarmOffResultResponse response = alarmUseCase.alarmOff(memberContext.memberId(), alarmId, request.clientNow());
@@ -116,5 +116,19 @@ public class AlarmController {
     ) {
         AlarmRemainingOffCountResponse response = alarmUseCase.getWeeklyRemainingOffCount(memberContext.memberId());
         return ApplicationResponse.onSuccess(response);
+    }
+
+    @CustomErrorCodes(
+        alarmErrorCodes = {ALARM_NOT_FOUND, ALARM_OCCURRENCE_NOT_FOUND, ALREADY_DEACTIVATED, NOT_ALARM_TIME},
+        authErrorCodes = {PERMISSION_DENIED}
+    )
+    @Operation(summary = "알람 울림", description = "알람이 울릴 때 호출합니다.")
+    @PostMapping("/{alarmId}/ring")
+    public ApplicationResponse<Void> ringAlarm(
+        @AuthenticationPrincipal MemberContext memberContext,
+        @PathVariable Long alarmId
+    ) {
+        alarmUseCase.ringAlarm(memberContext.memberId(), alarmId);
+        return ApplicationResponse.onSuccess();
     }
 }
