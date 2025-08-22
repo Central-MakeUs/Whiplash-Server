@@ -5,6 +5,7 @@ import akuma.whiplash.domains.alarm.application.dto.etc.RingingPushTargetDto;
 import akuma.whiplash.domains.alarm.domain.service.AlarmQueryService;
 import akuma.whiplash.infrastructure.firebase.FcmService;
 import akuma.whiplash.infrastructure.redis.RedisService;
+import akuma.whiplash.global.log.NoMethodLog;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,6 +23,7 @@ public class AlarmRingingNotificationScheduler {
 
     // 10초 간격으로 실행
     @Scheduled(fixedRate = 10000, zone = "Asia/Seoul")
+    @NoMethodLog
     public void sendRingingAlarmNotifications() {
         log.info("[AlarmRingingNotificationScheduler.sendRingingAlarmNotifications] 알람 울림 푸시 알림 전송 스케줄러 시작");
         try {
