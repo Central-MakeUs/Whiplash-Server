@@ -4,14 +4,18 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
 
 import akuma.whiplash.common.fixture.AlarmFixture;
 import akuma.whiplash.common.fixture.MemberFixture;
+import akuma.whiplash.domains.alarm.application.dto.request.AlarmCheckinRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmRegisterRequest;
+import akuma.whiplash.domains.alarm.application.mapper.AlarmMapper;
 import akuma.whiplash.domains.alarm.domain.constant.DeactivateType;
+import akuma.whiplash.domains.alarm.domain.constant.SoundType;
 import akuma.whiplash.domains.alarm.domain.constant.Weekday;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmEntity;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmOccurrenceEntity;
@@ -22,8 +26,11 @@ import akuma.whiplash.domains.alarm.persistence.repository.AlarmRingingLogReposi
 import akuma.whiplash.domains.member.persistence.entity.MemberEntity;
 import akuma.whiplash.domains.member.persistence.repository.MemberRepository;
 import akuma.whiplash.global.exception.ApplicationException;
+import java.time.DayOfWeek;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -105,6 +112,166 @@ class AlarmCommandServiceTest {
 
             // when & then
             assertThatThrownBy(() -> alarmCommandService.createAlarm(request, MemberFixture.MEMBER_6.getId()))
+                .isInstanceOf(ApplicationException.class);
+        }
+    }
+
+    @Nested
+    @DisplayName("checkinAlarm - 도착 인증")
+    class CheckinAlarmTest {
+
+        @Test
+        @DisplayName("성공: 허용 반경 내에서 도착 인증에 성공한다")
+        void success() {
+            // given
+            MemberEntity member = MemberFixture.MEMBER_10.toMockEntity();
+            AlarmFixture fixture = AlarmFixture.ALARM_10;
+            AlarmEntity alarm = AlarmEntity.builder()
+                .id(fixture.getId())
+                .alarmPurpose(fixture.getAlarmPurpose())
+                .time(fixture.getTime())
+                .repeatDays(List.of(Weekday.from(LocalDate.now().getDayOfWeek())))
+                .soundType(SoundType.ONE)
+                .latitude(fixture.getLatitude())
+                .longitude(fixture.getLongitude())
+                .address(fixture.getAddress())
+                .member(member)
+                .build();
+            given(alarmRepository.findById(alarm.getId())).willReturn(Optional.of(alarm));
+
+            LocalDate today = LocalDate.now();
+            AlarmOccurrenceEntity occurrence = AlarmMapper.mapToAlarmOccurrenceForDate(alarm, today);
+            given(alarmOccurrenceRepository.findByAlarmIdAndDate(alarm.getId(), today)).willReturn(Optional.of(occurrence));
+
+            AlarmCheckinRequest request = new AlarmCheckinRequest(alarm.getLatitude(), alarm.getLongitude());
+
+            // when
+            alarmCommandService.checkinAlarm(member.getId(), alarm.getId(), request);
+
+            // then
+            assertThat(occurrence.getDeactivateType()).isEqualTo(DeactivateType.CHECKIN);
+        }
+
+        @Test
+        @DisplayName("실패: 존재하지 않는 알람이면 예외가 발생한다")
+        void fail_alarmNotFound() {
+            // given
+            given(alarmRepository.findById(anyLong())).willReturn(Optional.empty());
+
+            // when & then
+            assertThatThrownBy(() -> alarmCommandService.checkinAlarm(1L, 1L, new AlarmCheckinRequest(0.0, 0.0)))
+                .isInstanceOf(ApplicationException.class);
+        }
+
+        @Test
+        @DisplayName("실패: 다른 사용자의 알람이면 예외가 발생한다")
+        void fail_permissionDenied() {
+            // given
+            MemberEntity owner = MemberFixture.MEMBER_11.toMockEntity();
+            AlarmFixture fixture = AlarmFixture.ALARM_11;
+            AlarmEntity alarm = AlarmEntity.builder()
+                .id(fixture.getId())
+                .alarmPurpose(fixture.getAlarmPurpose())
+                .time(fixture.getTime())
+                .repeatDays(fixture.getRepeatDays())
+                .soundType(fixture.getSoundType())
+                .latitude(fixture.getLatitude())
+                .longitude(fixture.getLongitude())
+                .address(fixture.getAddress())
+                .member(owner)
+                .build();
+            given(alarmRepository.findById(alarm.getId())).willReturn(Optional.of(alarm));
+
+            AlarmCheckinRequest request = new AlarmCheckinRequest(alarm.getLatitude(), alarm.getLongitude());
+
+            // when & then
+            assertThatThrownBy(() -> alarmCommandService.checkinAlarm(999L, alarm.getId(), request))
+                .isInstanceOf(ApplicationException.class);
+        }
+
+        @Test
+        @DisplayName("실패: 다음 주 알람에는 도착 인증할 수 없다")
+        void fail_nextWeek() {
+            // given
+            MemberEntity member = MemberFixture.MEMBER_12.toMockEntity();
+            DayOfWeek today = LocalDate.now().getDayOfWeek();
+            DayOfWeek previous = today.minus(1);
+            AlarmEntity alarm = AlarmEntity.builder()
+                .id(123L)
+                .alarmPurpose("test")
+                .time(LocalTime.of(7, 0))
+                .repeatDays(List.of(Weekday.from(previous)))
+                .soundType(SoundType.ONE)
+                .latitude(37.0)
+                .longitude(127.0)
+                .address("test")
+                .member(member)
+                .build();
+            given(alarmRepository.findById(alarm.getId())).willReturn(Optional.of(alarm));
+
+            AlarmCheckinRequest request = new AlarmCheckinRequest(alarm.getLatitude(), alarm.getLongitude());
+
+            // when & then
+            assertThatThrownBy(() -> alarmCommandService.checkinAlarm(member.getId(), alarm.getId(), request))
+                .isInstanceOf(ApplicationException.class);
+        }
+
+        @Test
+        @DisplayName("실패: 이미 도착 인증된 알람이면 예외가 발생한다")
+        void fail_alreadyDeactivated() {
+            // given
+            MemberEntity member = MemberFixture.MEMBER_13.toMockEntity();
+            AlarmFixture fixture = AlarmFixture.ALARM_13;
+            AlarmEntity alarm = AlarmEntity.builder()
+                .id(fixture.getId())
+                .alarmPurpose(fixture.getAlarmPurpose())
+                .time(fixture.getTime())
+                .repeatDays(List.of(Weekday.from(LocalDate.now().getDayOfWeek())))
+                .soundType(fixture.getSoundType())
+                .latitude(fixture.getLatitude())
+                .longitude(fixture.getLongitude())
+                .address(fixture.getAddress())
+                .member(member)
+                .build();
+            given(alarmRepository.findById(alarm.getId())).willReturn(Optional.of(alarm));
+            LocalDate today = LocalDate.now();
+            AlarmOccurrenceEntity occurrence = AlarmMapper.mapToAlarmOccurrenceForDate(alarm, today);
+            occurrence.checkin(LocalDateTime.now());
+            given(alarmOccurrenceRepository.findByAlarmIdAndDate(alarm.getId(), today)).willReturn(Optional.of(occurrence));
+
+            AlarmCheckinRequest request = new AlarmCheckinRequest(alarm.getLatitude(), alarm.getLongitude());
+
+            // when & then
+            assertThatThrownBy(() -> alarmCommandService.checkinAlarm(member.getId(), alarm.getId(), request))
+                .isInstanceOf(ApplicationException.class);
+        }
+
+        @Test
+        @DisplayName("실패: 허용 반경 밖에서 도착 인증을 시도하면 예외가 발생한다")
+        void fail_outOfRange() {
+            // given
+            MemberEntity member = MemberFixture.MEMBER_14.toMockEntity();
+            AlarmFixture fixture = AlarmFixture.ALARM_14;
+            AlarmEntity alarm = AlarmEntity.builder()
+                .id(fixture.getId())
+                .alarmPurpose(fixture.getAlarmPurpose())
+                .time(fixture.getTime())
+                .repeatDays(List.of(Weekday.from(LocalDate.now().getDayOfWeek())))
+                .soundType(fixture.getSoundType())
+                .latitude(fixture.getLatitude())
+                .longitude(fixture.getLongitude())
+                .address(fixture.getAddress())
+                .member(member)
+                .build();
+            given(alarmRepository.findById(alarm.getId())).willReturn(Optional.of(alarm));
+            LocalDate today = LocalDate.now();
+            AlarmOccurrenceEntity occurrence = AlarmMapper.mapToAlarmOccurrenceForDate(alarm, today);
+            given(alarmOccurrenceRepository.findByAlarmIdAndDate(alarm.getId(), today)).willReturn(Optional.of(occurrence));
+
+            AlarmCheckinRequest request = new AlarmCheckinRequest(alarm.getLatitude() + 1, alarm.getLongitude() + 1);
+
+            // when & then
+            assertThatThrownBy(() -> alarmCommandService.checkinAlarm(member.getId(), alarm.getId(), request))
                 .isInstanceOf(ApplicationException.class);
         }
     }

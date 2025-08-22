@@ -13,12 +13,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import akuma.whiplash.common.fixture.AlarmFixture;
 import akuma.whiplash.common.fixture.MemberFixture;
+import akuma.whiplash.domains.alarm.application.dto.request.AlarmCheckinRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmRegisterRequest;
 import akuma.whiplash.domains.alarm.application.dto.response.CreateAlarmResponse;
 import akuma.whiplash.domains.alarm.application.usecase.AlarmUseCase;
 import akuma.whiplash.domains.alarm.domain.constant.Weekday;
 import akuma.whiplash.domains.alarm.exception.AlarmErrorCode;
 import akuma.whiplash.domains.auth.application.dto.etc.MemberContext;
+import akuma.whiplash.domains.auth.exception.AuthErrorCode;
 import akuma.whiplash.domains.member.exception.MemberErrorCode;
 import akuma.whiplash.global.config.security.SecurityConfig;
 import akuma.whiplash.global.config.security.jwt.JwtAuthenticationFilter;
@@ -76,7 +78,7 @@ class AlarmControllerTest {
         SecurityContextHolder.setContext(securityContext);
     }
 
-    private MemberContext buildContextFromFixture(MemberFixture fixture) {
+    private MemberContext buildContext(MemberFixture fixture) {
         return MemberContext.builder()
             .memberId(fixture.getId())
             .role(fixture.getRole())
@@ -112,7 +114,7 @@ class AlarmControllerTest {
                 fixture.getRepeatDays().stream().map(Weekday::getDescription).toList(),
                 fixture.getSoundType().getDescription()
             );
-            setSecurityContext(buildContextFromFixture(MEMBER_3));
+            setSecurityContext(buildContext(MEMBER_3));
             CreateAlarmResponse response = CreateAlarmResponse.builder().alarmId(123L).build();
 
             // when
@@ -142,7 +144,7 @@ class AlarmControllerTest {
                 fixture.getRepeatDays().stream().map(Weekday::getDescription).toList(),
                 fixture.getSoundType().getDescription()
             );
-            setSecurityContext(buildContextFromFixture(MEMBER_4));
+            setSecurityContext(buildContext(MEMBER_4));
 
             // when & then
             when(alarmUseCase.createAlarm(any(AlarmRegisterRequest.class), anyLong()))
@@ -164,7 +166,7 @@ class AlarmControllerTest {
         void success() throws Exception {
 
             // given
-            setSecurityContext(buildContextFromFixture(MEMBER_3));
+            setSecurityContext(buildContext(MEMBER_3));
 
             // when
             mockMvc.perform(post("/api/alarms/{alarmId}/ring", 1L))
@@ -179,7 +181,7 @@ class AlarmControllerTest {
         void fail_notAlarmTime() throws Exception {
 
             // given
-            setSecurityContext(buildContextFromFixture(MEMBER_3));
+            setSecurityContext(buildContext(MEMBER_3));
 
             // when
             doThrow(ApplicationException.from(AlarmErrorCode.NOT_ALARM_TIME))
@@ -188,6 +190,113 @@ class AlarmControllerTest {
 
             // then
             mockMvc.perform(post("/api/alarms/{alarmId}/ring", 1L))
+                .andExpect(status().isBadRequest());
+        }
+    }
+
+    @Nested
+    @DisplayName("[POST] /api/alarms/{alarmId}/checkin - 도착 인증")
+    class CheckinTest {
+
+        @Test
+        @DisplayName("성공: 도착 인증 요청이 성공하면 200을 반환한다")
+        void success() throws Exception {
+            // given
+            setSecurityContext(buildContext(MemberFixture.MEMBER_8));
+            AlarmCheckinRequest request = new AlarmCheckinRequest(37.0, 127.0);
+
+            // when & then
+            mockMvc.perform(post("/api/alarms/{alarmId}/checkin", 1L)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk());
+
+            verify(alarmUseCase, times(1))
+                .checkinAlarm(eq(MemberFixture.MEMBER_8.getId()), eq(1L), any(AlarmCheckinRequest.class));
+        }
+
+        @Test
+        @DisplayName("실패: 존재하지 않는 알람이면 404를 반환한다")
+        void fail_alarmNotFound() throws Exception {
+            // given
+            setSecurityContext(buildContext(MemberFixture.MEMBER_9));
+            doThrow(ApplicationException.from(AlarmErrorCode.ALARM_NOT_FOUND))
+                .when(alarmUseCase)
+                .checkinAlarm(anyLong(), anyLong(), any(AlarmCheckinRequest.class));
+            AlarmCheckinRequest request = new AlarmCheckinRequest(37.0, 127.0);
+
+            // when & then
+            mockMvc.perform(post("/api/alarms/{alarmId}/checkin", 1L)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isNotFound());
+        }
+
+        @Test
+        @DisplayName("실패: 다른 사용자의 알람이면 403을 반환한다")
+        void fail_permissionDenied() throws Exception {
+            // given
+            setSecurityContext(buildContext(MemberFixture.MEMBER_10));
+            doThrow(ApplicationException.from(AuthErrorCode.PERMISSION_DENIED))
+                .when(alarmUseCase)
+                .checkinAlarm(anyLong(), anyLong(), any(AlarmCheckinRequest.class));
+            AlarmCheckinRequest request = new AlarmCheckinRequest(37.0, 127.0);
+
+            // when & then
+            mockMvc.perform(post("/api/alarms/{alarmId}/checkin", 1L)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isForbidden());
+        }
+
+        @Test
+        @DisplayName("실패: 이미 도착 인증된 알람이면 400을 반환한다")
+        void fail_alreadyDeactivated() throws Exception {
+            // given
+            setSecurityContext(buildContext(MemberFixture.MEMBER_11));
+            doThrow(ApplicationException.from(AlarmErrorCode.ALREADY_DEACTIVATED))
+                .when(alarmUseCase)
+                .checkinAlarm(anyLong(), anyLong(), any(AlarmCheckinRequest.class));
+            AlarmCheckinRequest request = new AlarmCheckinRequest(37.0, 127.0);
+
+            // when & then
+            mockMvc.perform(post("/api/alarms/{alarmId}/checkin", 1L)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest());
+        }
+
+        @Test
+        @DisplayName("실패: 허용 반경 밖이면 400을 반환한다")
+        void fail_outOfRange() throws Exception {
+            // given
+            setSecurityContext(buildContext(MemberFixture.MEMBER_12));
+            doThrow(ApplicationException.from(AlarmErrorCode.CHECKIN_OUT_OF_RANGE))
+                .when(alarmUseCase)
+                .checkinAlarm(anyLong(), anyLong(), any(AlarmCheckinRequest.class));
+            AlarmCheckinRequest request = new AlarmCheckinRequest(37.0, 127.0);
+
+            // when & then
+            mockMvc.perform(post("/api/alarms/{alarmId}/checkin", 1L)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest());
+        }
+
+        @Test
+        @DisplayName("실패: 다음 주 알람에는 도착 인증할 수 없다")
+        void fail_nextWeek() throws Exception {
+            // given
+            setSecurityContext(buildContext(MemberFixture.MEMBER_13));
+            doThrow(ApplicationException.from(AlarmErrorCode.NEXT_WEEK_ALARM_DEACTIVATION_NOT_ALLOWED))
+                .when(alarmUseCase)
+                .checkinAlarm(anyLong(), anyLong(), any(AlarmCheckinRequest.class));
+            AlarmCheckinRequest request = new AlarmCheckinRequest(37.0, 127.0);
+
+            // when & then
+            mockMvc.perform(post("/api/alarms/{alarmId}/checkin", 1L)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest());
         }
     }
