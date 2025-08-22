@@ -102,7 +102,7 @@ public class JwtUtils {
         response.setContentType(CONTENT_TYPE);
         response.setCharacterEncoding(CHARACTER_ENCODING);
 
-        log.error("errorCode {}, errorMessage {}", error.getCustomCode(), error.getMessage());
+        log.warn("errorCode {}, errorMessage {}", error.getCustomCode(), error.getMessage());
 
         try {
             String json = new ObjectMapper().writeValueAsString(ApplicationResponse.onFailure(error.getCustomCode(), error.getMessage()));
