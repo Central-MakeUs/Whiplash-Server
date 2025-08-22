@@ -14,7 +14,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import akuma.whiplash.common.fixture.AlarmFixture;
 import akuma.whiplash.common.fixture.MemberFixture;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmCheckinRequest;
+import akuma.whiplash.domains.alarm.application.dto.request.AlarmOffRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmRegisterRequest;
+import akuma.whiplash.domains.alarm.application.dto.response.AlarmOffResultResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.CreateAlarmResponse;
 import akuma.whiplash.domains.alarm.application.usecase.AlarmUseCase;
 import akuma.whiplash.domains.alarm.domain.constant.Weekday;
@@ -26,6 +28,8 @@ import akuma.whiplash.global.config.security.SecurityConfig;
 import akuma.whiplash.global.config.security.jwt.JwtAuthenticationFilter;
 import akuma.whiplash.global.exception.ApplicationException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
@@ -64,6 +68,8 @@ class AlarmControllerTest {
     private ObjectMapper objectMapper;
     @MockitoBean
     private AlarmUseCase alarmUseCase;
+
+    private static final String BASE = "/api/alarms";
 
     private void setSecurityContext(MemberContext context) {
         UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
@@ -295,6 +301,146 @@ class AlarmControllerTest {
 
             // when & then
             mockMvc.perform(post("/api/alarms/{alarmId}/checkin", 1L)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest());
+        }
+    }
+
+    @Nested
+    @DisplayName("[POST] /api/alarms/{id}/off - 알람 끄기(OFF)")
+    class AlarmOffTest {
+
+        @Test
+        @DisplayName("성공: 주간 잔여 OFF 횟수를 포함해 200 OK를 반환한다")
+        void success() throws Exception {
+            // given
+            setSecurityContext(buildContext(MEMBER_3));
+            AlarmOffRequest request = new AlarmOffRequest(LocalDateTime.now());
+            AlarmOffResultResponse response = AlarmOffResultResponse.builder()
+                .offTargetDate(LocalDate.now())
+                .offTargetDayOfWeek("월요일")
+                .reactivateDate(LocalDate.now().plusDays(1))
+                .reactivateDayOfWeek("화요일")
+                .remainingOffCount(1)
+                .build();
+            when(alarmUseCase.alarmOff(anyLong(), anyLong(), any(LocalDateTime.class)))
+                .thenReturn(response);
+
+            // when & then
+            mockMvc.perform(post(BASE + "/" + 1L + "/off")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk());
+        }
+
+        @Test
+        @DisplayName("실패: 회원이 없으면 404와 에러 코드를 반환한다")
+        void fail_memberNotFound() throws Exception {
+            // given
+            setSecurityContext(buildContext(MEMBER_4));
+            AlarmOffRequest request = new AlarmOffRequest(LocalDateTime.now());
+            when(alarmUseCase.alarmOff(anyLong(), anyLong(), any(LocalDateTime.class)))
+                .thenThrow(ApplicationException.from(MemberErrorCode.MEMBER_NOT_FOUND));
+
+            // when & then
+            mockMvc.perform(post(BASE + "/" + 1L + "/off")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isNotFound());
+        }
+
+        @Test
+        @DisplayName("실패: 알람이 없으면 404와 에러 코드를 반환한다")
+        void fail_alarmNotFound() throws Exception {
+            // given
+            setSecurityContext(buildContext(MEMBER_5));
+            AlarmOffRequest request = new AlarmOffRequest(LocalDateTime.now());
+            when(alarmUseCase.alarmOff(anyLong(), anyLong(), any(LocalDateTime.class)))
+                .thenThrow(ApplicationException.from(AlarmErrorCode.ALARM_NOT_FOUND));
+
+            // when & then
+            mockMvc.perform(post(BASE + "/" + 1L + "/off")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isNotFound());
+        }
+
+        @Test
+        @DisplayName("실패: 소유자가 아니면 403과 에러 코드를 반환한다")
+        void fail_permissionDenied() throws Exception {
+            // given
+            setSecurityContext(buildContext(MEMBER_6));
+            AlarmOffRequest request = new AlarmOffRequest(LocalDateTime.now());
+            when(alarmUseCase.alarmOff(anyLong(), anyLong(), any(LocalDateTime.class)))
+                .thenThrow(ApplicationException.from(AuthErrorCode.PERMISSION_DENIED));
+
+            // when & then
+            mockMvc.perform(post(BASE + "/" + 1L + "/off")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isForbidden());
+        }
+
+        @Test
+        @DisplayName("실패: 클라이언트 날짜가 서버와 다르면 400과 에러 코드를 반환한다")
+        void fail_invalidClientDate() throws Exception {
+            // given
+            setSecurityContext(buildContext(MEMBER_7));
+            AlarmOffRequest request = new AlarmOffRequest(LocalDateTime.now().minusDays(1));
+            when(alarmUseCase.alarmOff(anyLong(), anyLong(), any(LocalDateTime.class)))
+                .thenThrow(ApplicationException.from(AlarmErrorCode.INVALID_CLIENT_DATE));
+
+            // when & then
+            mockMvc.perform(post(BASE + "/" + 1L + "/off")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest());
+        }
+
+        @Test
+        @DisplayName("실패: 주간 OFF 한도를 초과하면 400과 에러 코드를 반환한다")
+        void fail_weeklyLimitExceeded() throws Exception {
+            // given
+            setSecurityContext(buildContext(MEMBER_8));
+            AlarmOffRequest request = new AlarmOffRequest(LocalDateTime.now());
+            when(alarmUseCase.alarmOff(anyLong(), anyLong(), any(LocalDateTime.class)))
+                .thenThrow(ApplicationException.from(AlarmErrorCode.ALARM_OFF_LIMIT_EXCEEDED));
+
+            // when & then
+            mockMvc.perform(post(BASE + "/" + 1L + "/off")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest());
+        }
+
+        @Test
+        @DisplayName("실패: 이미 끈 알람이면 400과 에러 코드를 반환한다")
+        void fail_alreadyDeactivated() throws Exception {
+            // given
+            setSecurityContext(buildContext(MEMBER_9));
+            AlarmOffRequest request = new AlarmOffRequest(LocalDateTime.now());
+            when(alarmUseCase.alarmOff(anyLong(), anyLong(), any(LocalDateTime.class)))
+                .thenThrow(ApplicationException.from(AlarmErrorCode.ALREADY_DEACTIVATED));
+
+            // when & then
+            mockMvc.perform(post(BASE + "/" + 1L + "/off")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest());
+        }
+
+        @Test
+        @DisplayName("실패: 다음 주 알람은 끌 수 없어 400과 에러 코드를 반환한다")
+        void fail_nextWeekAlarmDeactivationNotAllowed() throws Exception {
+            // given
+            setSecurityContext(buildContext(MEMBER_10));
+            AlarmOffRequest request = new AlarmOffRequest(LocalDateTime.now());
+            when(alarmUseCase.alarmOff(anyLong(), anyLong(), any(LocalDateTime.class)))
+                .thenThrow(ApplicationException.from(AlarmErrorCode.NEXT_WEEK_ALARM_DEACTIVATION_NOT_ALLOWED));
+
+            // when & then
+            mockMvc.perform(post(BASE + "/" + 1L + "/off")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest());

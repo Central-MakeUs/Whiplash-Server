@@ -1,6 +1,7 @@
 package akuma.whiplash.domains.alarm.presentation;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -9,6 +10,7 @@ import akuma.whiplash.common.fixture.AlarmFixture;
 import akuma.whiplash.common.fixture.AlarmOccurrenceFixture;
 import akuma.whiplash.common.fixture.MemberFixture;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmCheckinRequest;
+import akuma.whiplash.domains.alarm.application.dto.request.AlarmOffRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmRegisterRequest;
 import akuma.whiplash.domains.alarm.application.mapper.AlarmMapper;
 import akuma.whiplash.domains.alarm.domain.constant.DeactivateType;
@@ -16,16 +18,20 @@ import akuma.whiplash.domains.alarm.domain.constant.SoundType;
 import akuma.whiplash.domains.alarm.domain.constant.Weekday;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmEntity;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmOccurrenceEntity;
+import akuma.whiplash.domains.alarm.persistence.entity.AlarmOffLogEntity;
 import akuma.whiplash.domains.alarm.persistence.repository.AlarmOccurrenceRepository;
+import akuma.whiplash.domains.alarm.persistence.repository.AlarmOffLogRepository;
 import akuma.whiplash.domains.alarm.persistence.repository.AlarmRepository;
 import akuma.whiplash.domains.member.persistence.entity.MemberEntity;
 import akuma.whiplash.domains.member.persistence.repository.MemberRepository;
 import akuma.whiplash.global.config.security.jwt.JwtProvider;
+import akuma.whiplash.global.util.date.DateUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.Arrays;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -41,18 +47,33 @@ import org.springframework.test.web.servlet.MockMvc;
 @DisplayName("AlarmController Integration Test")
 class AlarmControllerIntegrationTest {
 
-    @Autowired
-    private JwtProvider jwtProvider;
-    @Autowired
-    private MockMvc mockMvc;
-    @Autowired
-    private ObjectMapper objectMapper;
-    @Autowired
-    private MemberRepository memberRepository;
-    @Autowired
-    private AlarmRepository alarmRepository;
-    @Autowired
-    private AlarmOccurrenceRepository alarmOccurrenceRepository;
+    @Autowired private JwtProvider jwtProvider;
+    @Autowired private MockMvc mockMvc;
+    @Autowired private ObjectMapper objectMapper;
+    @Autowired private MemberRepository memberRepository;
+    @Autowired private AlarmRepository alarmRepository;
+    @Autowired private AlarmOffLogRepository alarmOffLogRepository;
+    @Autowired private AlarmOccurrenceRepository alarmOccurrenceRepository;
+
+    private static final String BASE = "/api/alarms";
+
+    private AlarmEntity createAlarm(MemberEntity member, List<Weekday> repeatDays, LocalTime time) {
+        return alarmRepository.save(AlarmEntity.builder()
+            .alarmPurpose("test")
+            .time(time)
+            .repeatDays(repeatDays)
+            .soundType(SoundType.ONE)
+            .latitude(0.0)
+            .longitude(0.0)
+            .address("addr")
+            .member(member)
+            .build());
+    }
+
+    private String authHeader(MemberEntity member) {
+        String token = jwtProvider.generateAccessToken(member.getId(), member.getRole(), "mock_device_id");
+        return "Bearer " + token;
+    }
 
     private AlarmEntity saveAlarmForToday(MemberEntity member) {
         DayOfWeek today = LocalDate.now().getDayOfWeek();
@@ -355,6 +376,146 @@ class AlarmControllerIntegrationTest {
             // when & then
             mockMvc.perform(post("/api/alarms/{alarmId}/checkin", alarm.getId())
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest());
+        }
+    }
+
+    @Nested
+    @DisplayName("[POST] /api/alarms/{id}/off - 알람 끄기(OFF)")
+    class AlarmOffTest {
+
+        @Test
+        @DisplayName("성공: 알람을 끄면 끈 기록이 저장된다")
+        void success() throws Exception {
+            // given
+            MemberEntity member = memberRepository.save(MemberFixture.MEMBER_1.toEntity());
+            AlarmEntity alarm = createAlarm(member, Arrays.asList(Weekday.values()), LocalTime.of(8, 0));
+            AlarmOffRequest request = new AlarmOffRequest(LocalDateTime.now());
+
+            // when
+            mockMvc.perform(post(BASE + "/" + alarm.getId() + "/off")
+                    .header(HttpHeaders.AUTHORIZATION, authHeader(member))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk());
+
+            // then
+            LocalDate today = LocalDate.now();
+            long count = alarmOffLogRepository.countByMemberIdAndCreatedAtBetween(
+                member.getId(),
+                DateUtil.getWeekStartDate(today).atStartOfDay(),
+                DateUtil.getWeekEndDate(today).plusDays(1).atStartOfDay());
+            assertThat(count).isEqualTo(1);
+        }
+
+        @Test
+        @DisplayName("실패: 존재하지 않는 알람이면 404를 반환한다")
+        void fail_alarmNotFound() throws Exception {
+            // given
+            MemberEntity member = memberRepository.save(MemberFixture.MEMBER_2.toEntity());
+            AlarmOffRequest request = new AlarmOffRequest(LocalDateTime.now());
+
+            // when & then
+            mockMvc.perform(post(BASE + "/999/off")
+                    .header(HttpHeaders.AUTHORIZATION, authHeader(member))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isNotFound());
+        }
+
+        @Test
+        @DisplayName("실패: 소유자가 아니면 403을 반환한다")
+        void fail_permissionDenied() throws Exception {
+            // given
+            MemberEntity owner = memberRepository.save(MemberFixture.MEMBER_3.toEntity());
+            MemberEntity other = memberRepository.save(MemberFixture.MEMBER_4.toEntity());
+            AlarmEntity alarm = createAlarm(owner, Arrays.asList(Weekday.values()), LocalTime.of(8, 0));
+            AlarmOffRequest request = new AlarmOffRequest(LocalDateTime.now());
+
+            // when & then
+            mockMvc.perform(post(BASE + "/" + alarm.getId() + "/off")
+                    .header(HttpHeaders.AUTHORIZATION, authHeader(other))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isForbidden());
+        }
+
+        @Test
+        @DisplayName("실패: 클라이언트 날짜가 서버와 다르면 400을 반환한다")
+        void fail_invalidClientDate() throws Exception {
+            // given
+            MemberEntity member = memberRepository.save(MemberFixture.MEMBER_5.toEntity());
+            AlarmEntity alarm = createAlarm(member, Arrays.asList(Weekday.values()), LocalTime.of(8, 0));
+            AlarmOffRequest request = new AlarmOffRequest(LocalDateTime.now().minusDays(1));
+
+            // when & then
+            mockMvc.perform(post(BASE + "/" + alarm.getId() + "/off")
+                    .header(HttpHeaders.AUTHORIZATION, authHeader(member))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest());
+        }
+
+        @Test
+        @DisplayName("실패: 주간 OFF 한도를 초과하면 400을 반환한다")
+        void fail_weeklyLimitExceeded() throws Exception {
+            // given
+            MemberEntity member = memberRepository.save(MemberFixture.MEMBER_6.toEntity());
+            AlarmEntity alarm = createAlarm(member, Arrays.asList(Weekday.values()), LocalTime.of(8, 0));
+            alarmOffLogRepository.save(AlarmOffLogEntity.builder().alarm(alarm).member(member).build());
+            alarmOffLogRepository.save(AlarmOffLogEntity.builder().alarm(alarm).member(member).build());
+            AlarmOffRequest request = new AlarmOffRequest(LocalDateTime.now());
+
+            // when & then
+            mockMvc.perform(post(BASE + "/" + alarm.getId() + "/off")
+                    .header(HttpHeaders.AUTHORIZATION, authHeader(member))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest());
+        }
+
+        @Test
+        @DisplayName("실패: 이미 끈 알람이면 400을 반환한다")
+        void fail_alreadyDeactivated() throws Exception {
+            // given
+            MemberEntity member = memberRepository.save(MemberFixture.MEMBER_7.toEntity());
+            AlarmEntity alarm = createAlarm(member, Arrays.asList(Weekday.values()), LocalTime.of(8, 0));
+            AlarmOccurrenceEntity occurrence = AlarmOccurrenceEntity.builder()
+                .alarm(alarm)
+                .date(LocalDate.now())
+                .time(alarm.getTime())
+                .deactivateType(DeactivateType.OFF)
+                .alarmRinging(false)
+                .ringingCount(0)
+                .reminderSent(false)
+                .build();
+            alarmOccurrenceRepository.save(occurrence);
+            AlarmOffRequest request = new AlarmOffRequest(LocalDateTime.now());
+
+            // when & then
+            mockMvc.perform(post(BASE + "/" + alarm.getId() + "/off")
+                    .header(HttpHeaders.AUTHORIZATION, authHeader(member))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest());
+        }
+
+        @Test
+        @DisplayName("실패: 다음 주 알람은 끌 수 없어 400을 반환한다")
+        void fail_nextWeekAlarm() throws Exception {
+            // given
+            DayOfWeek today = LocalDate.now().getDayOfWeek();
+            assumeTrue(today != DayOfWeek.MONDAY);
+            MemberEntity member = memberRepository.save(MemberFixture.MEMBER_8.toEntity());
+            Weekday repeat = Weekday.from(today.minus(1));
+            AlarmEntity alarm = createAlarm(member, List.of(repeat), LocalTime.of(8, 0));
+            AlarmOffRequest request = new AlarmOffRequest(LocalDateTime.now());
+
+            // when & then
+            mockMvc.perform(post(BASE + "/" + alarm.getId() + "/off")
+                    .header(HttpHeaders.AUTHORIZATION, authHeader(member))
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest());

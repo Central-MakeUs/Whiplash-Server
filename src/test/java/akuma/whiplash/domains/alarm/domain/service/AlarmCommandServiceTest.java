@@ -13,16 +13,20 @@ import akuma.whiplash.common.fixture.AlarmFixture;
 import akuma.whiplash.common.fixture.MemberFixture;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmCheckinRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmRegisterRequest;
+import akuma.whiplash.domains.alarm.application.dto.response.AlarmOffResultResponse;
 import akuma.whiplash.domains.alarm.application.mapper.AlarmMapper;
 import akuma.whiplash.domains.alarm.domain.constant.DeactivateType;
 import akuma.whiplash.domains.alarm.domain.constant.SoundType;
 import akuma.whiplash.domains.alarm.domain.constant.Weekday;
+import akuma.whiplash.domains.alarm.exception.AlarmErrorCode;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmEntity;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmOccurrenceEntity;
+import akuma.whiplash.domains.alarm.persistence.entity.AlarmOffLogEntity;
 import akuma.whiplash.domains.alarm.persistence.repository.AlarmOccurrenceRepository;
 import akuma.whiplash.domains.alarm.persistence.repository.AlarmOffLogRepository;
 import akuma.whiplash.domains.alarm.persistence.repository.AlarmRepository;
 import akuma.whiplash.domains.alarm.persistence.repository.AlarmRingingLogRepository;
+import akuma.whiplash.domains.auth.exception.AuthErrorCode;
 import akuma.whiplash.domains.member.persistence.entity.MemberEntity;
 import akuma.whiplash.domains.member.persistence.repository.MemberRepository;
 import akuma.whiplash.global.exception.ApplicationException;
@@ -39,6 +43,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.MockedStatic;
+import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
@@ -59,10 +65,18 @@ class AlarmCommandServiceTest {
     @InjectMocks
     private AlarmCommandServiceImpl alarmCommandService;
 
-    @BeforeEach
-    void setUp() {
-        alarmCommandService = new AlarmCommandServiceImpl(
-            alarmRepository, alarmOccurrenceRepository, alarmOffLogRepository, alarmRingingLogRepository, memberRepository);
+    private AlarmEntity createAlarm(MemberEntity member, List<Weekday> repeatDays, LocalTime time) {
+        return AlarmEntity.builder()
+            .id(1L)
+            .alarmPurpose("test")
+            .time(time)
+            .repeatDays(repeatDays)
+            .soundType(SoundType.ONE)
+            .latitude(0.0)
+            .longitude(0.0)
+            .address("addr")
+            .member(member)
+            .build();
     }
 
     @Nested
@@ -273,6 +287,168 @@ class AlarmCommandServiceTest {
             // when & then
             assertThatThrownBy(() -> alarmCommandService.checkinAlarm(member.getId(), alarm.getId(), request))
                 .isInstanceOf(ApplicationException.class);
+        }
+    }
+
+    @Nested
+    @DisplayName("alarmOff - 알람 끄기(OFF)")
+    class AlarmOffTest {
+
+        @Test
+        @DisplayName("성공: 주간 OFF 한도 내에서 알람을 끈다")
+        void success() {
+            // given
+            MemberEntity member = MemberEntity.builder().id(1L).build();
+            LocalDateTime now = LocalDateTime.of(2024, 8, 27, 8, 0);
+            AlarmEntity alarm = createAlarm(member,
+                List.of(Weekday.from(DayOfWeek.TUESDAY)), LocalTime.of(8, 0));
+
+            try (MockedStatic<LocalDateTime> mocked = Mockito.mockStatic(LocalDateTime.class, Mockito.CALLS_REAL_METHODS)) {
+                mocked.when(LocalDateTime::now).thenReturn(now);
+                given(alarmRepository.findById(1L)).willReturn(Optional.of(alarm));
+                given(alarmOffLogRepository.countByMemberIdAndCreatedAtBetween(anyLong(), any(), any()))
+                    .willReturn(0L);
+                given(alarmOccurrenceRepository.findByAlarmIdAndDate(anyLong(), any()))
+                    .willReturn(Optional.empty());
+                given(alarmOccurrenceRepository.save(any(AlarmOccurrenceEntity.class)))
+                    .willAnswer(invocation -> invocation.getArgument(0));
+                given(alarmOffLogRepository.save(any(AlarmOffLogEntity.class)))
+                    .willAnswer(invocation -> invocation.getArgument(0));
+
+                // when
+                AlarmOffResultResponse response = alarmCommandService.alarmOff(1L, 1L, now);
+
+                // then
+                assertThat(response.remainingOffCount()).isEqualTo(1);
+                verify(alarmOffLogRepository).save(any(AlarmOffLogEntity.class));
+            }
+        }
+
+        @Test
+        @DisplayName("실패: 알람이 존재하지 않으면 예외를 던진다")
+        void fail_alarmNotFound() {
+            // given
+            LocalDateTime now = LocalDateTime.of(2024, 8, 27, 8, 0);
+            try (MockedStatic<LocalDateTime> mocked = Mockito.mockStatic(LocalDateTime.class, Mockito.CALLS_REAL_METHODS)) {
+                mocked.when(LocalDateTime::now).thenReturn(now);
+                given(alarmRepository.findById(1L)).willReturn(Optional.empty());
+
+                // when & then
+                assertThatThrownBy(() -> alarmCommandService.alarmOff(1L, 1L, now))
+                    .isInstanceOf(ApplicationException.class)
+                    .hasMessageContaining(AlarmErrorCode.ALARM_NOT_FOUND.getMessage());
+            }
+        }
+
+        @Test
+        @DisplayName("실패: 소유자가 아닌 사용자가 요청하면 예외를 던진다")
+        void fail_invalidOwner() {
+            // given
+            MemberEntity owner = MemberEntity.builder().id(2L).build();
+            LocalDateTime now = LocalDateTime.of(2024, 8, 27, 8, 0);
+            AlarmEntity alarm = createAlarm(owner,
+                List.of(Weekday.from(DayOfWeek.TUESDAY)), LocalTime.of(8, 0));
+
+            try (MockedStatic<LocalDateTime> mocked = Mockito.mockStatic(LocalDateTime.class, Mockito.CALLS_REAL_METHODS)) {
+                mocked.when(LocalDateTime::now).thenReturn(now);
+                given(alarmRepository.findById(1L)).willReturn(Optional.of(alarm));
+
+                // when & then
+                assertThatThrownBy(() -> alarmCommandService.alarmOff(1L, 1L, now))
+                    .isInstanceOf(ApplicationException.class)
+                    .hasMessageContaining(AuthErrorCode.PERMISSION_DENIED.getMessage());
+            }
+        }
+
+        @Test
+        @DisplayName("실패: 클라이언트 날짜가 서버와 다르면 예외를 던진다")
+        void fail_invalidClientDate() {
+            // given
+            LocalDateTime serverNow = LocalDateTime.of(2024, 8, 27, 8, 0);
+            LocalDateTime clientNow = serverNow.minusDays(1);
+            try (MockedStatic<LocalDateTime> mocked = Mockito.mockStatic(LocalDateTime.class, Mockito.CALLS_REAL_METHODS)) {
+                mocked.when(LocalDateTime::now).thenReturn(serverNow);
+
+                // when & then
+                assertThatThrownBy(() -> alarmCommandService.alarmOff(1L, 1L, clientNow))
+                    .isInstanceOf(ApplicationException.class)
+                    .hasMessageContaining(AlarmErrorCode.INVALID_CLIENT_DATE.getMessage());
+            }
+        }
+
+        @Test
+        @DisplayName("실패: 주간 OFF 한도를 초과하면 예외를 던진다")
+        void fail_weeklyLimitExceeded() {
+            // given
+            MemberEntity member = MemberEntity.builder().id(1L).build();
+            LocalDateTime now = LocalDateTime.of(2024, 8, 27, 8, 0);
+            AlarmEntity alarm = createAlarm(member,
+                List.of(Weekday.from(DayOfWeek.TUESDAY)), LocalTime.of(8, 0));
+
+            try (MockedStatic<LocalDateTime> mocked = Mockito.mockStatic(LocalDateTime.class, Mockito.CALLS_REAL_METHODS)) {
+                mocked.when(LocalDateTime::now).thenReturn(now);
+                given(alarmRepository.findById(1L)).willReturn(Optional.of(alarm));
+                given(alarmOffLogRepository.countByMemberIdAndCreatedAtBetween(anyLong(), any(), any()))
+                    .willReturn(2L);
+
+                // when & then
+                assertThatThrownBy(() -> alarmCommandService.alarmOff(1L, 1L, now))
+                    .isInstanceOf(ApplicationException.class)
+                    .hasMessageContaining(AlarmErrorCode.ALARM_OFF_LIMIT_EXCEEDED.getMessage());
+            }
+        }
+
+        @Test
+        @DisplayName("실패: 이미 끈 알람이면 예외를 던진다")
+        void fail_alreadyDeactivated() {
+            // given
+            MemberEntity member = MemberEntity.builder().id(1L).build();
+            LocalDateTime now = LocalDateTime.of(2024, 8, 27, 8, 0);
+            AlarmEntity alarm = createAlarm(member,
+                List.of(Weekday.from(DayOfWeek.TUESDAY)), LocalTime.of(8, 0));
+            AlarmOccurrenceEntity occurrence = AlarmOccurrenceEntity.builder()
+                .alarm(alarm)
+                .date(LocalDate.of(2024, 8, 27))
+                .time(alarm.getTime())
+                .deactivateType(DeactivateType.OFF)
+                .alarmRinging(false)
+                .ringingCount(0)
+                .reminderSent(false)
+                .build();
+
+            try (MockedStatic<LocalDateTime> mocked = Mockito.mockStatic(LocalDateTime.class, Mockito.CALLS_REAL_METHODS)) {
+                mocked.when(LocalDateTime::now).thenReturn(now);
+                given(alarmRepository.findById(1L)).willReturn(Optional.of(alarm));
+                given(alarmOffLogRepository.countByMemberIdAndCreatedAtBetween(anyLong(), any(), any()))
+                    .willReturn(0L);
+                given(alarmOccurrenceRepository.findByAlarmIdAndDate(anyLong(), any()))
+                    .willReturn(Optional.of(occurrence));
+
+                // when & then
+                assertThatThrownBy(() -> alarmCommandService.alarmOff(1L, 1L, now))
+                    .isInstanceOf(ApplicationException.class)
+                    .hasMessageContaining(AlarmErrorCode.ALREADY_DEACTIVATED.getMessage());
+            }
+        }
+
+        @Test
+        @DisplayName("실패: 다음 주 알람은 끌 수 없어 예외를 던진다")
+        void fail_nextWeekAlarm() {
+            // given
+            MemberEntity member = MemberEntity.builder().id(1L).build();
+            LocalDateTime now = LocalDateTime.of(2024, 8, 27, 8, 0);
+            AlarmEntity alarm = createAlarm(member,
+                List.of(Weekday.from(DayOfWeek.MONDAY)), LocalTime.of(8, 0));
+
+            try (MockedStatic<LocalDateTime> mocked = Mockito.mockStatic(LocalDateTime.class, Mockito.CALLS_REAL_METHODS)) {
+                mocked.when(LocalDateTime::now).thenReturn(now);
+                given(alarmRepository.findById(1L)).willReturn(Optional.of(alarm));
+
+                // when & then
+                assertThatThrownBy(() -> alarmCommandService.alarmOff(1L, 1L, now))
+                    .isInstanceOf(ApplicationException.class)
+                    .hasMessageContaining(AlarmErrorCode.NEXT_WEEK_ALARM_DEACTIVATION_NOT_ALLOWED.getMessage());
+            }
         }
     }
 
