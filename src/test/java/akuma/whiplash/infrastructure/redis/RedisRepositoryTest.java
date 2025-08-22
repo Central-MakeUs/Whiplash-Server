@@ -46,16 +46,28 @@ class RedisRepositoryTest {
     class GetValuesTest {
 
         @Test
-        @DisplayName("실패: 존재하지 않는 키를 조회하면 빈 Optional을 반환한다")
-        void fail_keyNotFound() {
+        @DisplayName("성공: 저장된 리프레시 토큰이 반환된다")
+        void success() {
             // given
-            String key = "REFRESH:999:unknown";
+            String key = "REFRESH:1:device";
+            String token = "testToken";
+            redisRepository.setValues(key, token, Duration.ofMinutes(5));
 
             // when
-            Optional<String> value = redisRepository.getValues(key);
+            Optional<String> result = redisRepository.getValues(key);
 
             // then
-            assertThat(value).isEmpty();
+            assertThat(result).contains(token);
+        }
+
+        @Test
+        @DisplayName("실패: 존재하지 않는 키는 빈 값을 반환한다")
+        void fail_tokenNotFound() {
+            // when
+            Optional<String> result = redisRepository.getValues("REFRESH:999:device");
+
+            // then
+            assertThat(result).isEmpty();
         }
     }
 }
