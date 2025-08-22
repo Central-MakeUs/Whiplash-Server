@@ -33,7 +33,7 @@ public class AlarmReminderScheduler {
     @Scheduled(cron = "0 * * * * *")
     @NoMethodLog
     public void sendPreAlarmNotifications() {
-        log.info("[AlarmReminderScheduler.sendPreAlarmNotifications] 알람 울리기 1시간 전 푸시 알림 전송 스케줄러 시작");
+        log.info("알람 울리기 1시간 전 푸시 알림 전송 스케줄러 시작");
         try {
             // 0. 시간 기준 (분 단위 정렬)
             LocalDateTime now = LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES);
@@ -80,7 +80,7 @@ public class AlarmReminderScheduler {
             }
 
         } finally {
-            log.info("[AlarmReminderScheduler.sendPreAlarmNotifications] 알람 울리기 1시간 전 푸시 알림 전송 스케줄러 종료");
+            log.info("알람 울리기 1시간 전 푸시 알림 전송 스케줄러 종료");
         }
     }
 
