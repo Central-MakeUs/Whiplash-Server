@@ -83,8 +83,8 @@ jobs:
 
             echo ${{ secrets.DOCKERHUB_TOKEN }} | docker login --username ${{ secrets.DOCKERHUB_USERNAME }} --password-stdin
             
-            docker stop noonddu-was || true
-            docker rm noonddu-was || true
+            docker stop nuntteo-was || true
+            docker rm nuntteo-was || true
 
             docker pull $IMAGE
 
