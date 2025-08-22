@@ -8,7 +8,9 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.times;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import akuma.whiplash.common.fixture.AlarmFixture;
@@ -17,6 +19,7 @@ import akuma.whiplash.domains.alarm.application.dto.request.AlarmCheckinRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmOffRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmRegisterRequest;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmOffResultResponse;
+import akuma.whiplash.domains.alarm.application.dto.response.AlarmRemainingOffCountResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.CreateAlarmResponse;
 import akuma.whiplash.domains.alarm.application.usecase.AlarmUseCase;
 import akuma.whiplash.domains.alarm.domain.constant.Weekday;
@@ -47,6 +50,7 @@ import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.ResultActions;
 
 
 @WebMvcTest(
@@ -444,6 +448,46 @@ class AlarmControllerTest {
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest());
+        }
+    }
+
+    @Nested
+    @DisplayName("[GET] /api/alarms/off-count - 남은 알람 끄기 횟수 조회")
+    class GetWeeklyRemainingOffCountTest {
+
+        @Test
+        @DisplayName("성공: 남은 알람 끄기 횟수를 포함해 200 OK를 반환한다")
+        void success() throws Exception {
+            // given
+            setSecurityContext(buildContext(MEMBER_3));
+            AlarmRemainingOffCountResponse response = AlarmRemainingOffCountResponse.builder()
+                .remainingOffCount(1)
+                .build();
+            when(alarmUseCase.getWeeklyRemainingOffCount(anyLong())).thenReturn(response);
+
+            // when
+            ResultActions result = mockMvc.perform(get("/api/alarms/off-count"));
+
+            // then
+            result.andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.remainingOffCount").value(1));
+
+            verify(alarmUseCase, times(1)).getWeeklyRemainingOffCount(MEMBER_3.getId());
+        }
+
+        @Test
+        @DisplayName("실패: 회원이 없으면 404와 에러 코드를 반환한다")
+        void fail_memberNotFound() throws Exception {
+            // given
+            setSecurityContext(buildContext(MEMBER_4));
+            when(alarmUseCase.getWeeklyRemainingOffCount(anyLong()))
+                .thenThrow(ApplicationException.from(MemberErrorCode.MEMBER_NOT_FOUND));
+
+            // when
+            ResultActions result = mockMvc.perform(get("/api/alarms/off-count"));
+
+            // then
+            result.andExpect(status().isNotFound());
         }
     }
 }

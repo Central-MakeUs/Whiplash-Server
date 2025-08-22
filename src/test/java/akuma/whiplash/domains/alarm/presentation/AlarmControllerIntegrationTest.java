@@ -2,7 +2,9 @@ package akuma.whiplash.domains.alarm.presentation;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import akuma.whiplash.common.config.IntegrationTest;
@@ -41,6 +43,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.ResultActions;
 
 @IntegrationTest
 @AutoConfigureMockMvc
@@ -520,5 +523,48 @@ class AlarmControllerIntegrationTest {
                     .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest());
         }
+    }
+
+    @Nested
+    @DisplayName("[GET] /api/alarms/off-count - 남은 알람 끄기 횟수 조회")
+    class GetWeeklyRemainingOffCountTest {
+
+        @Test
+        @DisplayName("성공: 200 OK와 남은 알람 끄기 횟수를 반환한다")
+        void success() throws Exception {
+            // given
+            MemberEntity member = memberRepository.save(MemberFixture.MEMBER_1.toEntity());
+            AlarmEntity alarm = alarmRepository.save(AlarmFixture.ALARM_01.toEntity(member));
+            alarmOffLogRepository.save(
+                AlarmOffLogEntity.builder().alarm(alarm).member(member).build()
+            );
+            String accessToken = jwtProvider.generateAccessToken(member.getId(), member.getRole(), "device");
+
+            // when
+            ResultActions result = mockMvc.perform(
+                get("/api/alarms/off-count")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+            );
+
+            // then
+            result.andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.remainingOffCount").value(1));
+        }
+
+/*        @Test
+        @DisplayName("실패: 회원이 없으면 404와 에러 코드를 반환한다")
+        void fail_memberNotFound() throws Exception {
+            // given
+            String accessToken = jwtProvider.generateAccessToken(999L, MemberFixture.MEMBER_1.getRole(), "device");
+
+            // when
+            ResultActions result = mockMvc.perform(
+                get("/api/alarms/off-count")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+            );
+
+            // then
+            result.andExpect(status().isNotFound());
+        }*/
     }
 }
