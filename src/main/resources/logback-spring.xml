@@ -69,16 +69,15 @@
     <appender-ref ref="ASYNC_APP_FILE"/>
   </logger>
 
-  <!-- [KEEP/OPT] Sentry Appender -->
-  <appender name="SENTRY" class="io.sentry.logback.SentryAppender">
-    <!-- [OPT] DSN이 application.yml에 없다면 환경변수로 주입 가능
-         <dsn>${SENTRY_DSN}</dsn>
-    -->
-    <!-- ERROR 레벨 이상의 로그만 Sentry로 전송 -->
-    <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
-      <level>ERROR</level>
-    </filter>
-  </appender>
+  <!-- dev, prod 프로필에서만 Sentry Appender 활성화 -->
+  <springProfile name="dev,prod">
+    <appender name="SENTRY" class="io.sentry.logback.SentryAppender">
+      <!-- ERROR 레벨 이상의 로그만 Sentry로 전송 -->
+      <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
+        <level>ERROR</level>
+      </filter>
+    </appender>
+  </springProfile>
 
   <!-- root 로거: 파일/에러/Sentry 모두 연결 -->
   <root level="${LOG_LEVEL}">
