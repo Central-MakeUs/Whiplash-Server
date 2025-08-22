@@ -31,7 +31,12 @@ public class MethodLoggingAspect {
     private final ObjectMapper objectMapper;
 
     // Controller, Service 메서드 실행 전후 로깅
-    @Around("within(@org.springframework.web.bind.annotation.RestController *) || within(@org.springframework.stereotype.Service *)")
+    @Around(
+      "within(@org.springframework.web.bind.annotation.RestController *) || " +
+      "within(@org.springframework.stereotype.Service *) || " +
+      "@annotation(akuma.whiplash.global.log.NoMethodLog) || " +
+      "@within(akuma.whiplash.global.log.NoMethodLog)"
+    )
     public Object logAroundMethodExecution(ProceedingJoinPoint joinPoint) throws Throwable {
         boolean noLog = hasNoMethodLog(joinPoint);
         boolean previousSuppressed = MethodLogSuppressor.isSuppressed();
