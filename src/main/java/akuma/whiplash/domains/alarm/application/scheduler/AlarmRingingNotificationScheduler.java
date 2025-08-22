@@ -21,7 +21,7 @@ public class AlarmRingingNotificationScheduler {
     private final FcmService fcmService;
 
     // 10초 간격으로 실행
-    @Scheduled(fixedRate = 10000, zone = "Asia/Seoul)
+    @Scheduled(fixedRate = 10000, zone = "Asia/Seoul")
     public void sendRingingAlarmNotifications() {
         log.info("[AlarmRingingNotificationScheduler.sendRingingAlarmNotifications] 알람 울림 푸시 알림 전송 스케줄러 시작");
         try {
