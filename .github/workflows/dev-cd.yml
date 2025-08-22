@@ -62,7 +62,7 @@ jobs:
       # 9. Docker 이미지 빌드 및 푸시 (SHA 태그만)
       - name: Build and push Docker image
         env:
-          IMAGE_NAME: ${{ secrets.DOCKERHUB_USERNAME }}/noonddu-was
+          IMAGE_NAME: ${{ secrets.DOCKERHUB_USERNAME }}/nuntteo-was
         run: |
           TAG=${{ steps.vars.outputs.sha }}
           echo "Building image with tag: $TAG"
@@ -77,22 +77,29 @@ jobs:
           username: ${{ secrets.EC2_USERNAME }}
           key: ${{ secrets.EC2_PRIVATE_KEY }}
           script: |
-            IMAGE=${{ secrets.DOCKERHUB_USERNAME }}/noonddu-was:${{ steps.vars.outputs.sha }}
+            IMAGE=${{ secrets.DOCKERHUB_USERNAME }}/nuntteo-was:${{ steps.vars.outputs.sha }}
 
             echo "Deploying image: $IMAGE"
 
             echo ${{ secrets.DOCKERHUB_TOKEN }} | docker login --username ${{ secrets.DOCKERHUB_USERNAME }} --password-stdin
 
+            # 호스트 로그 디렉터리 준비 (권한 이슈 있으면 sudo 사용)
+            mkdir -p /var/log/nuntteo-was || true
+            
             docker stop noonddu-was || true
             docker rm noonddu-was || true
 
             docker pull $IMAGE
 
             docker run -d \
-              --name noonddu-was \
+              --name nuntteo-was \
               -p 8080:8080 \
               --restart unless-stopped \
               -e TZ=Asia/Seoul \
+              -v /var/log/nuntteo-was:/app/logs \
+              --log-driver json-file \
+              --log-opt max-size=10m \
+              --log-opt max-file=3 \
               $IMAGE
 
             docker image prune -af
