@@ -138,7 +138,7 @@ public class FcmService {
             String deeplink = UriComponentsBuilder.newInstance()
                 .scheme("nuntteo")
                 .host("alarm")
-                .path("/ringing/view")
+                .path("/ringing")
                 .queryParam("alarmId", alarmId)
                 .build()
                 .toUriString();
