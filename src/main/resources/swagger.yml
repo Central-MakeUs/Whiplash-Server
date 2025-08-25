@@ -11,6 +11,7 @@ springdoc:
   show-actuator: true
   api-docs:
     path: /api/nuntteo/v3/api-docs
+  paths-to-exclude: /actuator/**
 
 swagger.server.url: ${SWAGGER_SERVER_URL}
 
