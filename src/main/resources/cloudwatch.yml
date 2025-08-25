@@ -11,11 +11,12 @@ management:
         http.server.requests: true
       percentiles:
         http.server.requests: 0.5,0.95
-
-  metrics.export.cloudwatch:
-    enabled: true
-    namespace: Nuntteo/Dev
-    step: 5m          # 프리티어 안전(5분)
+    export:
+      cloudwatch:
+        region: ap-northeast-2
+        enabled: true
+        namespace: Nuntteo/Dev
+        step: 5m          # 프리티어 안전(5분)
     # 선택 옵션(필요 시)
     # batchSize: 20
     # numThreads: 2
@@ -25,3 +26,5 @@ management:
 logging:
   level:
     io.micrometer.cloudwatch2: DEBUG
+    software.amazon.awssdk.auth.credentials: DEBUG
+    software.amazon.awssdk.regions.providers: DEBUG
