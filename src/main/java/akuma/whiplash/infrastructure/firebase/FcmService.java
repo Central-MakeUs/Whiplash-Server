@@ -27,6 +27,7 @@ import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.web.util.UriComponentsBuilder;
 
 @Slf4j
 @Service
@@ -76,10 +77,16 @@ public class FcmService {
             String body = entry.getKey();
             List<PushTargetDto> group = dedupByToken(entry.getValue(), PushTargetDto::token);
 
+            String deeplink = UriComponentsBuilder.newInstance()
+                .scheme("nuntteo")
+                .host("main")
+                .build()
+                .toUriString();
+
             Map<String, String> data = Map.of(
                 "title", DEFAULT_TITLE,
                 "body", body,
-                "route", "MAIN_VIEW"
+                "deeplink", deeplink
             );
 
             for (List<PushTargetDto> batch : partition(group, FCM_MULTICAST_LIMIT)) {
@@ -128,11 +135,18 @@ public class FcmService {
             Long alarmId = entry.getKey();
             List<RingingPushTargetDto> group = dedupByToken(entry.getValue(), RingingPushTargetDto::token);
 
+            String deeplink = UriComponentsBuilder.newInstance()
+                .scheme("nuntteo")
+                .host("alarm")
+                .path("/ringing/view")
+                .queryParam("alarmId", alarmId)
+                .build()
+                .toUriString();
+
             Map<String, String> data = Map.of(
                 "title", DEFAULT_TITLE,
                 "body", RINGING_BODY,
-                "route", "ALARM_RINGING_VIEW",
-                "alarm_id", alarmId.toString()
+                "deeplink", deeplink
             );
 
             for (List<RingingPushTargetDto> batch : partition(group, FCM_MULTICAST_LIMIT)) {
