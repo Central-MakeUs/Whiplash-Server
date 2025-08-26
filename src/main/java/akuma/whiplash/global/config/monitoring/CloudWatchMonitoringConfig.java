@@ -7,7 +7,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.cloudwatch.CloudWatchAsyncClient;
-import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;
+import software.amazon.awssdk.auth.credentials.InstanceProfileCredentialsProvider;
 
 import java.time.Duration;
 import java.util.Properties;
@@ -19,7 +19,7 @@ public class CloudWatchMonitoringConfig {
     public CloudWatchAsyncClient cloudWatchAsyncClient() {
         return CloudWatchAsyncClient.builder()
             .region(Region.AP_NORTHEAST_2)
-            .credentialsProvider(DefaultCredentialsProvider.create()) 
+            .credentialsProvider(InstanceProfileCredentialsProvider.create()) // IMDS 직접 사용 
             .build();
     }
 
