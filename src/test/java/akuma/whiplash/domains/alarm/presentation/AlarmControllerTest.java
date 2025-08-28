@@ -1,6 +1,7 @@
 package akuma.whiplash.domains.alarm.presentation;
 
 import static akuma.whiplash.common.fixture.MemberFixture.*;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -37,11 +38,13 @@ import akuma.whiplash.global.exception.ApplicationException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -141,6 +144,39 @@ class AlarmControllerTest {
 
             // then
             verify(alarmUseCase, times(1)).createAlarm(any(AlarmRegisterRequest.class), eq(MEMBER_3.getId()));
+        }
+
+        @Test
+        @DisplayName("성공: 24시 형식의 시간을 보내면 0시로 변환되어 알람이 등록된다")
+        void success_parse24HourTime() throws Exception {
+
+            // given
+            setSecurityContext(buildContext(MEMBER_3));
+            String json = """
+                {
+                  \"address\": \"서울시 중구 퇴계로 24\",
+                  \"latitude\": 37.564213,
+                  \"longitude\": 127.001698,
+                  \"alarmPurpose\": \"도서관 정기 출석 알람\",
+                  \"time\": \"24:30\",
+                  \"repeatDays\": [\"월\"],
+                  \"soundType\": \"알람 소리1\"
+                }
+                """;
+            CreateAlarmResponse response = CreateAlarmResponse.builder().alarmId(1L).build();
+
+            // when
+            when(alarmUseCase.createAlarm(any(AlarmRegisterRequest.class), anyLong())).thenReturn(response);
+
+            mockMvc.perform(post("/api/alarms")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(json))
+                .andExpect(status().isOk());
+
+            // then
+            ArgumentCaptor<AlarmRegisterRequest> captor = ArgumentCaptor.forClass(AlarmRegisterRequest.class);
+            verify(alarmUseCase, times(1)).createAlarm(captor.capture(), eq(MEMBER_3.getId()));
+            assertThat(captor.getValue().time()).isEqualTo(LocalTime.of(0, 30));
         }
 
         @Test
