@@ -5,14 +5,19 @@ import static akuma.whiplash.domains.alarm.exception.AlarmErrorCode.REPEAT_DAYS_
 import akuma.whiplash.domains.alarm.domain.constant.Weekday;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmEntity;
 import akuma.whiplash.global.exception.ApplicationException;
+import akuma.whiplash.global.response.code.CommonErrorCode;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.format.DateTimeParseException;
 import java.time.temporal.WeekFields;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 public class DateUtil {
 
     private DateUtil() {
@@ -52,6 +57,36 @@ public class DateUtil {
      */
     public static boolean isSameDay(LocalDateTime dateTime1, LocalDateTime dateTime2) {
         return dateTime1.toLocalDate().isEqual(dateTime2.toLocalDate());
+    }
+
+    /**
+     * 문자열을 {@link LocalTime}으로 변환합니다.
+     * 24시 형태("24:00", "24:30")는 다음 날 0시 형태("00:00", "00:30")로 변환하여 파싱합니다.
+     *
+     * @param timeString 시각 문자열
+     * @return 파싱된 {@link LocalTime}
+     * @throws DateTimeParseException 잘못된 형식의 문자열인 경우
+     */
+    public static LocalTime parseLocalTimeWith24HourSupport(String timeString) {
+        String normalized = "";
+
+        try {
+            if (timeString == null) {
+                log.warn("timeString must not be null");
+                throw ApplicationException.from(CommonErrorCode.BAD_REQUEST);
+            }
+
+            normalized = timeString;
+            if (normalized.startsWith("24:")) {
+                normalized = "00" + normalized.substring(2);
+            }
+
+        } catch (DateTimeParseException e) {
+            log.warn(e.getMessage());
+            ApplicationException.from(CommonErrorCode.BAD_REQUEST);
+        }
+
+        return LocalTime.parse(normalized);
     }
 
     public static String getKoreanDayOfWeek(LocalDate date) {

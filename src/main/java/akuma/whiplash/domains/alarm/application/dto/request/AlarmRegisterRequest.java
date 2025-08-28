@@ -1,5 +1,7 @@
 package akuma.whiplash.domains.alarm.application.dto.request;
 
+import akuma.whiplash.global.util.date.LocalTime24HourDeserializer;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
@@ -34,6 +36,7 @@ public record AlarmRegisterRequest(
 
     @Schema(description = "알람 시간", example = "08:30")
     @NotNull(message = "알람 시간을 선택해주세요.")
+    @JsonDeserialize(using = LocalTime24HourDeserializer.class)
     LocalTime time,
 
     // TODO: 월~일 요일 검증 필요
