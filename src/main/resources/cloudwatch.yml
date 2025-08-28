@@ -1,30 +1,29 @@
 management:
   endpoints:
-    web.exposure.include: health,metrics   # (선택)
-  endpoint.health.show-details: never      # 필요 시 always
+    web:
+      exposure:
+        include: health, metrics
+  endpoint:
+    health:
+      show-details: never
 
   metrics:
-    tags:
+    # 모든 메트릭에 공통 태그를 적용
+    common-tags:
       application: nuntteo-api
     distribution:
-      percentiles-histogram:
-        http.server.requests: true
-      percentiles:
-        http.server.requests: 0.5,0.95
-    export:
-      cloudwatch:
-        region: ap-northeast-2
-        enabled: true
-        namespace: Nuntteo/Dev
-        step: 5m          # 프리티어 안전(5분)
-    # 선택 옵션(필요 시)
-    # batchSize: 20
-    # numThreads: 2
-    # connect-timeout: 1s
-    # read-timeout: 10s
+      # 'http.server.requests' 메트릭에 대해 p50, p95 값을 계산하여 'phi' 태그를 생성
+      percentiles[http.server.requests]: 0.5, 0.95
 
+  cloudwatch:
+    metrics:
+      # 메트릭을 전송할 CloudWatch 네임스페이스
+      namespace: Nuntteo/Dev
+      # 데이터 전송 주기
+      step: 5m
+
+# (선택) 디버깅을 위한 로깅 설정
 logging:
   level:
     io.micrometer.cloudwatch2: DEBUG
-    software.amazon.awssdk.auth.credentials: DEBUG
-    software.amazon.awssdk.regions.providers: DEBUG
+    software.amazon.awssdk: DEBUG
