@@ -14,7 +14,20 @@ management:
     distribution:
       # 'http.server.requests' 메트릭에 대해 p50, p95 값을 계산하여 'phi' 태그를 생성
       percentiles[http.server.requests]: 0.5, 0.95
-
+    meter-filter:
+      - deny: # status 태그(200, 401, 500 등)를 제거
+          meter-name: http.server.requests
+          tag-name: status
+      - deny: # method 태그(GET, POST 등)를 제거 URI별 집계 시 불필요
+          meter-name: http.server.requests
+          tag-name: method
+      - deny: # exception 태그를 제거
+          meter-name: http.server.requests
+          tag-name: exception
+      - deny: # error 태그를 제거
+          meter-name: http.server.requests
+          tag-name: error
+          
   cloudwatch:
     metrics:
       # 메트릭을 전송할 CloudWatch 네임스페이스
