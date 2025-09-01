@@ -1,4 +1,4 @@
-# 눈 떠! - Nuntteo <img width="100" height="100" align="left" alt="눈 떠! 로고" src="https://github.com/user-attachments/assets/cd4ff61c-2f86-4ab1-8621-6d80d9ea50c6" />
+# 눈 떠! <img width="100" height="100" align="left" alt="눈 떠! 로고" src="https://github.com/user-attachments/assets/cd4ff61c-2f86-4ab1-8621-6d80d9ea50c6" />
 [![App Store](https://img.shields.io/badge/App%20Store-Download-blue?logo=apple&logoColor=white)](https://apps.apple.com/kr/app/눈-떠-목표-장소-도착-인증-강제-알람/id6749834236)
 [![Google Play](https://img.shields.io/badge/Google%20Play-Download-green?logo=googleplay&logoColor=white)](https://play.google.com/store/apps/details?id=com.whiplash.akuma&hl=ko)
 
@@ -19,7 +19,7 @@
 | **Frameworks**    | ![Spring](https://img.shields.io/badge/Spring-6DB33F?style=flat&logo=spring&logoColor=white) ![Spring Security](https://img.shields.io/badge/Spring%20Security-6DB33F?style=flat&logo=springsecurity&logoColor=white) |
 | **Language**      | ![Java](https://img.shields.io/badge/Java%2017-007396?style=flat&logo=openjdk&logoColor=white) |
 | **Persistence**   | ![Spring Data JPA](https://img.shields.io/badge/Spring%20Data%20JPA-007396?style=flat&logo=hibernate&logoColor=white) |
-| **Database**      | ![MySQL](https://img.shields.io/badge/MySQL-4479A1?style=flat&logo=mysql&logoColor=white) |
+| **Database**      | ![MySQL](https://img.shields.io/badge/MySQL-4479A1?style=flat&logo=mysql&logoColor=white) ![Redis](https://img.shields.io/badge/Redis-DC382D?style=flat&logo=redis&logoColor=white) |
 | **Cloud (AWS)**   | ![EC2](https://img.shields.io/badge/EC2-FF9900?style=flat&logo=amazon-ec2&logoColor=white) ![RDS](https://img.shields.io/badge/RDS-527FFF?style=flat&logo=amazon-rds&logoColor=white) ![Lambda](https://img.shields.io/badge/Lambda-FF9900?style=flat&logo=aws-lambda&logoColor=white) |
 | **Messaging**     | ![FCM](https://img.shields.io/badge/FCM-4285F4?style=flat&logo=google&logoColor=white) |
 | **Container & DevOps** | ![Docker](https://img.shields.io/badge/Docker-2496ED?style=flat&logo=docker&logoColor=white) |
@@ -27,6 +27,7 @@
 | **Documentation** | ![Swagger](https://img.shields.io/badge/Swagger-85EA2D?style=flat&logo=swagger&logoColor=black) |
 | **Testing**       | ![JUnit5](https://img.shields.io/badge/JUnit%205-25A162?style=flat&logo=junit5&logoColor=white) ![Mockito](https://img.shields.io/badge/Mockito-007396?style=flat&logo=java&logoColor=white) |
 | **CI/CD**         | ![GitHub Actions](https://img.shields.io/badge/GitHub%20Actions-2088FF?style=flat&logo=githubactions&logoColor=white) |
+
 
 
 
