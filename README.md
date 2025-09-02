@@ -29,13 +29,10 @@
 | **CI/CD**         | ![GitHub Actions](https://img.shields.io/badge/GitHub%20Actions-2088FF?style=flat&logo=githubactions&logoColor=white) |
 
 
-
-
-
 <br><br>
-## 🏛️ Architecture
-<img width="2793" height="2096" alt="눈 떠_Dev_인프라구조도_v1_4" src="https://github.com/user-attachments/assets/1939afe4-339c-43fa-b7f4-52d37885e1b2" />
 
+## 🏛️ Architecture
+<img width="2793" height="2096" alt="눈 떠_Dev_인프라구조도_v1 4" src="https://github.com/user-attachments/assets/09c961cb-589a-49ab-8112-97d13c9d3bf2" />
 
 <br><br>
 
