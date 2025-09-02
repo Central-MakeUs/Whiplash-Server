@@ -37,7 +37,7 @@ spring:
   config:
     import:
       - optional:classpath:env.properties
-      - cloudwatch.yml
+      # - cloudwatch.yml
 logging:
   level:
     root: INFO
