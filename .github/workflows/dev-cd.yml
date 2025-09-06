@@ -1,4 +1,4 @@
-name: CD - Build & Deploy for noonddu
+9name: CD - Build & Deploy for noonddu
 
 on:
   push:
@@ -93,12 +93,7 @@ jobs:
               -p 8080:8080 \
               --restart unless-stopped \
               -e TZ=Asia/Seoul \
-              -v /var/log/nuntteo-was:/app/logs \
-              # --log-driver=awslogs \
-              # --log-opt awslogs-region=ap-northeast-2 \
-              # --log-opt awslogs-group=/dev/nuntteo \
-              # --log-opt awslogs-stream=api-1 \
-              # --log-opt awslogs-create-group=true \
-              $IMAGE
+              -v /var/log/nuntteo-was:/app/logs \ 
+            $IMAGE
 
             docker image prune -af
