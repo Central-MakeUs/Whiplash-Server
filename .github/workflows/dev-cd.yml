@@ -93,7 +93,7 @@ jobs:
               -p 8080:8080 \
               --restart unless-stopped \
               -e TZ=Asia/Seoul \
-              -v /var/log/nuntteo-was:/app/logs \ 
+              -v /var/log/nuntteo-was:/app/logs \
             $IMAGE
 
             docker image prune -af
