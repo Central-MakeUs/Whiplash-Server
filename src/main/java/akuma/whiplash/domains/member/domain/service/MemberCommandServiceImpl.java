@@ -9,6 +9,7 @@ import akuma.whiplash.domains.member.persistence.entity.MemberEntity;
 import akuma.whiplash.domains.member.persistence.repository.MemberRepository;
 import akuma.whiplash.global.config.security.jwt.JwtUtils;
 import akuma.whiplash.global.exception.ApplicationException;
+import akuma.whiplash.global.service.ArchiveService;
 import akuma.whiplash.infrastructure.redis.RedisService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -26,6 +27,7 @@ public class MemberCommandServiceImpl implements MemberCommandService {
     private final AlarmRingingLogRepository alarmRingingLogRepository;
     private final JwtUtils jwtUtils;
     private final RedisService redisService;
+    private final ArchiveService archiveService;
 
     @Override
     public void modifyPrivacyPolicy(Long memberId, boolean privacyPolicy) {
@@ -51,6 +53,9 @@ public class MemberCommandServiceImpl implements MemberCommandService {
     public void hardDeleteMember(Long memberId, String deviceId) {
         MemberEntity member = memberRepository.findById(memberId)
             .orElseThrow(() -> ApplicationException.from(MemberErrorCode.MEMBER_NOT_FOUND));
+
+        // 1. 삭제할 데이터 삭제 전 아카이빙
+        archiveService.archiveMemberWithRelations(memberId);
 
         // 2. alarm_ringing_log 삭제
         alarmRingingLogRepository.deleteByMemberId(memberId);
