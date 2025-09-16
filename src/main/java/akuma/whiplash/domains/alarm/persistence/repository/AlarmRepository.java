@@ -11,6 +11,8 @@ public interface AlarmRepository extends JpaRepository<AlarmEntity, Long> {
 
     List<AlarmEntity> findAllByMemberId(Long memberId);
 
+    boolean existsByMemberIdAndAlarmPurpose(Long memberId, String alarmPurpose);
+
     @Query(value = "SELECT * FROM alarm WHERE repeat_days LIKE %:day%", nativeQuery = true)
     List<AlarmEntity> findByRepeatDaysLike(@Param("day") String day);
 

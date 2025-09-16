@@ -170,6 +170,32 @@ class AlarmControllerIntegrationTest {
                     .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest());
         }
+
+        @Test
+        @DisplayName("실패: 같은 이름의 알람이 존재하면 409 응답을 반환한다")
+        void fail_duplicateAlarmPurpose() throws Exception {
+            // given
+            MemberEntity member = memberRepository.save(MemberFixture.MEMBER_3.toEntity());
+            AlarmFixture fixture = AlarmFixture.ALARM_03;
+            alarmRepository.save(fixture.toEntity(member));
+            AlarmRegisterRequest request = new AlarmRegisterRequest(
+                fixture.getAddress(),
+                fixture.getLatitude(),
+                fixture.getLongitude(),
+                fixture.getAlarmPurpose(),
+                fixture.getTime(),
+                fixture.getRepeatDays().stream().map(Weekday::getDescription).toList(),
+                fixture.getSoundType().getDescription()
+            );
+            String accessToken = jwtProvider.generateAccessToken(member.getId(), member.getRole(), "mock_device_id");
+
+            // when & then
+            mockMvc.perform(post("/api/alarms")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isConflict());
+        }
     }
 
 

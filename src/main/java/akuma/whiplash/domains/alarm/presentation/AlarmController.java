@@ -39,7 +39,10 @@ public class AlarmController {
 
     private final AlarmUseCase alarmUseCase;
 
-    @CustomErrorCodes(memberErrorCodes = {MEMBER_NOT_FOUND})
+    @CustomErrorCodes(
+          memberErrorCodes = {MEMBER_NOT_FOUND}
+        , alarmErrorCodes = {DUPLICATE_ALARM_PURPOSE}
+    )
     @Operation(summary = "알람 등록", description = "사용자가 알람을 등록합니다.")
     @PostMapping
     public ApplicationResponse<CreateAlarmResponse> createAlarm(@AuthenticationPrincipal MemberContext memberContext, @RequestBody @Valid AlarmRegisterRequest request) {
