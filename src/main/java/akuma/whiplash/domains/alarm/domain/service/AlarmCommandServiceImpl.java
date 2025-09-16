@@ -23,6 +23,7 @@ import akuma.whiplash.domains.member.exception.MemberErrorCode;
 import akuma.whiplash.domains.member.persistence.entity.MemberEntity;
 import akuma.whiplash.domains.member.persistence.repository.MemberRepository;
 import akuma.whiplash.global.exception.ApplicationException;
+import akuma.whiplash.global.service.ArchiveService;
 import akuma.whiplash.global.util.date.DateUtil;
 import com.google.api.services.sheets.v4.Sheets;
 import com.google.api.services.sheets.v4.SheetsScopes;
@@ -58,6 +59,7 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
     private final AlarmOffLogRepository alarmOffLogRepository;
     private final AlarmRingingLogRepository alarmRingingLogRepository;
     private final MemberRepository memberRepository;
+    private final ArchiveService archiveService;
 
     @Value("${oauth.google.sheet.id}")
     private String spreadsheetsId;
@@ -182,9 +184,12 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
 
     @Override
     public void removeAlarm(Long memberId, Long alarmId, String reason) {
-        // 1. 알람 조회 및 소유자 검증
+        // 1-1. 알람 조회 및 소유자 검증
         AlarmEntity alarm = findAlarmById(alarmId);
         validAlarmOwner(memberId, alarm.getMember().getId());
+
+        // 1-2. 삭제할 데이터 삭제 전 아카이빙
+        archiveService.archiveAlarmWithRelations(alarmId);
 
         // 2. 삭제 사유를 Google Sheets에 로그로 기록
         logDeleteReason(alarm.getAlarmPurpose(), reason);
