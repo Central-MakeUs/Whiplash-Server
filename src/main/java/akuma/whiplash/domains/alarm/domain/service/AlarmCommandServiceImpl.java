@@ -77,6 +77,11 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
     public CreateAlarmResponse createAlarm(AlarmRegisterRequest request, Long memberId) {
         MemberEntity memberEntity = findMemberById(memberId);
 
+        boolean exists = alarmRepository.existsByMemberIdAndAlarmPurpose(memberId, request.alarmPurpose());
+        if (exists) {
+            throw ApplicationException.from(DUPLICATE_ALARM_PURPOSE);
+        }
+
         AlarmEntity alarm = AlarmMapper.mapToAlarmEntity(request, memberEntity);
         alarmRepository.save(alarm);
 
