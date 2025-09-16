@@ -207,6 +207,33 @@ class AlarmControllerTest {
         }
     }
 
+    @Test
+    @DisplayName("실패: 같은 이름의 알람이 존재하면 409를 반환한다")
+    void fail_duplicateAlarmPurpose() throws Exception {
+
+        // given
+        AlarmFixture fixture = AlarmFixture.ALARM_03;
+        AlarmRegisterRequest request = new AlarmRegisterRequest(
+            fixture.getAddress(),
+            fixture.getLatitude(),
+            fixture.getLongitude(),
+            fixture.getAlarmPurpose(),
+            fixture.getTime(),
+            fixture.getRepeatDays().stream().map(Weekday::getDescription).toList(),
+            fixture.getSoundType().getDescription()
+        );
+        setSecurityContext(buildContext(MEMBER_3));
+
+        // when & then
+        when(alarmUseCase.createAlarm(any(AlarmRegisterRequest.class), anyLong()))
+            .thenThrow(ApplicationException.from(AlarmErrorCode.DUPLICATE_ALARM_PURPOSE));
+
+        mockMvc.perform(post("/api/alarms")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+            .andExpect(status().isConflict());
+    }
+
     @Nested
     @DisplayName("[POST] /api/alarms/{id}/ring - 알람 울림")
     class RingAlarmTest {
