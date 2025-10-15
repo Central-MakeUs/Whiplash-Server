@@ -1,5 +1,5 @@
 # 눈 떠! <img width="100" height="100" align="left" alt="눈 떠! 로고" src="https://github.com/user-attachments/assets/cd4ff61c-2f86-4ab1-8621-6d80d9ea50c6" />
-[![App Store](https://img.shields.io/badge/App%20Store-Download-blue?logo=apple&logoColor=white)](https://apps.apple.com/kr/app/눈-떠-목표-장소-도착-인증-강제-알람/id6749834236)
+[![App Store](https://apps.apple.com/kr/app/%EB%88%88-%EB%96%A0-%EB%AA%A9%ED%91%9C-%EC%9E%A5%EC%86%8C-%EB%8F%84%EC%B0%A9-%EC%9D%B8%EC%A6%9D-%EC%95%8C%EB%9E%8C/id6753883773)
 [![Google Play](https://img.shields.io/badge/Google%20Play-Download-green?logo=googleplay&logoColor=white)](https://play.google.com/store/apps/details?id=com.whiplash.akuma&hl=ko)
 
 
