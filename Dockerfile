@@ -22,18 +22,18 @@ RUN ./gradlew bootJar --no-daemon
 FROM eclipse-temurin:17-jre-alpine AS runtime
 
 # 비루트 사용자 생성 (보안)
-RUN addgroup -g 1000 noonddu && adduser -u 1000 -G noonddu -s /bin/sh -D noonddu
+RUN addgroup -g 1000 nuntteo && adduser -u 1000 -G nuntteo -s /bin/sh -D nuntteo
 
 WORKDIR /app
 
 # 빌드된 JAR 복사
 COPY --from=build /app/build/libs/*.jar app.jar
 
-RUN chown noonddu:noonddu app.jar
+RUN chown nuntteo:nuntteo app.jar
 
-USER noonddu
+USER nuntteo
 
 EXPOSE 8080
 
 # dev 프로필로 실행
-ENTRYPOINT ["java", "-Dspring.profiles.active=dev", "-jar", "/app/app.jar"]
+ENTRYPOINT ["java", "-jar", "/app/app.jar"]
