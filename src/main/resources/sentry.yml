@@ -1,0 +1,43 @@
+---
+spring.config.activate.on-profile: local
+
+sentry:
+  dsn: ${SENTRY_DSN}
+  send-default-pii: false # 민감정보 수집 X
+  logging:
+    minimum-event-level: error
+    minimum-breadcrumb-level: info
+  traces-sample-rate: 0.0
+  environment: local
+
+---
+spring.config.activate.on-profile: dev
+
+sentry:
+  dsn: ${SENTRY_DSN}
+  send-default-pii: true
+  logging:
+    minimum-event-level: error
+    minimum-breadcrumb-level: info
+  traces-sample-rate: 0.3 # 트랜잭션 100% 수집
+  environment: dev
+  release: nuntteo-api@1.0.0
+
+---
+spring.config.activate.on-profile: prod
+
+sentry:
+  dsn: ${SENTRY_DSN}
+  send-default-pii: true
+  logging:
+    minimum-event-level: error
+    minimum-breadcrumb-level: info
+  traces-sample-rate: 0.3 # 트랜잭션 100% 수집
+  environment: prod
+
+---
+spring.config.activate.on-profile: test
+
+sentry:
+  enabled: false   # Sentry SDK 비활성화
+  dsn: ""          # 혹시 로깅 앱렌더가 있어도 안전하게

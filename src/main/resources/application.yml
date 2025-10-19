@@ -1,0 +1,46 @@
+spring:
+  autoconfigure:
+    exclude: org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration
+  application:
+    name: whiplash
+  jackson:
+    time-zone: Asia/Seoul
+  config:
+    import:
+      - mysql.yml
+      - swagger.yml
+      - jwt.yml
+      - redis.yml
+      - oauth.yml
+      - naver.yml
+      - sentry.yml
+
+server:
+  forward-headers-strategy: framework
+
+---
+spring.config.activate.on-profile: local
+
+spring:
+  config:
+    import:
+      - optional:classpath:env.properties
+
+logging:
+  level:
+    root: INFO
+
+---
+spring.config.activate.on-profile: dev
+
+spring:
+  config:
+    import:
+      - optional:classpath:env.properties
+
+logging:
+  level:
+    root: INFO
+
+---
+spring.config.activate.on-profile: prod

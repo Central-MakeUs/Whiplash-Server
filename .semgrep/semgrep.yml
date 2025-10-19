@@ -1,0 +1,154 @@
+rules:
+  # 1) Repository 계층: 허용된 메서드 접두어만 사용
+  - id: repo-method-naming-allowed-prefixes
+    languages: [java]
+    message: "Repository 메서드는 findBy*/findAllBy*/countBy*/existsBy*/insert*/update*/delete* 접두어만 허용됩니다."
+    severity: ERROR
+    patterns:
+      - pattern-either:
+          - pattern: |
+              class $C {
+                ...
+                public $RET $METH(...) { ... }
+              }
+          - pattern: |
+              interface $C {
+                ...
+                $RET $METH(...);
+              }
+      - metavariable-regex:
+          metavariable: $METH
+          regex: "^(?!(findBy|findAllBy|countBy|existsBy|insert|update|delete)).*$"
+    paths:
+      include:
+        - "domains/**/persistence/**"
+
+  # 2) Service/UseCase 등에서 repository 전용 접두어(method 선언) 사용 금지
+  - id: service-method-should-not-use-repo-prefix
+    languages: [java]
+    message: "Service/UseCase 계층 메서드명에 insert*/update*/delete*/findBy*/countBy*/existsBy*를 사용하지 마세요."
+    severity: WARNING
+    patterns:
+      - pattern: |
+          class $C {
+            ...
+            public $RET $METH(...) { ... }
+          }
+      - metavariable-regex:
+          metavariable: $METH
+          regex: "^(insert|update|delete|findBy|countBy|existsBy).*$"
+    paths:
+      include:
+        - "domains/**/application/**"
+        - "domains/**/domain/**"
+        - "domains/**/presentation/**"
+
+  # 3) Controller 계층: 허용된 HttpStatus만 사용 (단일 규칙)
+  - id: controller-httpstatus-whitelist
+    languages: [java]
+    message: "허용된 HttpStatus(400/401/403/404/409)만 사용하세요."
+    severity: ERROR
+    patterns:
+      - pattern: HttpStatus.$S
+      - metavariable-regex:
+          metavariable: $S
+          # 허용된 상태만 통과시키고, 나머지는 적발
+          regex: "^(?!(BAD_REQUEST|UNAUTHORIZED|FORBIDDEN|NOT_FOUND|CONFLICT)$).*$"
+
+    paths:
+      include:
+        - "domains/**/presentation/**"
+
+  # 4) Controller 메서드: @CustomErrorCodes 누락 감지 (애노테이션 스택 허용)
+  - id: controller-must-have-customerrorcodes-on-mapped-method
+    languages: [java]
+    message: "매핑된 Controller 메서드에는 @CustomErrorCodes를 명시하세요."
+    severity: WARNING
+    patterns:
+      - pattern-either:
+          - pattern: |
+              @GetMapping(...)
+              ...
+              public $RET $M(...){ ... }
+          - pattern: |
+              @PostMapping(...)
+              ...
+              public $RET $M(...){ ... }
+          - pattern: |
+              @PutMapping(...)
+              ...
+              public $RET $M(...){ ... }
+          - pattern: |
+              @DeleteMapping(...)
+              ...
+              public $RET $M(...){ ... }
+          - pattern: |
+              @PatchMapping(...)
+              ...
+              public $RET $M(...){ ... }
+      - pattern-not-either:
+          - pattern: |
+              @GetMapping(...)
+              ...
+              @CustomErrorCodes(...)
+              ...
+              public $RET $M(...){ ... }
+          - pattern: |
+              @PostMapping(...)
+              ...
+              @CustomErrorCodes(...)
+              ...
+              public $RET $M(...){ ... }
+          - pattern: |
+              @PutMapping(...)
+              ...
+              @CustomErrorCodes(...)
+              ...
+              public $RET $M(...){ ... }
+          - pattern: |
+              @DeleteMapping(...)
+              ...
+              @CustomErrorCodes(...)
+              ...
+              public $RET $M(...){ ... }
+          - pattern: |
+              @PatchMapping(...)
+              ...
+              @CustomErrorCodes(...)
+              ...
+              public $RET $M(...){ ... }
+    paths:
+      include:
+        - "domains/**/presentation/**"
+
+  # 5) 테스트: @Test가 있어도 @DisplayName이 애노테이션 블록 어딘가에 없으면 경고
+  - id: junit-test-should-have-displayname
+    languages: [java]
+    message: "@Test 메서드에 @DisplayName을 추가하세요(문장형 권장)."
+    severity: WARNING
+    patterns:
+      - pattern: |
+          @...
+          @Test
+          @...
+          public $RET $M(...){ ... }
+      - pattern-not: |
+          @...
+          @DisplayName(...)
+          @...
+          public $RET $M(...){ ... }
+    paths:
+      include:
+        - "src/test/**"
+
+  # 6) 시간 소스: LocalDateTime.now() 직접 사용 금지(Clock/DateUtil 사용 권장)
+  - id: forbid-direct-now
+    languages: [java]
+    message: "LocalDateTime.now() 직접 호출을 지양하고 Clock/DateUtil을 통해 주입받아 사용하세요."
+    severity: WARNING
+    pattern: LocalDateTime.now(...)
+    paths:
+      include:
+        - "domains/**/application/**"
+        - "domains/**/domain/**"
+        - "domains/**/presentation/**"
