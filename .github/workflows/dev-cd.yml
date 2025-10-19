@@ -93,6 +93,7 @@ jobs:
               -p 8080:8080 \
               --restart unless-stopped \
               -e TZ=Asia/Seoul \
+              -e SPRING_PROFILES_ACTIVE=dev \
               -v /var/log/nuntteo-was:/app/logs \
             $IMAGE
 
