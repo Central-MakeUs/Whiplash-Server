@@ -82,34 +82,30 @@ pipeline {
     }
 
     post {
-		    success {
-		        withCredentials([string(credentialsId: 'DISCORD_WEBHOOK_URL', variable: 'HOOK_URL')]) {
-		            discordSend(
-		                webhookURL: "${HOOK_URL}",
-		                title: "✅ Build Success: ${env.JOB_NAME}",
-		                description: "운영 서버 배포에 성공했습니다. #${env.BUILD_NUMBER}",
-		                link: env.BUILD_URL,
-		                status: "SUCCESSFUL",
-		                color: '#28a745'
-		            )
-		        }
-		    }
-		    failure {
-		        withCredentials([string(credentialsId: 'DISCORD_WEBHOOK_URL', variable: 'HOOK_URL')]) {
-		            discordSend(
-		                webhookURL: "${HOOK_URL}",
-		                title: "❌ Build Failed: ${env.JOB_NAME}",
-		                description: "운영 서버 배포에 실패했습니다. 확인이 필요합니다. #${env.BUILD_NUMBER}",
-		                link: env.BUILD_URL,
-		                status: "FAILED",
-		                color: '#dc3545'
-		            )
-		        }
-		    }
-		    always {
-		        // 정리 작업은 always 블록에 남겨둡니다.
-		        echo 'Pipeline finished. Cleaning up...'
-		        sh 'docker logout'
-		    }
-		}
+        success {
+            withCredentials([string(credentialsId: 'DISCORD_WEBHOOK_URL', variable: 'HOOK_URL')]) {
+                discordSend(
+                    webhookURL: "${HOOK_URL}",
+                    title: "✅ Build Success: ${env.JOB_NAME}",
+                    description: "운영 서버 배포에 성공했습니다. #${env.BUILD_NUMBER}",
+                    link: env.BUILD_URL
+                )
+            }
+        }
+        failure {
+            withCredentials([string(credentialsId: 'DISCORD_WEBHOOK_URL', variable: 'HOOK_URL')]) {
+                discordSend(
+                    webhookURL: "${HOOK_URL}",
+                    title: "❌ Build Failed: ${env.JOB_NAME}",
+                    description: "운영 서버 배포에 실패했습니다. 확인이 필요합니다. #${env.BUILD_NUMBER}",
+                    link: env.BUILD_URL
+                )
+            }
+        }
+        always {
+            // 정리작업
+            echo 'Pipeline finished. Cleaning up...'
+            sh 'docker logout'
+        }
+    }
 }
