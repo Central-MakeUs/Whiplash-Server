@@ -70,7 +70,7 @@ pipeline {
                         stage('Deploy Blue/Green to Production') {
                             sshagent(credentials: ['PROD_PRIVATE_KEY']) {
                                 sh """
-                                    ssh -p 30022 -o StrictHostKeyChecking=no ${PROD_USERNAME}@${PROD_WAS_HOST} 'cd /opt/app/scripts && ./deploy.sh ${env.SHORT_SHA} ${IMAGE_NAME}'
+                                    ssh -p 30022 -o StrictHostKeyChecking=no ${PROD_USERNAME}@${PROD_WAS_HOST} 'cd /opt/app/scripts && ./deploy.sh ${env.SHORT_SHA} ${IMAGE_NAME} ${DOCKER_USER} ${DOCKER_PASS}'
                                 """
                             }
                         }
