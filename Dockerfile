@@ -29,11 +29,15 @@ WORKDIR /app
 # 빌드된 JAR 복사
 COPY --from=build /app/build/libs/*.jar app.jar
 
+# 로그 디렉토리를 미리 생성하고 소유권을 nuntteo 사용자에게 부여
+# 이 작업은 컨테이너 내부에서 로그 파일 생성 시 발생하는 권한 문제를 해결
+RUN mkdir -p /app/logs && chown -R nuntteo:nuntteo /app/logs
+
 RUN chown nuntteo:nuntteo app.jar
 
 USER nuntteo
 
 EXPOSE 8080
 
-# dev 프로필로 실행
+# 컨테이너 실행 시 환경 변수(SPRING_PROFILES_ACTIVE)로 프로필을 주입
 ENTRYPOINT ["java", "-jar", "/app/app.jar"]
