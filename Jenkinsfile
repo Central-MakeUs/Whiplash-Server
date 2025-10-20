@@ -81,40 +81,35 @@ pipeline {
         }
     }
 
-    // 파이프라인 종료 후 실행될 작업 (성공/실패 알림)
     post {
-        always {
-            script {
-                withCredentials([string(credentialsId: 'DISCORD_WEBHOOK_URL', variable: 'HOOK_URL')]) {
-                    def message
-                    def color
-
-                    // currentBuild.result는 SUCCESS, UNSTABLE, FAILURE 등의 값을 가짐
-                    if (currentBuild.result == 'SUCCESS') {
-                        color = '3066993' // Green
-                        message = "✅ **[${env.JOB_NAME}]** 빌드 성공! ( #${env.BUILD_NUMBER} )"
-                    } else if (currentBuild.result == 'UNSTABLE') {
-                        color = '15105570' // Yellow
-                        message = "⚠️ **[${env.JOB_NAME}]** 빌드 불안정. ( #${env.BUILD_NUMBER} )"
-                    } else {
-                        color = '15158332' // Red
-                        message = "❌ **[${env.JOB_NAME}]** 빌드 실패! ( #${env.BUILD_NUMBER} )"
-                    }
-
-                    // Discord Notifier 플러그인의 discordSend 스텝 사용
-                    discordSend(
-                        webhookURL: "${HOOK_URL}",
-                        embeds: [[
-                            "title": "Build Status: ${currentBuild.result}",
-                            "description": "${message}\n[Jenkins 빌드 로그 보기](${env.BUILD_URL})",
-                            "color": color
-                        ]]
-                    )
-                }
-            }
-            // 정리 작업
-            echo 'Pipeline finished. Cleaning up...'
-            sh 'docker logout'
-        }
-    }
+		    success {
+		        withCredentials([string(credentialsId: 'DISCORD_WEBHOOK_URL', variable: 'HOOK_URL')]) {
+		            discordSend(
+		                webhookURL: "${HOOK_URL}",
+		                title: "✅ Build Success: ${env.JOB_NAME}",
+		                description: "운영 서버 배포에 성공했습니다. #${env.BUILD_NUMBER}",
+		                link: env.BUILD_URL,
+		                status: "SUCCESSFUL",
+		                color: '#28a745'
+		            )
+		        }
+		    }
+		    failure {
+		        withCredentials([string(credentialsId: 'DISCORD_WEBHOOK_URL', variable: 'HOOK_URL')]) {
+		            discordSend(
+		                webhookURL: "${HOOK_URL}",
+		                title: "❌ Build Failed: ${env.JOB_NAME}",
+		                description: "운영 서버 배포에 실패했습니다. 확인이 필요합니다. #${env.BUILD_NUMBER}",
+		                link: env.BUILD_URL,
+		                status: "FAILED",
+		                color: '#dc3545'
+		            )
+		        }
+		    }
+		    always {
+		        // 정리 작업은 always 블록에 남겨둡니다.
+		        echo 'Pipeline finished. Cleaning up...'
+		        sh 'docker logout'
+		    }
+		}
 }
