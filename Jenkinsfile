@@ -68,7 +68,10 @@ pipeline {
 
                         // 6. 운영 서버에 무중단 배포 실행
                         stage('Deploy Blue/Green to Production') {
-                            sshagent(credentials: ['PROD_PRIVATE_KEY']) {
+                            withCredentials([
+                                    usernamePassword(credentialsId: 'DOCKERHUB_CREDENTIALS', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS'),
+                                    sshagent(credentials: ['PROD_PRIVATE_KEY'])
+                            ]) {
                                 sh """
                                     ssh -p 30022 -o StrictHostKeyChecking=no ${PROD_USERNAME}@${PROD_WAS_HOST} 'cd /opt/app/scripts && ./deploy.sh ${env.SHORT_SHA} ${IMAGE_NAME} ${DOCKER_USER} ${DOCKER_PASS}'
                                 """
