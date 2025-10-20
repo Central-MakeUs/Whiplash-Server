@@ -44,3 +44,12 @@ logging:
 
 ---
 spring.config.activate.on-profile: prod
+
+spring:
+  config:
+    import:
+      - optional:classpath:env.properties
+
+logging:
+  level:
+    root: INFO
