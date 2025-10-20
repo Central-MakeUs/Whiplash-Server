@@ -33,7 +33,7 @@ pipeline {
                     // Docker & Server Info
                     string(credentialsId: 'DOCKERHUB_USERNAME', variable: 'DOCKERHUB_USERNAME'),
                     string(credentialsId: 'IMAGE_NAME', variable: 'IMAGE_NAME'),
-                    string(credentialsId: 'PROD_HOST', variable: 'PROD_HOST'),
+                    string(credentialsId: 'PROD_WAS_HOST', variable: 'PROD_WAS_HOST'),
                     string(credentialsId: 'PROD_USERNAME', variable: 'PROD_USERNAME'),
                     // Application Config Files
                     string(credentialsId: 'PROD_ENV_PROPERTIES', variable: 'ENV_PROPERTIES'),
@@ -70,7 +70,7 @@ pipeline {
                         stage('Deploy Blue/Green to Production') {
                             sshagent(credentials: ['PROD_PRIVATE_KEY']) {
                                 sh """
-                                    ssh -p 30022 -o StrictHostKeyChecking=no ${PROD_USERNAME}@${PROD_HOST} 'cd /opt/app/scripts && ./deploy.sh ${env.SHORT_SHA} ${IMAGE_NAME}'
+                                    ssh -p 30022 -o StrictHostKeyChecking=no ${PROD_USERNAME}@${PROD_WAS_HOST} 'cd /opt/app/scripts && ./deploy.sh ${env.SHORT_SHA} ${IMAGE_NAME}'
                                 """
                             }
                         }
