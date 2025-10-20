@@ -69,9 +69,8 @@ pipeline {
                         // 6. 운영 서버에 무중단 배포 실행
                         stage('Deploy Blue/Green to Production') {
                             sshagent(credentials: ['PROD_PRIVATE_KEY']) {
-                                // deploy.sh 스크립트에 이미지 태그와 이미지 이름을 인자로 전달
                                 sh """
-                                    ssh -o StrictHostKeyChecking=no ${PROD_USERNAME}@${PROD_HOST} 'cd /opt/app/scripts && ./deploy.sh ${env.SHORT_SHA} ${IMAGE_NAME}'
+                                    ssh -p 30022 -o StrictHostKeyChecking=no ${PROD_USERNAME}@${PROD_HOST} 'cd /opt/app/scripts && ./deploy.sh ${env.SHORT_SHA} ${IMAGE_NAME}'
                                 """
                             }
                         }
