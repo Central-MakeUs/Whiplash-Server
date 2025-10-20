@@ -68,13 +68,16 @@ pipeline {
 
                         // 6. 운영 서버에 무중단 배포 실행
                         stage('Deploy Blue/Green to Production') {
-                            withCredentials([
-                                    usernamePassword(credentialsId: 'DOCKERHUB_CREDENTIALS', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS'),
-                                    sshagent(credentials: ['PROD_PRIVATE_KEY'])
-                            ]) {
-                                sh """
-                                    ssh -p 30022 -o StrictHostKeyChecking=no ${PROD_USERNAME}@${PROD_WAS_HOST} 'cd /opt/app/scripts && ./deploy.sh ${env.SHORT_SHA} ${IMAGE_NAME} ${DOCKER_USER} ${DOCKER_PASS}'
-                                """
+                            // sshagent를 withCredentials 리스트가 아닌, 중첩된 래퍼(wrapper)로 올바르게 사용
+                            // 먼저 withCredentials로 Docker 인증 정보를 변수로 로드
+                            withCredentials([usernamePassword(credentialsId: 'DOCKERHUB_CREDENTIALS', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                                // 그 안에서 sshagent로 SSH 환경을 감싸줌
+                                sshagent(credentials: ['PROD_PRIVATE_KEY']) {
+                                    // DOCKER_USER/PASS 변수와 SSH 키를 모두 사용 가능
+                                    sh """
+                                        ssh -p 30022 -o StrictHostKeyChecking=no ${PROD_USERNAME}@${PROD_WAS_HOST} 'cd /opt/app/scripts && ./deploy.sh "${env.SHORT_SHA}" "${IMAGE_NAME}" "${DOCKER_USER}" "${DOCKER_PASS}"'
+                                    """
+                                }
                             }
                         }
                     }
