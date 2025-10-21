@@ -3,14 +3,14 @@ springdoc:
   default-produces-media-type: application/json;charset=UTF-8
   swagger-ui:
     persist-authorization: true
-    path: /api/nuntteo/swagger-ui.html
+    path: ${SWAGGER_UI_PATH}
     tags-sorter: alpha
     operations-sorter: method
     display-request-duration: true
     disable-swagger-default-url: true
   show-actuator: true
   api-docs:
-    path: /api/nuntteo/v3/api-docs
+    path: ${API_DOCS_PATH}
   paths-to-exclude: /actuator/**
 
 swagger.server.url: ${SWAGGER_SERVER_URL}
