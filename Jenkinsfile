@@ -35,8 +35,9 @@ pipeline {
                     string(credentialsId: 'IMAGE_NAME', variable: 'IMAGE_NAME'),
                     string(credentialsId: 'PROD_WAS_HOST', variable: 'PROD_WAS_HOST'),
                     string(credentialsId: 'PROD_USERNAME', variable: 'PROD_USERNAME'),
+                    string(credentialsId: 'PROD_WAS_SSH_PORT', variable: 'PROD_WAS_SSH_PORT'),
                     // Application Config Files
-                    string(credentialsId: 'PROD_ENV_PROPERTIES', variable: 'ENV_PROPERTIES'),
+                    file(credentialsId: 'PROD_ENV_PROPERTIES', variable: 'ENV_PROPERTIES_FILE_PATH'),
                     string(credentialsId: 'PROD_GOOGLE_JSON_BASE64', variable: 'GOOGLE_JSON_B64'),
                     string(credentialsId: 'PROD_FIREBASE_KEY_JSON_BASE64', variable: 'FIREBASE_KEY_B64')
                 ]) {
@@ -45,7 +46,8 @@ pipeline {
                         stage('Generate Config Files') {
                             sh '''
                                 mkdir -p src/main/resources
-                                echo "${ENV_PROPERTIES}" > src/main/resources/env.properties
+                                # ENV_PROPERTIES_FILE_PATH 변수에는 임시 파일의 경로가 담겨있음
+                                cp "${ENV_PROPERTIES_FILE_PATH}" src/main/resources/env.properties
                                 echo "${GOOGLE_JSON_B64}" | base64 -d > src/main/resources/google.json
                                 echo "${FIREBASE_KEY_B64}" | base64 -d > src/main/resources/whiplash-firebase-key.json
                             '''
@@ -75,7 +77,7 @@ pipeline {
                                 sshagent(credentials: ['PROD_PRIVATE_KEY']) {
                                     // DOCKER_USER/PASS 변수와 SSH 키를 모두 사용 가능
                                     sh """
-                                        ssh -p 30022 -o StrictHostKeyChecking=no ${PROD_USERNAME}@${PROD_WAS_HOST} 'cd /opt/app/scripts && ./deploy.sh "${env.SHORT_SHA}" "${IMAGE_NAME}" "${DOCKER_USER}" "${DOCKER_PASS}"'
+                                        ssh -p ${PROD_WAS_SSH_PORT} -o StrictHostKeyChecking=no ${PROD_USERNAME}@${PROD_WAS_HOST} 'cd /opt/app/scripts && ./deploy.sh "${env.SHORT_SHA}" "${IMAGE_NAME}" "${DOCKER_USER}" "${DOCKER_PASS}"'
                                     """
                                 }
                             }
