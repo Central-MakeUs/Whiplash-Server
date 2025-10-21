@@ -93,9 +93,11 @@ pipeline {
             withCredentials([string(credentialsId: 'DISCORD_WEBHOOK_URL', variable: 'HOOK_URL')]) {
                 discordSend(
                     webhookURL: "${HOOK_URL}",
-                    title: "✅ Build Success: ${env.JOB_NAME}",
-                    description: "운영 서버 배포에 성공했습니다. #${env.BUILD_NUMBER}",
-                    link: env.BUILD_URL
+                    title: "✅ 눈 떠! 운영 API 서버 배포 성공 (Job : ${env.JOB_NAME})",
+                    description: "운영 API 서버 배포에 성공했습니다. #${env.BUILD_NUMBER}",
+                    link: env.BUILD_URL,
+                    result: currentBuild.currentResult,
+                    footer: "Branch: ${env.BRANCH_NAME} | Commit: ${env.SHORT_SHA}"
                 )
             }
         }
@@ -103,9 +105,11 @@ pipeline {
             withCredentials([string(credentialsId: 'DISCORD_WEBHOOK_URL', variable: 'HOOK_URL')]) {
                 discordSend(
                     webhookURL: "${HOOK_URL}",
-                    title: "❌ Build Failed: ${env.JOB_NAME}",
-                    description: "운영 서버 배포에 실패했습니다. 확인이 필요합니다. #${env.BUILD_NUMBER}",
-                    link: env.BUILD_URL
+                    title: "❌ 눈 떠! 운영 API 서버 배포 실패 (Job : ${env.JOB_NAME})",
+                    description: "운영 API 서버 배포에 실패했습니다. 확인이 필요합니다. #${env.BUILD_NUMBER}",
+                    link: env.BUILD_URL,
+                    result: currentBuild.currentResult,
+                    footer: "Branch: ${env.BRANCH_NAME} | Commit: ${env.SHORT_SHA}"
                 )
             }
         }
