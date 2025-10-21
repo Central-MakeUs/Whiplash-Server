@@ -18,6 +18,12 @@ spring:
 server:
   forward-headers-strategy: framework
 
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "health,info,env"
+
 ---
 spring.config.activate.on-profile: local
 
@@ -53,9 +59,3 @@ spring:
 logging:
   level:
     root: INFO
-
-management:
-  endpoints:
-    web:
-      exposure:
-        include: "health,info,env"
