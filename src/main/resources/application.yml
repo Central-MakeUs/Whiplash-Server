@@ -22,7 +22,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: "health,info,env"
+        include: "health,info,prometheus"
 
 ---
 spring.config.activate.on-profile: local
