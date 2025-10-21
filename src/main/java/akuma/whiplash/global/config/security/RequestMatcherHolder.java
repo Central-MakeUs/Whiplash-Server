@@ -58,8 +58,11 @@ public class RequestMatcherHolder {
         new RequestInfo(PUT, "/api/members/**", USER),
         new RequestInfo(DELETE, "/api/members/**", USER),
 
-         // place
-         new RequestInfo(GET, "/api/places/**", USER),
+        // place
+        new RequestInfo(GET, "/api/places/**", USER),
+
+        // actuator
+        new RequestInfo(GET, "/actuator/**", null),
 
         // 빌드 에러 방지를 위해 각 권한에 대한 RequestInfo가 최소 1개씩은 리스트에 있어야함
         new RequestInfo(GET, "/api/admin/**", ADMIN)
