@@ -89,36 +89,28 @@ pipeline {
     }
 
     post {
-        always {
-            script {
-                withCredentials([string(credentialsId: 'DISCORD_WEBHOOK_URL', variable: 'HOOK_URL')]) {
-                    def title
-                    def color
-                    def description
-
-                    // currentBuild.result는 최종 빌드 상태를 정확히 반영합니다.
-                    if (currentBuild.result == 'SUCCESS' || currentBuild.result == null) {
-                        color = 3066993 // 초록색
-                        title = "✅ Build Success: ${env.JOB_NAME}"
-                        description = "운영 서버 배포에 성공했습니다. #${env.BUILD_NUMBER}"
-                    } else {
-                        color = 15158332 // 빨간색
-                        title = "❌ Build Failed: ${env.JOB_NAME}"
-                        description = "운영 서버 배포에 실패했습니다. 확인이 필요합니다. #${env.BUILD_NUMBER}"
-                    }
-
-                    // embeds를 사용하는 최신 방식
-                    discordSend(
-                        webhookURL: "${HOOK_URL}",
-                        embeds: [[
-                            "title": title,
-                            "description": "${description}\n[Jenkins 빌드 로그 보기](${env.BUILD_URL})",
-                            "color": color
-                        ]]
-                    )
-                }
+        success {
+            withCredentials([string(credentialsId: 'DISCORD_WEBHOOK_URL', variable: 'HOOK_URL')]) {
+                discordSend(
+                    webhookURL: "${HOOK_URL}",
+                    title: "✅ Build Success: ${env.JOB_NAME}",
+                    description: "운영 서버 배포에 성공했습니다. #${env.BUILD_NUMBER}",
+                    link: env.BUILD_URL
+                )
             }
-            // 정리 작업
+        }
+        failure {
+            withCredentials([string(credentialsId: 'DISCORD_WEBHOOK_URL', variable: 'HOOK_URL')]) {
+                discordSend(
+                    webhookURL: "${HOOK_URL}",
+                    title: "❌ Build Failed: ${env.JOB_NAME}",
+                    description: "운영 서버 배포에 실패했습니다. 확인이 필요합니다. #${env.BUILD_NUMBER}",
+                    link: env.BUILD_URL
+                )
+            }
+        }
+        always {
+            // 정리작업
             echo 'Pipeline finished. Cleaning up...'
             // docker logout 실패가 빌드 상태에 영향을 주지 않도록 || true 추가
             sh 'docker logout || true'
