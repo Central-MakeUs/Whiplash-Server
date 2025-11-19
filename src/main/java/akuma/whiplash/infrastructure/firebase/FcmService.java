@@ -2,6 +2,7 @@ package akuma.whiplash.infrastructure.firebase;
 
 import akuma.whiplash.domains.alarm.application.dto.etc.PushTargetDto;
 import akuma.whiplash.domains.alarm.application.dto.etc.RingingPushTargetDto;
+import akuma.whiplash.infrastructure.firebase.dto.FcmMetricResult;
 import akuma.whiplash.infrastructure.firebase.dto.FcmSendResult;
 import akuma.whiplash.infrastructure.redis.RedisService;
 import com.google.firebase.messaging.AndroidConfig;
@@ -60,6 +61,8 @@ public class FcmService {
                 .successOccurrenceIds(Set.of())
                 .invalidTokens(List.of())
                 .memberToTokens(Map.of())
+                .successCount(0)
+                .failedCount(0)
                 .build();
         }
 
@@ -72,6 +75,9 @@ public class FcmService {
         Set<Long> successOccurrenceIds = new HashSet<>();
         List<String> invalidTokens = new ArrayList<>();
         Map<Long, List<String>> memberToTokens = new HashMap<>();
+
+        int totalSuccessCount = 0
+          , totalFailureCount = 0;
 
         for (Map.Entry<String, List<PushTargetDto>> entry : groupedByBody.entrySet()) {
             String body = entry.getKey();
@@ -105,6 +111,9 @@ public class FcmService {
                     BatchResponse response = FirebaseMessaging.getInstance().sendEachForMulticast(message);
                     log.info("사전 알림 FCM 멀티캐스트 결과: success={}, failure={}", response.getSuccessCount(), response.getFailureCount());
 
+                    totalSuccessCount += response.getSuccessCount();
+                    totalFailureCount += response.getFailureCount();
+
                     handleSendResult(response.getResponses(), batch, successOccurrenceIds, invalidTokens, memberToTokens);
                 } catch (FirebaseMessagingException e) {
                     log.error("FCM 전송 실패(멀티캐스트 전체). body={}", body, e);
@@ -116,6 +125,8 @@ public class FcmService {
             .successOccurrenceIds(successOccurrenceIds)
             .invalidTokens(invalidTokens)
             .memberToTokens(memberToTokens)
+            .successCount(totalSuccessCount)
+            .failedCount(totalFailureCount)
             .build();
     }
 
@@ -123,13 +134,19 @@ public class FcmService {
      * 알람 울릴 때 FCM 푸시 알림 전송
       * @param targets
      */
-    public void sendRingingNotifications(List<RingingPushTargetDto> targets) {
+    public FcmMetricResult sendRingingNotifications(List<RingingPushTargetDto> targets) {
         if (targets == null || targets.isEmpty()) {
-            return;
+            return FcmMetricResult.builder()
+                .successCount(0)
+                .failedCount(0)
+                .build();
         }
 
         Map<Long, List<RingingPushTargetDto>> groupedByAlarm = targets.stream()
             .collect(Collectors.groupingBy(RingingPushTargetDto::alarmId));
+
+        int totalSuccessCount = 0
+          , totalFailureCount = 0;
 
         for (Map.Entry<Long, List<RingingPushTargetDto>> entry : groupedByAlarm.entrySet()) {
             Long alarmId = entry.getKey();
@@ -160,12 +177,21 @@ public class FcmService {
                 try {
                     BatchResponse response = FirebaseMessaging.getInstance().sendEachForMulticast(message);
                     log.info("알람 울림 FCM 멀티캐스트 결과: success={}, failure={}", response.getSuccessCount(), response.getFailureCount());
+
+                    totalSuccessCount += response.getSuccessCount();
+                    totalFailureCount += response.getFailureCount();
+
                     handleRingingSendResult(response.getResponses(), batch);
                 } catch (FirebaseMessagingException e) {
                     log.error("FCM 전송 실패(알람 울림)", e);
                 }
             }
         }
+
+        return FcmMetricResult.builder()
+            .successCount(totalSuccessCount)
+            .failedCount(totalFailureCount)
+            .build();
     }
 
     private void handleRingingSendResult(
