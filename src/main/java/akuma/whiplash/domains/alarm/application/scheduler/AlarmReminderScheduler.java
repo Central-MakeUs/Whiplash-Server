@@ -8,6 +8,9 @@ import akuma.whiplash.infrastructure.firebase.FcmService;
 import akuma.whiplash.infrastructure.firebase.dto.FcmSendResult;
 import akuma.whiplash.infrastructure.redis.RedisService;
 import akuma.whiplash.global.log.NoMethodLog;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
+import jakarta.annotation.PostConstruct;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.HashSet;
@@ -28,59 +31,93 @@ public class AlarmReminderScheduler {
     private final RedisService redisService;
     private final FcmService fcmService;
     private final AlarmCommandService alarmCommandService;
+    private final MeterRegistry meterRegistry;
+
+    private Counter preAlarmPushAttemptCounter;
+    private Counter preAlarmPushSuccessCounter;
+    private Counter preAlarmPushFailureCounter;
+    private Counter invalidFcmTokenCounter;
+
+    @PostConstruct
+    void registerMetrics() {
+        preAlarmPushAttemptCounter = meterRegistry.counter(
+            "pre_alarm.push_attempt", "scheduler", "pre-alarm");
+
+        preAlarmPushSuccessCounter = meterRegistry.counter(
+            "pre_alarm.push_success", "scheduler", "pre-alarm");
+
+        preAlarmPushFailureCounter = meterRegistry.counter(
+            "pre_alarm.push_failure", "scheduler", "pre-alarm");
+
+        invalidFcmTokenCounter = meterRegistry.counter(
+            "pre_alarm.invalid_token_removed", "scheduler", "pre-alarm");
+    }
 
     // 매 분 마다 실행
     @Scheduled(cron = "0 * * * * *")
     @NoMethodLog
     public void sendPreAlarmNotifications() {
-        log.info("알람 울리기 1시간 전 푸시 알림 전송 스케줄러 시작");
-        try {
-            // 0. 시간 기준 (분 단위 정렬)
-            LocalDateTime now = LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES);
-            LocalDateTime windowStart = now.plusMinutes(59);
-            LocalDateTime windowEnd = now.plusMinutes(61);
 
-            // 1. DB에서 알림 대상 필터링 (자정 크로스 안전)
-            List<OccurrencePushInfo> infos = alarmQueryService.getPreNotificationTargets(windowStart, windowEnd);
+        // 0. 시간 기준 (분 단위 정렬)
+        LocalDateTime now = LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES);
+        LocalDateTime windowStart = now.plusMinutes(59);
+        LocalDateTime windowEnd = now.plusMinutes(61);
 
-            if (infos.isEmpty())
-                return;
+        // 1. DB에서 알림 대상 필터링 (자정 크로스 안전)
+        List<OccurrencePushInfo> infos = alarmQueryService.getPreNotificationTargets(windowStart, windowEnd);
 
-            // 2. Redis에서 FCM 토큰 조회 → PushTargetDto 변환
-            List<PushTargetDto> targets = infos.stream()
-                .flatMap(info ->
-                    redisService.getFcmTokens(info.memberId()).stream()
-                        .map(token -> PushTargetDto.builder()
-                            .token(token)
-                            .address(info.address())
-                            .memberId(info.memberId())
-                            .occurrenceId(info.occurrenceId())
-                            .build()
-                        )
-                )
-                .toList(); // <-- 여기서 한 번만 호출
+        if (infos.isEmpty())
+            return;
 
-            if (targets.isEmpty())
-                return;
+        // 2. Redis에서 FCM 토큰 조회 → push 대상 생성
+        List<PushTargetDto> targets = infos.stream()
+            .flatMap(info ->
+                redisService.getFcmTokens(info.memberId()).stream()
+                    .map(token -> PushTargetDto.builder()
+                        .token(token)
+                        .address(info.address())
+                        .memberId(info.memberId())
+                        .occurrenceId(info.occurrenceId())
+                        .build()
+                    )
+            )
+            .toList();
 
-            FcmSendResult result = fcmService.sendBulkNotification(targets);
+        if (targets.isEmpty())
+            return;
 
-            // 3. 성공한 occurrence만 reminderSent=true 벌크 업데이트
-            if (!result.getSuccessOccurrenceIds().isEmpty()) {
-                alarmCommandService.markReminderSent(result.getSuccessOccurrenceIds());
-            }
+        // 실제 전송 시도한 횟수 기록
+        preAlarmPushAttemptCounter.increment(targets.size());
 
-            // 4. 무효 토큰 정리: 각 회원의 토큰 중 무효한 것만 제거
-            Set<String> invalidTokenSet = new HashSet<>(result.getInvalidTokens());
-            for (Map.Entry<Long, List<String>> e : result.getMemberToTokens().entrySet()) {
-                Long memberId = e.getKey();
-                e.getValue().stream()
-                    .filter(invalidTokenSet::contains)
-                    .forEach(token -> redisService.removeInvalidToken(memberId, token));
-            }
+        log.info("알람 울리기 1시간 전 푸시 알림 대상 {}건 전송 시도", targets.size());
 
-        } finally {
-            log.info("알람 울리기 1시간 전 푸시 알림 전송 스케줄러 종료");
+        // 3. FCM 전송
+        FcmSendResult result = fcmService.sendBulkNotification(targets);
+
+        // 전송 성공/실패 횟수 기록
+        preAlarmPushSuccessCounter.increment(result.getSuccessCount());
+        preAlarmPushFailureCounter.increment(result.getFailedCount());
+
+        // 4. 성공한 occurrence만 reminderSent=true 벌크 업데이트
+        if (!result.getSuccessOccurrenceIds().isEmpty()) {
+            alarmCommandService.markReminderSent(result.getSuccessOccurrenceIds());
+        }
+
+        // 5. 무효 토큰 정리: 각 회원의 토큰 중 무효한 것만 제거
+        Set<String> invalidTokenSet = new HashSet<>(result.getInvalidTokens());
+        int invalidCount = 0;
+
+        for (Map.Entry<Long, List<String>> e : result.getMemberToTokens().entrySet()) {
+            Long memberId = e.getKey();
+            invalidCount += (int) e.getValue().stream()
+                .filter(invalidTokenSet::contains)
+                .peek(token -> redisService.removeInvalidToken(memberId, token))
+                .count();
+        }
+
+        // 제거된 무효 토큰 개수 기록
+        if (invalidCount > 0) {
+            invalidFcmTokenCounter.increment(invalidCount);
         }
     }
 
