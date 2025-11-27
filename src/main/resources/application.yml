@@ -19,6 +19,10 @@ server:
   forward-headers-strategy: framework
 
 management:
+  metrics:
+    distribution:
+      percentiles-histogram:
+        "[http.server.requests]": true # 여러 서버의 메트릭을 집계하여 더 정확한 메트릭(p95, p99등)을 측정, 다중 서버 환경에서 management.metrics.distribution.percentiles보다 더 정확하게 측정 가능
   endpoints:
     web:
       exposure:
