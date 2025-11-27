@@ -45,6 +45,10 @@ public class SwaggerConfig {
         return createOpenAPI(getDevServer());
     }
 
+    @Bean
+    @Profile("prod")
+    public OpenAPI prodOpenAPI() {return  createOpenAPI(getProdServer()); }
+
     private OpenAPI createOpenAPI(Server server) {
         return new OpenAPI()
                 .components(new Components()
@@ -70,6 +74,12 @@ public class SwaggerConfig {
         return new Server()
                 .url(serverUrl)
                 .description("Dev Server");
+    }
+
+    private Server getProdServer() {
+        return new Server()
+            .url(serverUrl)
+            .description("Dev Server");
     }
 
     @Bean
