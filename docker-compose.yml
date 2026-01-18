@@ -4,19 +4,16 @@ services:
   db:
     image: mysql:8.0
     container_name: db
-    environment:
-      MYSQL_DATABASE: whiplash_local
-      MYSQL_USER: whiplash
-      MYSQL_PASSWORD: whiplash1!
-      MYSQL_ROOT_PASSWORD: whiplash1!
+    env_file:
+      - env.properties
     ports:
       - "33366:3306"
     volumes:
       - mysql_data:/var/lib/mysql
     networks:
-      - whiplash-local
+      - monitoring
     healthcheck:
-      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "whiplash", "--password=whiplash1!" ]
+      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "${MYSQL_USER}", "--password=${MYSQL_PASSWORD}" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -27,92 +24,117 @@ services:
           cpus: "2"  # 최대 2개의 코어 할당
           memory: 2GB   # 최대 2GB 메모리 할당
 
-#  # mysql exporter
-#  mysql_exporter:
-#    image: prom/mysqld-exporter
-#    container_name: mysql_exporter
-#    ports:
-#      - "9105:9104"
-#    environment:
-#      - DATA_SOURCE_NAME=whiplash:whiplash1\!@(db:3306)/
-#    depends_on:
-#      - db
-#    networks:
-#      - whiplash-local
+  app:
+    build: .
+    container_name: spring-app
+    ports:
+      - "8080:8080"
+    env_file:
+      - env.properties
+    environment:
+      SPRING_PROFILES_ACTIVE: local
+      # Docker 내부에서는 'localhost' 대신 서비스명(db, redis)을 사용
+      DB_URL: jdbc:mysql://db:3306/whiplash_local?allowPublicKeyRetrieval=true&useSSL=false&rewriteBatchedStatements=true
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      JAVA_OPTS: "-Xms256m -Xmx512m"  # JVM 힙 메모리 제한
+    deploy:
+      resources:
+        limits:
+          cpus: '2'    # CPU 2코어로 제한
+          memory: 1G   # 전체 메모리 1GB로 제한
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    depends_on:
+      db:
+        condition: service_healthy  # MySQL의 health check가 성공할 때까지 대기
+      redis:
+        condition: service_started  # Redis가 시작되면 바로 시작
+    networks:
+      - monitoring
 
-#  prometheus:
-#    image: prom/prometheus
-#    container_name: prometheus
-#    ports:
-#      - "9092:9090"
-#    volumes:
-#      - ./prometheus.yml:/etc/prometheus/prometheus.yml
-#    networks:
-#      - whiplash-local
-#    deploy:
-#      resources:
-#        limits:
-#          cpus: '0.5'
-#          memory: 512M
-#
-#  grafana:
-#    image: grafana/grafana
-#    container_name: grafana
-#    ports:
-#      - "3003:3000"
-#    environment:
-#      - GF_SECURITY_ADMIN_USER=admin
-#      - GF_SECURITY_ADMIN_PASSWORD=admin
-#    volumes:
-#      - grafana_data:/var/lib/grafana
-#    networks:
-#      - whiplash-local
-#    deploy:
-#      resources:
-#        limits:
-#          cpus: '0.5'
-#          memory: 512M
+  prometheus:
+    image: prom/prometheus
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    networks:
+      - monitoring
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
 
-#  k6:
-#    image: grafana/k6:latest
-#    container_name: k6
-#    volumes:
-#      - ./excel-member-post.js:/excel-member-post.js
-#    networks:
-#      - whiplash-local
-#    environment:
-#      - K6_PROMETHEUS_RW_SERVER_URL=http://prometheus:9090/api/v1/write
-#    command: run --out experimental-prometheus-rw /test.js
+  grafana:
+    image: grafana/grafana
+    container_name: grafana
+    ports:
+      - "3001:3000"
+    env_file:
+      - env.properties
+    volumes:
+      - grafana_data:/var/lib/grafana
+    networks:
+      - monitoring
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
 
+  # Redis
   redis:
-    image: redis:7.0
+    image: redis:latest
     container_name: redis-server
     ports:
       - "63790:6379"
-    command: [ "redis-server", "--requirepass", "whiplash1!" ]
+    env_file:
+      - env.properties
+    command: redis-server --requirepass ${REDIS_PASSWORD}
     volumes:
       - redis_data:/data
     networks:
-      - whiplash-local
+      - monitoring
     deploy:
       resources:
         limits:
           cpus: '1'
           memory: 512M
 
-#  # Redis Exporter
-#  redis_exporter:
-#    image: oliver006/redis_exporter
-#    container_name: redis_exporter
-#    ports:
-#      - "9122:9121"
-#    command:
-#      - '--redis.addr=redis://redis:6379'
-#      - '--redis.password=whiplash1!'
-#    depends_on:
-#      - redis
-#    networks:
-#      - whiplash-local
+  # Redis Exporter
+  redis_exporter:
+    image: oliver006/redis_exporter
+    container_name: redis_exporter
+    ports:
+      - "9121:9121"
+    command:
+      - '--redis.addr=redis://redis:6379'
+      - '--redis.password=${REDIS_PASSWORD}'
+    depends_on:
+      - redis
+    networks:
+      - monitoring
+
+  k6:
+    image: grafana/k6
+    container_name: k6
+    ports:
+      - "6565:6565"
+    volumes:
+      - ./k6:/scripts
+    networks:
+      - monitoring
+    depends_on:
+      app:
+        condition: service_healthy
+    # k6가 바로 실행되지 않고, 무한 대기 상태로 유지되도록 entrypoint 변경
+    entrypoint: [ "tail", "-f", "/dev/null" ]
+    # command: run /scripts/script.js
+
 
 volumes:
   mysql_data:
@@ -120,4 +142,4 @@ volumes:
   redis_data:
 
 networks:
-  whiplash-local:
+  monitoring:
