@@ -59,6 +59,15 @@ public class MockFcmService extends FcmService {
 
     @Override
     public FcmMetricResult sendRingingNotifications(List<RingingPushTargetDto> targets) {
+        // 부모의 지연 로직(TEST_DELAY_MS)을 반영하기 위해 sleep 시뮬레이션 추가
+        if (TEST_DELAY_MS > 0) {
+            try {
+                Thread.sleep(TEST_DELAY_MS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }
+
         log.info("[MockFcmService] sendRingingNotifications called with {} targets", targets.size());
 
         if (targets == null || targets.isEmpty()) {
@@ -68,9 +77,23 @@ public class MockFcmService extends FcmService {
                 .build();
         }
 
+        int success = 0;
+        int failed = 0;
+
+        // "INVALID"로 시작하는 토큰은 실패로 간주
+        for (RingingPushTargetDto target : targets) {
+            if (target.token().startsWith("INVALID")) {
+                failed++;
+                // 실제 서비스에서는 여기서 Redis 삭제 로직이 호출되도록 유도해야 함
+                // Mock에서는 카운트만 집계하거나, 필요 시 부모의 핸들링 로직을 흉내내야 함
+            } else {
+                success++;
+            }
+        }
+
         return FcmMetricResult.builder()
-            .successCount(targets.size())
-            .failedCount(0)
+            .successCount(success)
+            .failedCount(failed)
             .build();
     }
 }
