@@ -50,6 +50,8 @@ public class AlarmRingingNotificationScheduler {
     @Scheduled(fixedRate = 10000, zone = "Asia/Seoul")
     @NoMethodLog
     public void sendRingingAlarmNotifications() {
+        long startTime = System.currentTimeMillis();
+        log.info("[Scheduler] Ringing Notification Start: {}", startTime);
 
         List<RingingPushInfo> infos = alarmQueryService.getRingingNotificationTargets();
         if (infos.isEmpty()) {
@@ -94,5 +96,6 @@ public class AlarmRingingNotificationScheduler {
                 .forEach(token -> redisService.removeInvalidToken(memberId, token));
         }
         */
+        log.info("[Scheduler] Ringing Notification End: {}, Duration: {}ms", System.currentTimeMillis(), (System.currentTimeMillis() - startTime));
     }
 }
