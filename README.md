@@ -8,7 +8,6 @@
 <br><br>
 
 ## 🤗 Introduction
-<img width="1920" height="1080" alt="띄울 화면1" src="https://github.com/user-attachments/assets/4bf5a609-a450-486d-8c85-d4442ec2a9a0" />
 <img width="1920" height="1080" alt="디바이스 설명1" src="https://github.com/user-attachments/assets/a5ee8ce7-2fd8-4d53-82d7-209d35d57908" />
 
 <br><br>
@@ -20,19 +19,19 @@
 | **Language**      | ![Java](https://img.shields.io/badge/Java%2017-007396?style=flat&logo=openjdk&logoColor=white) |
 | **Persistence**   | ![Spring Data JPA](https://img.shields.io/badge/Spring%20Data%20JPA-007396?style=flat&logo=hibernate&logoColor=white) |
 | **Database**      | ![MySQL](https://img.shields.io/badge/MySQL-4479A1?style=flat&logo=mysql&logoColor=white) ![Redis](https://img.shields.io/badge/Redis-DC382D?style=flat&logo=redis&logoColor=white) |
-| **Cloud (AWS)**   | ![EC2](https://img.shields.io/badge/EC2-FF9900?style=flat&logo=amazon-ec2&logoColor=white) ![RDS](https://img.shields.io/badge/RDS-527FFF?style=flat&logo=amazon-rds&logoColor=white) ![Lambda](https://img.shields.io/badge/Lambda-FF9900?style=flat&logo=aws-lambda&logoColor=white) |
 | **Messaging**     | ![FCM](https://img.shields.io/badge/FCM-4285F4?style=flat&logo=google&logoColor=white) |
 | **Container & DevOps** | ![Docker](https://img.shields.io/badge/Docker-2496ED?style=flat&logo=docker&logoColor=white) |
-| **Monitoring**    | ![CloudWatch](https://img.shields.io/badge/CloudWatch-FF4F8B?style=flat&logo=amazon-cloudwatch&logoColor=white) ![Sentry](https://img.shields.io/badge/Sentry-362D59?style=flat&logo=sentry&logoColor=white) |
+| **Monitoring**    | ![Prometheus](https://img.shields.io/badge/Prometheus-E6522C?style=flat&logo=prometheus&logoColor=white) ![Grafana](https://img.shields.io/badge/Grafana-F46800?style=flat&logo=grafana&logoColor=white) ![Grafana Alloy](https://img.shields.io/badge/Grafana%20Alloy-F46800?style=flat&logo=grafana-alloy&logoColor=white) ![Grafana Loki](https://img.shields.io/badge/Grafana%20Loki-F46800?style=flat&logo=grafana-loki&logoColor=white) |
 | **Documentation** | ![Swagger](https://img.shields.io/badge/Swagger-85EA2D?style=flat&logo=swagger&logoColor=black) |
 | **Testing**       | ![JUnit5](https://img.shields.io/badge/JUnit%205-25A162?style=flat&logo=junit5&logoColor=white) ![Mockito](https://img.shields.io/badge/Mockito-007396?style=flat&logo=java&logoColor=white) |
-| **CI/CD**         | ![GitHub Actions](https://img.shields.io/badge/GitHub%20Actions-2088FF?style=flat&logo=githubactions&logoColor=white) |
+| **CI/CD**         | ![Jenkins](https://img.shields.io/badge/Jenkins-D24939?style=flat&logo=jenkins&logoColor=white) |
 
 
 <br><br>
 
 ## 🏛️ Architecture
-<img width="2793" height="2096" alt="눈 떠_Dev_인프라구조도_v1 4" src="https://github.com/user-attachments/assets/09c961cb-589a-49ab-8112-97d13c9d3bf2" />
+<img width="3164" height="1888" alt="운영_인프라구조도" src="https://github.com/user-attachments/assets/1d69554d-3522-4883-8ba1-e6b7485d8c0e" />
+
 
 <br><br>
 

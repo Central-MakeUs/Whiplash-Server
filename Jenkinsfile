@@ -47,6 +47,7 @@ pipeline {
                             sh '''
                                 mkdir -p src/main/resources
                                 # ENV_PROPERTIES_FILE_PATH 변수에는 임시 파일의 경로가 담겨있음
+                                rm -f src/main/resources/env.properties
                                 cp "${ENV_PROPERTIES_FILE_PATH}" src/main/resources/env.properties
                                 echo "${GOOGLE_JSON_B64}" | base64 -d > src/main/resources/google.json
                                 echo "${FIREBASE_KEY_B64}" | base64 -d > src/main/resources/whiplash-firebase-key.json

@@ -79,7 +79,7 @@ public class SwaggerConfig {
     private Server getProdServer() {
         return new Server()
             .url(serverUrl)
-            .description("Dev Server");
+            .description("Prod Server");
     }
 
     @Bean
