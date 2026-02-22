@@ -63,7 +63,7 @@ pipeline {
                         // Application Config Files
                         file(credentialsId: ENV_PROPERTIES_CRED, variable: 'ENV_PROPERTIES_FILE_PATH'),
                         string(credentialsId: 'PROD_GOOGLE_JSON_BASE64', variable: 'GOOGLE_JSON_B64'),
-                        string(credentialsId: 'PROD_FIREBASE_KEY_JSON_B64', variable: 'FIREBASE_KEY_B64')
+                        string(credentialsId: 'PROD_FIREBASE_KEY_JSON_BASE64', variable: 'FIREBASE_KEY_B64')
                         //string(credentialsId: GOOGLE_JSON_CRED, variable: 'GOOGLE_JSON_B64'),
                         //string(credentialsId: FIREBASE_JSON_CRED, variable: 'FIREBASE_KEY_B64')
                     ]) {
