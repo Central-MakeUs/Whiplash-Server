@@ -39,5 +39,4 @@ USER nuntteo
 
 EXPOSE 8080
 
-# 컨테이너 실행 시 환경 변수(SPRING_PROFILES_ACTIVE)로 프로필을 주입
 ENTRYPOINT ["java", "-jar", "/app/app.jar"]
