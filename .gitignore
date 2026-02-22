@@ -37,6 +37,6 @@ out/
 .vscode/
 
 env.properties
-env-test.properties
+env-*.properties
 google.json
 whiplash-firebase-key.json
