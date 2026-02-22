@@ -32,7 +32,7 @@ pipeline {
             steps {
                 script {
                     // - main  -> prod
-                    // - 그 외 -> qa (예: develop)
+                    // - 그 외 -> qa
                     env.DEPLOY_ENV = (env.BRANCH_NAME == 'main') ? 'prod' : 'qa'
 
                     echo "### DEPLOY_ENV: ${env.DEPLOY_ENV}"
