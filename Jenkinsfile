@@ -104,9 +104,14 @@ pipeline {
 
                                 // 6. 운영/QA 서버에 무중단 배포 실행
                                 stage("Deploy Blue/Green to ${env.DEPLOY_ENV.toUpperCase()}") {
-                                    sh """
-                                        ssh -p ${WAS_SSH_PORT} -o StrictHostKeyChecking=no ${WAS_USERNAME}@${WAS_HOST} 'cd /opt/app/scripts && ./deploy.sh "${env.SHORT_SHA}" "${IMAGE_NAME}" "${DOCKER_USER}" "${DOCKER_PASS}" "${env.DEPLOY_ENV}"'
-                                    """
+                                    script {
+                                        // prod면 /opt/app/scripts, qa면 /opt/db/scripts
+                                        env.REMOTE_SCRIPT_DIR = (env.DEPLOY_ENV == 'prod') ? '/opt/app/scripts' : '/opt/db/scripts'
+
+                                        sh """
+                                            ssh -p ${WAS_SSH_PORT} -o StrictHostKeyChecking=no ${WAS_USERNAME}@${WAS_HOST} 'cd ${env.REMOTE_SCRIPT_DIR} && ./deploy.sh "${env.SHORT_SHA}" "${IMAGE_NAME}" "${DOCKER_USER}" "${DOCKER_PASS}" "${env.DEPLOY_ENV}"'
+                                        """
+                                    }
                                 }
                             }
                         }
