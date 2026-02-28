@@ -2,8 +2,6 @@
 FROM eclipse-temurin:17-jdk-alpine AS build
 # FROM eclipse-temurin:17-jdk AS build
 
-
-
 WORKDIR /app
 
 # Gradle Wrapper 및 의존성 관련 파일 먼저 복사 (캐싱 최적화)
@@ -28,12 +26,9 @@ RUN ./gradlew bootJar --no-daemon
 # 로컬 전용
 FROM eclipse-temurin:17-jdk AS runtime
 
-# 비루트 사용자 생성 (보안)
-RUN addgroup -g 1000 nuntteo && adduser -u 1000 -G nuntteo -s /bin/sh -D nuntteo
-
-# 로컬 전용 (Ubuntu/Debian 기반에서는 addgroup 대신 groupadd, adduser 문법이 다를 수 있으니 아래 명령어로 통일)
-# RUN groupadd -g 1001 nuntteo && \
-#    useradd -u 1001 -g nuntteo -s /bin/sh -m nuntteo
+# Ubuntu/Debian 방식
+RUN groupadd -g 1000 nuntteo && \
+    useradd -u 1000 -g nuntteo -s /bin/sh -m nuntteo
 
 WORKDIR /app
 
