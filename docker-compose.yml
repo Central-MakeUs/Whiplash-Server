@@ -5,7 +5,7 @@ services:
     image: mysql:8.0
     container_name: db
     env_file:
-      - env.properties
+      - src/main/resources/env.properties
     ports:
       - "33366:3306"
     volumes:
@@ -30,7 +30,7 @@ services:
     ports:
       - "8080:8080"
     env_file:
-      - env.properties
+      - src/main/resources/env.properties
     environment:
       SPRING_PROFILES_ACTIVE: local
       # Docker 내부에서는 'localhost' 대신 서비스명(db, redis)을 사용
@@ -75,7 +75,7 @@ services:
     ports:
       - "3001:3000"
     env_file:
-      - env.properties
+      - src/main/resources/env.properties
     volumes:
       - grafana_data:/var/lib/grafana
     networks:
@@ -93,7 +93,7 @@ services:
     ports:
       - "63790:6379"
     env_file:
-      - env.properties
+      - src/main/resources/env.properties
     command: redis-server --requirepass ${REDIS_PASSWORD}
     volumes:
       - redis_data:/data
