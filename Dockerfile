@@ -1,9 +1,8 @@
-# Build Stage
+# 1. Build Stage: 빌드 시에도 Alpine 사용 (Mac 로컬 호환성을 위해 JDK 버전 사용)
 FROM eclipse-temurin:17-jdk-alpine AS build
-
 WORKDIR /app
 
-# Gradle Wrapper 및 의존성 관련 파일 먼저 복사 (캐싱 최적화)
+# Gradle Wrapper 및 의존성 파일 복사
 COPY gradlew .
 COPY gradle gradle
 COPY build.gradle .
@@ -12,32 +11,29 @@ COPY settings.gradle .
 RUN chmod +x ./gradlew
 RUN ./gradlew dependencies --no-daemon
 
-# 소스 코드 복사
+# 소스 코드 복사 및 빌드
 COPY src src
-
-# 빌드
 RUN ./gradlew bootJar --no-daemon
 
-# Runtime Stage
+# 2. Runtime Stage: 최경량화를 위해 JRE Alpine 사용
 FROM eclipse-temurin:17-jre-alpine AS runtime
-
-# 비루트 사용자 생성 (보안)
-RUN addgroup -g 1000 nuntteo && adduser -u 1000 -G nuntteo -s /bin/sh -D nuntteo
-
 WORKDIR /app
+
+# 보안을 위해 비루트 사용자 생성
+RUN addgroup -g 1000 nuntteo && \
+    adduser -u 1000 -G nuntteo -h /home/nuntteo -D nuntteo
 
 # 빌드된 JAR 복사
 COPY --from=build /app/build/libs/*.jar app.jar
 
-# 로그 디렉토리를 미리 생성하고 소유권을 nuntteo 사용자에게 부여
-# 이 작업은 컨테이너 내부에서 로그 파일 생성 시 발생하는 권한 문제를 해결
-RUN mkdir -p /app/logs && chown -R nuntteo:nuntteo /app/logs
+# 로그 디렉토리 생성 및 권한 부여
+RUN mkdir -p /app/logs && \
+    chown -R nuntteo:nuntteo /app/logs && \
+    chmod 755 /app/logs && \
+    chmod 444 app.jar
 
-RUN chown nuntteo:nuntteo app.jar
-
+# 사용자 전환
 USER nuntteo
-
 EXPOSE 8080
 
-# 컨테이너 실행 시 환경 변수(SPRING_PROFILES_ACTIVE)로 프로필을 주입
-ENTRYPOINT ["java", "-jar", "/app/app.jar"]
+ENTRYPOINT ["java", "-jar", "app.jar"]

@@ -6,7 +6,7 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
 @Component("MOCK")
-//@Profile("local")
+@Profile("!prod")
 public class MockVerifier implements SocialVerifier {
 
     @Override
