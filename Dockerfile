@@ -20,8 +20,8 @@ FROM eclipse-temurin:17-jre-alpine AS runtime
 WORKDIR /app
 
 # 보안을 위해 비루트 사용자 생성
-RUN addgroup -g 2000 nuntteo && \
-    adduser -u 2000 -G nuntteo -h /home/nuntteo -D nuntteo
+RUN addgroup -g 1000 nuntteo && \
+    adduser -u 1000 -G nuntteo -h /home/nuntteo -D nuntteo
 
 # 빌드된 JAR 복사
 COPY --from=build /app/build/libs/*.jar app.jar
@@ -32,6 +32,7 @@ RUN mkdir -p /app/logs && \
     chmod 755 /app/logs && \
     chmod 444 app.jar
 
+# 사용자 전환
 USER nuntteo
 EXPOSE 8080
 
