@@ -13,7 +13,7 @@ RUN ./gradlew dependencies --no-daemon
 
 # 소스 코드 복사 및 빌드
 COPY src src
-RUN ./gradlew bootJar --no-daemon -x test
+RUN ./gradlew bootJar --no-daemon
 
 # 2. Runtime Stage: 최경량화를 위해 JRE Alpine 사용
 FROM eclipse-temurin:17-jre-alpine AS runtime
@@ -29,7 +29,8 @@ COPY --from=build /app/build/libs/*.jar app.jar
 # 로그 디렉토리 생성 및 권한 부여
 RUN mkdir -p /app/logs && \
     chown -R nuntteo:nuntteo /app/logs && \
-    chown nuntteo:nuntteo app.jar
+    chmod 755 /app/logs && \
+    chmod 444 app.jar
 
 USER nuntteo
 EXPOSE 8080
