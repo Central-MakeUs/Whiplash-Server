@@ -226,7 +226,7 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
             .map(Weekday::getDayOfWeek)
             .collect(Collectors.toSet());
 
-        // TODO: 요청일보다 이전 날짜에 울려야할 알람을 꺼야하는 경우도 처리해야함(사용자가 알람을 안꺼서
+        // TODO: 요청일보다 이전 날짜에 울려야할 알람을 꺼야하는 경우도 처리해야함(사용자가 알람을 안꺼서)
         LocalDate targetDate = DateUtil.getNextOccurrenceDate(repeatDays, today);
 
         // 3. 요청일과 끄려고 하는 날짜가 같은 주인지 검증
@@ -261,6 +261,7 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
         AlarmEntity alarm = findAlarmById(alarmId);
         validAlarmOwner(memberId, alarm.getMember().getId());
 
+        // 아직 비활성화되지 않은 알람 발생 이력 중 가장 최근 것을 가져옴.
         AlarmOccurrenceEntity occurrence = alarmOccurrenceRepository
             .findTopByAlarmIdAndDeactivateTypeInOrderByDateDescTimeDesc(
                 alarmId,
@@ -268,12 +269,14 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
             )
             .orElseThrow(() -> ApplicationException.from(ALARM_OCCURRENCE_NOT_FOUND));
 
+        // 아직 알람이 울릴 시간이 아니라면 예외 발생
         LocalDateTime now = LocalDateTime.now();
         LocalDateTime scheduledDateTime = LocalDateTime.of(occurrence.getDate(), occurrence.getTime());
         if (now.isBefore(scheduledDateTime)) {
             throw ApplicationException.from(NOT_ALARM_TIME);
         }
 
+        // 알람 울림 로그 생성
         int ringIndex = occurrence.ring();
         AlarmRingingLogEntity log = AlarmMapper.mapToAlarmRingingLogEntity(
             occurrence,
