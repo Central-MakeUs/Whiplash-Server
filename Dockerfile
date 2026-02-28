@@ -1,5 +1,8 @@
-# Build Stage
+# Build Stage (mac 로컬에서는 alpine 이미지 사용 불가)
 FROM eclipse-temurin:17-jdk-alpine AS build
+# FROM eclipse-temurin:17-jdk AS build
+
+
 
 WORKDIR /app
 
@@ -15,14 +18,22 @@ RUN ./gradlew dependencies --no-daemon
 # 소스 코드 복사
 COPY src src
 
-# 빌드
+# 빌드 (로컬에서는 테스트 제외를 위해 -x test 추가)
 RUN ./gradlew bootJar --no-daemon
+# RUN ./gradlew bootJar --no-daemon -x test
 
 # Runtime Stage
-FROM eclipse-temurin:17-jre-alpine AS runtime
+# FROM eclipse-temurin:17-jre-alpine AS runtime
+
+# 로컬 전용
+FROM eclipse-temurin:17-jdk AS runtime
 
 # 비루트 사용자 생성 (보안)
 RUN addgroup -g 1000 nuntteo && adduser -u 1000 -G nuntteo -s /bin/sh -D nuntteo
+
+# 로컬 전용 (Ubuntu/Debian 기반에서는 addgroup 대신 groupadd, adduser 문법이 다를 수 있으니 아래 명령어로 통일)
+# RUN groupadd -g 1001 nuntteo && \
+#    useradd -u 1001 -g nuntteo -s /bin/sh -m nuntteo
 
 WORKDIR /app
 

@@ -38,6 +38,9 @@ public class FcmService {
     private static final int FCM_MULTICAST_LIMIT = 500;
     private static final String DEFAULT_TITLE = "눈 떠";
     private static final String RINGING_BODY = "알람이 울리고 있어요! 앱으로 접속해서 알람을 꺼주세요!";
+    
+    // TODO: 테스트용 지연 변수 (배포 시 제거 필요)
+    public static long TEST_DELAY_MS = 0;
 
     private final RedisService redisService;
 
@@ -135,6 +138,15 @@ public class FcmService {
       * @param targets
      */
     public FcmMetricResult sendRingingNotifications(List<RingingPushTargetDto> targets) {
+        if (TEST_DELAY_MS > 0) {
+            try {
+                log.warn("FCM Latency Simulation: Sleeping for {}ms", TEST_DELAY_MS);
+                Thread.sleep(TEST_DELAY_MS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }
+
         if (targets == null || targets.isEmpty()) {
             return FcmMetricResult.builder()
                 .successCount(0)
