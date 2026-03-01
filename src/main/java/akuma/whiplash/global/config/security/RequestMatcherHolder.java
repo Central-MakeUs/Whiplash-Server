@@ -64,6 +64,9 @@ public class RequestMatcherHolder {
         // actuator
         new RequestInfo(GET, "/actuator/**", null),
 
+        // QA 전용 토큰 발급 (SecurityConfig에서 qa 프로파일에서만 등록)
+        new RequestInfo(POST, "/qa/auth/token", null),
+
         // 빌드 에러 방지를 위해 각 권한에 대한 RequestInfo가 최소 1개씩은 리스트에 있어야함
         new RequestInfo(GET, "/api/admin/**", ADMIN)
     );
