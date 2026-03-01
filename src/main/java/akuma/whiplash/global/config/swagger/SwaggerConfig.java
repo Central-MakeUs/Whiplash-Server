@@ -25,6 +25,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
+import org.springframework.core.env.Environment;
 import org.springframework.web.method.HandlerMethod;
 
 @Configuration
@@ -34,20 +35,10 @@ public class SwaggerConfig {
     private String serverUrl;
 
     @Bean
-    @Profile("local")
-    public OpenAPI localOpenAPI() {
-        return createOpenAPI(getLocalServer());
+    @Profile({"local", "dev", "qa", "prod"})
+    public OpenAPI openAPI(Environment environment) {
+        return createOpenAPI(getServer(environment));
     }
-
-    @Bean
-    @Profile("dev")
-    public OpenAPI devOpenAPI() {
-        return createOpenAPI(getDevServer());
-    }
-
-    @Bean
-    @Profile("prod")
-    public OpenAPI prodOpenAPI() {return  createOpenAPI(getProdServer()); }
 
     private OpenAPI createOpenAPI(Server server) {
         return new OpenAPI()
@@ -64,22 +55,30 @@ public class SwaggerConfig {
                 .addSecurityItem(new SecurityRequirement().addList("bearerAuth"));
     }
 
-    private Server getLocalServer() {
-        return new Server()
-                .url(serverUrl)
-                .description("Local Server");
-    }
-
-    private Server getDevServer() {
-        return new Server()
-                .url(serverUrl)
-                .description("Dev Server");
-    }
-
-    private Server getProdServer() {
+    private Server getServer(Environment environment) {
+        String description = resolveServerDescription(environment);
         return new Server()
             .url(serverUrl)
-            .description("Prod Server");
+            .description(description);
+    }
+
+    private String resolveServerDescription(Environment environment) {
+        for (String profile : environment.getActiveProfiles()) {
+            switch (profile) {
+                case "local":
+                    return "Local Server";
+                case "dev":
+                    return "Dev Server";
+                case "qa":
+                    return "Qa Server";
+                case "prod":
+                    return "Prod Server";
+                default:
+                    break;
+            }
+        }
+
+        return "Server";
     }
 
     @Bean
