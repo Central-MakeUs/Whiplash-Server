@@ -56,6 +56,7 @@ public class AlarmOccurrenceBatchService {
             try {
                 AlarmOccurrenceEntity occurrence = AlarmMapper.mapToAlarmOccurrenceForDate(alarm, today);
                 alarmOccurrenceRepository.save(occurrence);
+
                 createdCount++;
 
                 log.info("[AlarmOccurrence Create Batch] 생성 완료: alarmId={}, date={}", alarm.getId(), today);

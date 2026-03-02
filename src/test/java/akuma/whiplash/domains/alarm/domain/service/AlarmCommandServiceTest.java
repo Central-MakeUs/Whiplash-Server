@@ -36,6 +36,9 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.Optional;
+
+import akuma.whiplash.global.service.ArchiveService;
+import akuma.whiplash.infrastructure.redis.RingingAlarmRedisRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -61,6 +64,10 @@ class AlarmCommandServiceTest {
     private AlarmRingingLogRepository alarmRingingLogRepository;
     @Mock
     private MemberRepository memberRepository;
+    @Mock
+    private RingingAlarmRedisRepository ringingAlarmRedisRepository;
+    @Mock
+    private ArchiveService archiveService;
 
     @InjectMocks
     private AlarmCommandServiceImpl alarmCommandService;
@@ -532,40 +539,52 @@ class AlarmCommandServiceTest {
         }
     }
 
-/*    @Nested
+    @Nested
     @DisplayName("ringAlarm - 알람 울림")
     class RingAlarmTest {
 
         @Test
-        @DisplayName("알람이 울리면 울림 정보가 갱신되고 로그가 저장된다")
+        @DisplayName("알람이 울리면 alarmRinging=true, 로그 저장, Redis 적재가 모두 수행된다")
         void success() {
-
             // given
             MemberEntity member = MemberFixture.MEMBER_5.toMockEntity();
-            AlarmEntity alarm = AlarmFixture.ALARM_05.toMockEntity();
+            AlarmFixture fixture = AlarmFixture.ALARM_05;
+            AlarmEntity alarm = AlarmEntity.builder()
+                    .id(fixture.getId())
+                    .alarmPurpose(fixture.getAlarmPurpose())
+                    .time(fixture.getTime())
+                    .repeatDays(fixture.getRepeatDays())
+                    .soundType(fixture.getSoundType())
+                    .latitude(fixture.getLatitude())
+                    .longitude(fixture.getLongitude())
+                    .address(fixture.getAddress())
+                    .member(member) // toEntity()는 id가 없으므로 toMockEntity()로 생성한 member 직접 주입
+                    .build();
             AlarmOccurrenceEntity occurrence = AlarmOccurrenceEntity.builder()
-                .id(1L)
-                .alarm(alarm)
-                .date(LocalDate.now().minusDays(1))
-                .time(alarm.getTime())
-                .deactivateType(DeactivateType.NONE)
-                .alarmRinging(false)
-                .ringingCount(0)
-                .reminderSent(false)
-                .build();
+                    .id(1L)
+                    .alarm(alarm)
+                    .date(LocalDate.now().minusDays(1)) // 과거 날짜 → 알람 시각 이미 지남
+                    .time(LocalTime.of(0, 0))
+                    .deactivateType(DeactivateType.NONE)
+                    .alarmRinging(false)
+                    .ringingCount(0)
+                    .reminderSent(false)
+                    .build();
 
-            given(
-                alarmOccurrenceRepository
-                    .findTopByAlarmIdAndDeactivateTypeInOrderByDateDescTimeDesc(eq(alarm.getId()), anyList())
-            ).willReturn(Optional.of(occurrence));
+            given(alarmRepository.findById(alarm.getId())).willReturn(Optional.of(alarm));
+            given(alarmOccurrenceRepository
+                    .findTopByAlarmIdAndDeactivateTypeInOrderByDateDescTimeDesc(eq(alarm.getId()), anyList()))
+                    .willReturn(Optional.of(occurrence));
 
             // when
             alarmCommandService.ringAlarm(member.getId(), alarm.getId());
 
             // then
-            verify(alarmRingingLogRepository).save(any());
-            assertThat(occurrence.isAlarmRinging()).isTrue();
+            assertThat(occurrence.isAlarmRinging()).isTrue();          // DB 컬럼 변경
             assertThat(occurrence.getRingingCount()).isEqualTo(1);
+            verify(alarmRingingLogRepository).save(any());             // 로그 저장
+            verify(ringingAlarmRedisRepository).add(                   // Redis ZADD
+                    eq(alarm.getId()), eq(member.getId()), anyLong());
         }
 
         @Test
@@ -574,11 +593,22 @@ class AlarmCommandServiceTest {
 
             // given
             MemberEntity member = MemberFixture.MEMBER_5.toMockEntity();
-            AlarmEntity alarm = AlarmFixture.ALARM_05.toMockEntity();
+            AlarmFixture fixture = AlarmFixture.ALARM_05;
+            AlarmEntity alarm = AlarmEntity.builder()
+                    .id(fixture.getId())
+                    .alarmPurpose(fixture.getAlarmPurpose())
+                    .time(fixture.getTime())
+                    .repeatDays(fixture.getRepeatDays())
+                    .soundType(fixture.getSoundType())
+                    .latitude(fixture.getLatitude())
+                    .longitude(fixture.getLongitude())
+                    .address(fixture.getAddress())
+                    .member(member) // toEntity()는 id가 없으므로 toMockEntity()로 생성한 member 직접 주입
+                    .build();
             AlarmOccurrenceEntity occurrence = AlarmOccurrenceEntity.builder()
                 .id(1L)
                 .alarm(alarm)
-                .date(LocalDate.now().plusDays(1))
+                .date(LocalDate.now().plusDays(1))  // 미래 날짜 → 아직 울릴 시간 아님
                 .time(LocalTime.now().plusHours(1))
                 .deactivateType(DeactivateType.NONE)
                 .alarmRinging(false)
@@ -586,6 +616,7 @@ class AlarmCommandServiceTest {
                 .reminderSent(false)
                 .build();
 
+            given(alarmRepository.findById(alarm.getId())).willReturn(Optional.of(alarm));
             given(
                 alarmOccurrenceRepository
                     .findTopByAlarmIdAndDeactivateTypeInOrderByDateDescTimeDesc(eq(alarm.getId()), anyList())
@@ -595,6 +626,5 @@ class AlarmCommandServiceTest {
             assertThatThrownBy(() -> alarmCommandService.ringAlarm(member.getId(), alarm.getId()))
                 .isInstanceOf(ApplicationException.class);
         }
-    }*/
-
+    }
 }

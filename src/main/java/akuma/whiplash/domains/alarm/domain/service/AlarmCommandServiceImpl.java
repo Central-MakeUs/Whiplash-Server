@@ -25,6 +25,7 @@ import akuma.whiplash.domains.member.persistence.repository.MemberRepository;
 import akuma.whiplash.global.exception.ApplicationException;
 import akuma.whiplash.global.service.ArchiveService;
 import akuma.whiplash.global.util.date.DateUtil;
+import akuma.whiplash.infrastructure.redis.RingingAlarmRedisRepository;
 import com.google.api.services.sheets.v4.Sheets;
 import com.google.api.services.sheets.v4.SheetsScopes;
 import com.google.api.services.sheets.v4.model.ValueRange;
@@ -35,6 +36,7 @@ import com.google.auth.oauth2.ServiceAccountCredentials;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.Collections;
 import java.util.List;
@@ -60,6 +62,7 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
     private final AlarmRingingLogRepository alarmRingingLogRepository;
     private final MemberRepository memberRepository;
     private final ArchiveService archiveService;
+    private final RingingAlarmRedisRepository ringingAlarmRedisRepository;
 
     @Value("${oauth.google.sheet.id}")
     private String spreadsheetsId;
@@ -193,7 +196,10 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
         AlarmEntity alarm = findAlarmById(alarmId);
         validAlarmOwner(memberId, alarm.getMember().getId());
 
-        // 1-2. 삭제할 데이터 삭제 전 아카이빙
+        // 1-2. 울리고 있을 수 있으므로 Redis Sorted Set에서 먼저 제거
+        ringingAlarmRedisRepository.remove(alarmId, memberId);
+
+        // 1-3. 삭제할 데이터 삭제 전 아카이빙
         archiveService.archiveAlarmWithRelations(alarmId);
 
         // 2. 삭제 사유를 Google Sheets에 로그로 기록
@@ -254,6 +260,10 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
 
         // 7. 체크인 처리
         occurrence.checkin(LocalDateTime.now());
+
+        // 체크인으로 알람이 비활성화됐으므로 Redis Sorted Set에서 제거.
+        // 항목이 없어도 ZREM은 no-op이므로 항상 안전하게 호출한다.
+        ringingAlarmRedisRepository.remove(alarmId, memberId);
     }
 
     @Override
@@ -284,6 +294,14 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
             now
         );
         alarmRingingLogRepository.save(log);
+
+        // Redis Sorted Set 적재: score = 알람 예정 시각 epoch millis
+        // 동일 member로 재호출 시 score만 갱신되므로 멱등하다.
+        long score = scheduledDateTime
+            .atZone(ZoneId.of("Asia/Seoul"))
+            .toInstant()
+            .toEpochMilli();
+        ringingAlarmRedisRepository.add(alarmId, memberId, score);
     }
 
     @Override
