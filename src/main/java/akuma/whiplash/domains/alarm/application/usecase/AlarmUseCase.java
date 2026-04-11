@@ -3,14 +3,11 @@ package akuma.whiplash.domains.alarm.application.usecase;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmCheckinRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmRegisterRequest;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmInfoPreviewResponse;
-import akuma.whiplash.domains.alarm.application.dto.response.AlarmOffResultResponse;
-import akuma.whiplash.domains.alarm.application.dto.response.AlarmRemainingOffCountResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.CreateAlarmOccurrenceResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.CreateAlarmResponse;
 import akuma.whiplash.domains.alarm.domain.service.AlarmCommandService;
 import akuma.whiplash.domains.alarm.domain.service.AlarmQueryService;
 import akuma.whiplash.global.annotation.architecture.UseCase;
-import java.time.LocalDateTime;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 
@@ -29,10 +26,6 @@ public class AlarmUseCase {
         return alarmCommandService.createAlarmOccurrence(memberId, alarmId);
     }
 
-    public AlarmOffResultResponse alarmOff(Long memberId, Long alarmId, LocalDateTime clientNow) {
-        return alarmCommandService.alarmOff(memberId, alarmId, clientNow);
-    }
-
     public void removeAlarm(Long memberId, Long alarmId, String reason) {
         alarmCommandService.removeAlarm(memberId, alarmId, reason);
     }
@@ -49,7 +42,4 @@ public class AlarmUseCase {
         return alarmQueryService.getAlarms(memberId);
     }
 
-    public AlarmRemainingOffCountResponse getWeeklyRemainingOffCount(Long memberId) {
-        return alarmQueryService.getWeeklyRemainingOffCount(memberId);
-    }
 }

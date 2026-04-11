@@ -1,7 +1,6 @@
 package akuma.whiplash.domains.alarm.application.mapper;
 
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmRegisterRequest;
-import akuma.whiplash.domains.alarm.application.dto.response.AlarmInfoPreviewResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.CreateAlarmOccurrenceResponse;
 import akuma.whiplash.domains.alarm.domain.constant.DeactivateType;
 import akuma.whiplash.domains.alarm.domain.constant.SoundType;
@@ -9,14 +8,12 @@ import akuma.whiplash.domains.alarm.domain.constant.Weekday;
 import akuma.whiplash.domains.alarm.exception.AlarmErrorCode;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmEntity;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmOccurrenceEntity;
-import akuma.whiplash.domains.alarm.persistence.entity.AlarmOffLogEntity;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmRingingLogEntity;
 import akuma.whiplash.domains.member.persistence.entity.MemberEntity;
 import akuma.whiplash.global.exception.ApplicationException;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Objects;
 
@@ -32,13 +29,6 @@ public class AlarmMapper {
             .latitude(request.latitude())
             .longitude(request.longitude())
             .address(request.address())
-            .build();
-    }
-
-    public static AlarmOffLogEntity mapToAlarmOffLogEntity(AlarmEntity alarm, MemberEntity member) {
-        return AlarmOffLogEntity.builder()
-            .alarm(alarm)
-            .member(member)
             .build();
     }
 
@@ -107,4 +97,3 @@ public class AlarmMapper {
             .toList();
     }
 }
-
