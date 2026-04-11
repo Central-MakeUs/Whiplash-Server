@@ -2,21 +2,15 @@ package akuma.whiplash.domains.alarm.domain.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.verify;
 
 import akuma.whiplash.common.fixture.AlarmFixture;
 import akuma.whiplash.common.fixture.MemberFixture;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmInfoPreviewResponse;
-import akuma.whiplash.domains.alarm.application.dto.response.AlarmRemainingOffCountResponse;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmEntity;
 import akuma.whiplash.domains.alarm.persistence.repository.AlarmOccurrenceRepository;
-import akuma.whiplash.domains.alarm.persistence.repository.AlarmOffLogRepository;
 import akuma.whiplash.domains.alarm.persistence.repository.AlarmRepository;
 import akuma.whiplash.domains.member.exception.MemberErrorCode;
 import akuma.whiplash.domains.member.persistence.entity.MemberEntity;
@@ -38,7 +32,6 @@ class AlarmQueryServiceTest {
 
     @Mock private AlarmRepository alarmRepository;
     @Mock private AlarmOccurrenceRepository alarmOccurrenceRepository;
-    @Mock private AlarmOffLogRepository alarmOffLogRepository;
     @Mock private MemberRepository memberRepository;
 
     @InjectMocks private AlarmQueryServiceImpl alarmQueryService;
@@ -77,41 +70,6 @@ class AlarmQueryServiceTest {
             assertThatThrownBy(() -> alarmQueryService.getAlarms(memberId))
                 .isInstanceOf(ApplicationException.class)
                 .hasFieldOrPropertyWithValue("code", MemberErrorCode.MEMBER_NOT_FOUND);
-        }
-    }
-
-    @Nested
-    @DisplayName("getWeeklyRemainingOffCount - 남은 알람 끄기 횟수 조회")
-    class GetWeeklyRemainingOffCountTest {
-
-        @Test
-        @DisplayName("성공: 이번 주 남은 OFF 횟수를 반환한다")
-        void success() {
-            // given
-            Long memberId = MemberFixture.MEMBER_5.getId();
-            MemberEntity member = MemberFixture.MEMBER_5.toMockEntity();
-            given(memberRepository.findById(memberId)).willReturn(Optional.of(member));
-            given(alarmOffLogRepository.countByMemberIdAndCreatedAtBetween(eq(memberId), any(), any()))
-                .willReturn(1L);
-
-            // when
-            AlarmRemainingOffCountResponse response = alarmQueryService.getWeeklyRemainingOffCount(memberId);
-
-            // then
-            assertThat(response.remainingOffCount()).isEqualTo(1);
-            verify(alarmOffLogRepository).countByMemberIdAndCreatedAtBetween(eq(memberId), any(), any());
-        }
-
-        @Test
-        @DisplayName("실패: 회원이 존재하지 않으면 예외를 던진다")
-        void fail_memberNotFound() {
-            // given
-            Long memberId = MemberFixture.MEMBER_6.getId();
-            given(memberRepository.findById(memberId)).willReturn(Optional.empty());
-
-            // when & then
-            assertThatThrownBy(() -> alarmQueryService.getWeeklyRemainingOffCount(memberId))
-                .isInstanceOf(ApplicationException.class);
         }
     }
 }

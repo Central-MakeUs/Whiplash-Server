@@ -3,13 +3,11 @@ package akuma.whiplash.domains.alarm.domain.service;
 import akuma.whiplash.domains.alarm.application.dto.etc.OccurrencePushInfo;
 import akuma.whiplash.domains.alarm.application.dto.etc.RingingPushInfo;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmInfoPreviewResponse;
-import akuma.whiplash.domains.alarm.application.dto.response.AlarmRemainingOffCountResponse;
 import akuma.whiplash.domains.alarm.domain.constant.DeactivateType;
 import akuma.whiplash.domains.alarm.domain.constant.Weekday;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmEntity;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmOccurrenceEntity;
 import akuma.whiplash.domains.alarm.persistence.repository.AlarmOccurrenceRepository;
-import akuma.whiplash.domains.alarm.persistence.repository.AlarmOffLogRepository;
 import akuma.whiplash.domains.alarm.persistence.repository.AlarmRepository;
 import akuma.whiplash.domains.member.exception.MemberErrorCode;
 import akuma.whiplash.domains.member.persistence.repository.MemberRepository;
@@ -38,10 +36,7 @@ public class AlarmQueryServiceImpl implements AlarmQueryService {
 
     private final AlarmRepository alarmRepository;
     private final AlarmOccurrenceRepository alarmOccurrenceRepository;
-    private final AlarmOffLogRepository alarmOffLogRepository;
     private final MemberRepository memberRepository;
-
-    private static final int WEEKLY_OFF_LIMIT = 2;
 
     @Transactional
     @Override
@@ -55,7 +50,7 @@ public class AlarmQueryServiceImpl implements AlarmQueryService {
         LocalDate today = LocalDate.now();
 
         return alarms.stream()
-            .map(alarm -> buildPreviewResponse(alarm, today, memberId))
+            .map(alarm -> buildPreviewResponse(alarm, today))
             .toList();
     }
 
@@ -89,29 +84,7 @@ public class AlarmQueryServiceImpl implements AlarmQueryService {
             ));
     }
 
-    @Override
-    public AlarmRemainingOffCountResponse getWeeklyRemainingOffCount(Long memberId) {
-        memberRepository
-            .findById(memberId)
-            .orElseThrow(() -> ApplicationException.from(MemberErrorCode.MEMBER_NOT_FOUND));
-
-        LocalDate today = LocalDate.now();
-        LocalDate monday = today.with(DayOfWeek.MONDAY);
-        LocalDateTime weekStart = monday.atStartOfDay();
-        LocalDateTime now = LocalDateTime.now();
-
-        long offCount = alarmOffLogRepository.countByMemberIdAndCreatedAtBetween(
-            memberId, weekStart, now
-        );
-
-        int count = (int) Math.max(0, WEEKLY_OFF_LIMIT - offCount);
-
-        return AlarmRemainingOffCountResponse.builder()
-            .remainingOffCount(count)
-            .build();
-    }
-
-    private AlarmInfoPreviewResponse buildPreviewResponse(AlarmEntity alarm, LocalDate today, Long memberId) {
+    private AlarmInfoPreviewResponse buildPreviewResponse(AlarmEntity alarm, LocalDate today) {
         // 1. 가장 최근 OFF 또는 CHECKIN 이력 조회
         Optional<AlarmOccurrenceEntity> recentOccurrenceOpt =
             alarmOccurrenceRepository.findTopByAlarmIdAndDeactivateTypeInOrderByDateDescTimeDesc(
@@ -184,6 +157,4 @@ public class AlarmQueryServiceImpl implements AlarmQueryService {
         return alarmOccurrenceRepository.findRingingNotificationTargets(DeactivateType.NONE);
     }
 }
-
-
 

@@ -1,7 +1,6 @@
 package akuma.whiplash.domains.alarm.persistence.repository;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.*;
 
 import akuma.whiplash.common.config.PersistenceTest;
 import akuma.whiplash.common.fixture.AlarmFixture;
@@ -10,10 +9,8 @@ import akuma.whiplash.domains.alarm.application.mapper.AlarmMapper;
 import akuma.whiplash.domains.alarm.domain.constant.DeactivateType;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmEntity;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmOccurrenceEntity;
-import akuma.whiplash.domains.alarm.persistence.entity.AlarmOffLogEntity;
 import akuma.whiplash.domains.member.persistence.entity.MemberEntity;
 import akuma.whiplash.domains.member.persistence.repository.MemberRepository;
-import akuma.whiplash.global.util.date.DateUtil;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Optional;
@@ -30,8 +27,6 @@ class AlarmOccurrenceRepositoryTest {
     private AlarmOccurrenceRepository alarmOccurrenceRepository;
     @Autowired
     private AlarmRepository alarmRepository;
-    @Autowired
-    private AlarmOffLogRepository alarmOffLogRepository;
     @Autowired
     private MemberRepository memberRepository;
 
@@ -89,54 +84,6 @@ class AlarmOccurrenceRepositoryTest {
             // then
             assertThat(found.getDeactivateType()).isEqualTo(DeactivateType.CHECKIN);
             assertThat(found.getCheckinTime()).isNotNull();
-        }
-    }
-
-    @Nested
-    @DisplayName("countByMemberIdAndCreatedAtBetween - 주간 알람 끈 횟수 조회")
-    class CountByMemberIdAndCreatedAtBetweenTest {
-
-        @Test
-        @DisplayName("성공: 회원의 주간 알람 끈 횟수를 반환한다")
-        void success() {
-            // given
-            MemberEntity member = memberRepository.save(MemberFixture.MEMBER_11.toEntity());
-            AlarmEntity alarm = alarmRepository.save(AlarmFixture.ALARM_11.toEntity(member));
-            alarmOffLogRepository.save(AlarmOffLogEntity.builder().alarm(alarm).member(member).build());
-
-            LocalDate weekStart = DateUtil.getWeekStartDate(LocalDate.now());
-            LocalDate weekEnd = DateUtil.getWeekEndDate(weekStart);
-
-            // when
-            long count = alarmOffLogRepository.countByMemberIdAndCreatedAtBetween(
-                member.getId(),
-                weekStart.atStartOfDay(),
-                weekEnd.plusDays(1).atStartOfDay()
-            );
-
-            // then
-            assertThat(count).isEqualTo(1);
-        }
-
-        @Test
-        @DisplayName("성공: 해당 주에 끈 기록이 없으면 0을 반환한다")
-        void success_zeroWhenNoLog() {
-            // given
-            MemberEntity member = memberRepository.save(MemberFixture.MEMBER_12.toEntity());
-            alarmRepository.save(AlarmFixture.ALARM_12.toEntity(member));
-
-            LocalDate weekStart = DateUtil.getWeekStartDate(LocalDate.now());
-            LocalDate weekEnd = DateUtil.getWeekEndDate(weekStart);
-
-            // when
-            long count = alarmOffLogRepository.countByMemberIdAndCreatedAtBetween(
-                member.getId(),
-                weekStart.atStartOfDay(),
-                weekEnd.plusDays(1).atStartOfDay()
-            );
-
-            // then
-            assertThat(count).isZero();
         }
     }
 }
