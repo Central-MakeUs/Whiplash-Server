@@ -14,13 +14,13 @@ NAME(HttpStatus.STATUS, "DOMAIN_x001", "~입니다."),
 허용 상태: 400 / 401 / 403 / 404 / 409
 
 ## 코드 범위
-| 범위 | 상태 |
-|---|---|
+| 범위               | 상태 |
+|------------------|---|
 | `DOMAIN_001~099` | 400 Bad Request |
 | `DOMAIN_101~199` | 401 Unauthorized |
 | `DOMAIN_301~399` | 403 Forbidden |
 | `DOMAIN_401~499` | 404 Not Found |
-| `DOMAIN_409` | 409 Conflict |
+| `DOMAIN_901~999` | 409 Conflict |
 
 ## 예외 발생
 ```java
