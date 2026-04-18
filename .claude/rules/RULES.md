@@ -20,6 +20,17 @@ ErrorCode enum: `NAME(HttpStatus.STATUS, "Domain_x001", "~입니다.")`
 | 삭제 | `removeXxx` | `deleteXxx` |
 | 수정 | `modifyXxx` | `updateXxx` |
 
+## Mapper
+- 엔티티 ↔ DTO 변환 `{Domain}Mapper.mapToXxx()` static 메서드를 사용
+- Service/UseCase 내 인라인 빌더 직접 사용 금지
+- Mapper 클래스: `public class XxxMapper { private XxxMapper() { throw new IllegalArgumentException(); } }`
+
+## 엔티티 FK 참조
+- 연관 엔티티는 `Long xxxId` 컬럼이 아닌 `@ManyToOne(fetch = FetchType.LAZY)` 객체 참조 사용
+- Repository 쿼리 메서드에서 중첩 프로퍼티 접근은 `_`로 구분
+  - ✅ `findByMember_IdAndDeviceId(Long memberId, String deviceId)`
+  - ❌ `findByMemberIdAndDeviceId(Long memberId, String deviceId)`
+
 ## DTO 필드
 - PK: 도메인명 포함 (`alarmId`, `memberId`)
 - List 응답 필드명: `{도메인}s` (`alarms`, `tickets`)

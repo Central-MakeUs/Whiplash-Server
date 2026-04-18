@@ -32,6 +32,48 @@ Entity → Repository → enum → ErrorCode → Service → DTO → Mapper → 
 ### Entity
 `BaseTimeEntity` 상속, `@SuperBuilder`, `@DynamicInsert`, `@NoArgsConstructor(access = PROTECTED)`
 
+연관 엔티티는 ID(Long) 컬럼 대신 `@ManyToOne` 객체 참조를 사용한다:
+```java
+// ❌ 금지
+@Column(name = "member_id", nullable = false)
+private Long memberId;
+
+// ✅ 올바른 패턴
+@ManyToOne(fetch = FetchType.LAZY)
+@JoinColumn(name = "member_id", nullable = false)
+private MemberEntity member;
+```
+
+### Repository
+중첩 엔티티의 ID로 조회할 때는 `_`로 프로퍼티 경로를 구분한다:
+```java
+// member 필드의 id로 조회
+Optional<MemberDeviceEntity> findByMember_IdAndDeviceId(Long memberId, String deviceId);
+```
+
+### Mapper
+엔티티 ↔ DTO 변환은 반드시 Mapper의 static 메서드로 처리한다. Service 내 인라인 빌더 금지.
+```java
+public class AuthMapper {
+    private AuthMapper() { throw new IllegalArgumentException(); }
+
+    // SocialMemberInfo → MemberEntity (신규 회원 저장용)
+    public static MemberEntity mapToMemberEntity(SocialMemberInfo info) { ... }
+
+    // MemberEntity + request → MemberDeviceEntity (연관 엔티티 포함)
+    public static MemberDeviceEntity mapToMemberDeviceEntity(MemberEntity member, SocialLoginRequest request) {
+        return MemberDeviceEntity.builder()
+            .member(member)   // Long memberId ❌ → MemberEntity ✅
+            .deviceId(request.deviceId())
+            ...
+            .build();
+    }
+
+    // MemberEntity → LoginResponse.MemberInfo
+    public static MemberInfo mapToMemberInfo(MemberEntity member, boolean isNewMember) { ... }
+}
+```
+
 ### CommandService / QueryService
 - Command: `@Service @Transactional` — 상태 변경
 - Query: `@Service @Transactional(readOnly = true)` — 조회
