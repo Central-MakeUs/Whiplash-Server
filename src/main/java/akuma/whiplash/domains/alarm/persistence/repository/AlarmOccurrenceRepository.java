@@ -73,7 +73,6 @@ public interface AlarmOccurrenceRepository extends JpaRepository<AlarmOccurrence
       AND o.time BETWEEN :start AND :end
       AND o.deactivateType = :status
       AND o.reminderSent = false
-      AND m.pushNotificationPolicy = true
 """)
     List<OccurrencePushInfo> findPreNotificationTargetsSameDay(
         @Param("date") LocalDate date,
@@ -91,7 +90,6 @@ public interface AlarmOccurrenceRepository extends JpaRepository<AlarmOccurrence
       AND o.time >= :start
       AND o.deactivateType = :status
       AND o.reminderSent = false
-      AND m.pushNotificationPolicy = true
 """)
     List<OccurrencePushInfo> findPreNotificationTargetsFromTime(
         @Param("date") LocalDate date,
@@ -108,7 +106,6 @@ public interface AlarmOccurrenceRepository extends JpaRepository<AlarmOccurrence
       AND o.time <= :end
       AND o.deactivateType = :status
       AND o.reminderSent = false
-      AND m.pushNotificationPolicy = true
 """)
     List<OccurrencePushInfo> findPreNotificationTargetsUntilTime(
         @Param("date") LocalDate date,
@@ -131,7 +128,6 @@ public interface AlarmOccurrenceRepository extends JpaRepository<AlarmOccurrence
     JOIN a.member m
     WHERE o.alarmRinging = true
       AND o.deactivateType = :status
-      AND m.pushNotificationPolicy = true
     """)
     List<RingingPushInfo> findRingingNotificationTargets(@Param("status") DeactivateType status);
 }

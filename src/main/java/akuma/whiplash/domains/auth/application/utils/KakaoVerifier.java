@@ -20,7 +20,7 @@ public class KakaoVerifier implements SocialVerifier {
     public SocialMemberInfo verify(SocialLoginRequest request) {
         KakaoUserInfo response = webClient.get()
             .uri("https://kapi.kakao.com/v2/user/me")
-            .headers(h -> h.setBearerAuth(request.token()))
+            .headers(h -> h.setBearerAuth(request.providerAccessToken()))
             .retrieve()
             .bodyToMono(KakaoUserInfo.class)
             .block();
@@ -28,7 +28,8 @@ public class KakaoVerifier implements SocialVerifier {
         log.info("Kakao API response: {}", response);
 
         return SocialMemberInfo.builder()
-            .socialId(SocialType.KAKAO.name() + "_" + String.valueOf(response.id()))
+            .provider(SocialType.KAKAO)
+            .providerUserId(String.valueOf(response.id()))
             .email(response.kakaoAccount().email())
             .name(response.properties().nickname())
             .build();

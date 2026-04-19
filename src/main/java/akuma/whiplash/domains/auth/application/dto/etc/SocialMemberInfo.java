@@ -4,10 +4,9 @@ import akuma.whiplash.domains.member.domain.contants.SocialType;
 import lombok.Builder;
 
 @Builder
-public record SocialMemberInfo (
-    String socialId,    // 플랫폼_ID(ex: KAKAO_2y8dnbk33dd)
+public record SocialMemberInfo(
+    SocialType provider,
+    String providerUserId,
     String email,
     String name
-) {
-
-}
+) {}

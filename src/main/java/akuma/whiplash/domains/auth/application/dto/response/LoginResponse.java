@@ -8,7 +8,16 @@ import lombok.Builder;
 public record LoginResponse(
     String accessToken,
     String refreshToken,
-    String nickname,
-    boolean isNewMember
+    MemberInfo member
 ) {
+
+    @Builder
+    public record MemberInfo(
+        Long memberId,
+        String provider,
+        String nickname,
+        String email,
+        boolean isNewMember,
+        String status
+    ) {}
 }

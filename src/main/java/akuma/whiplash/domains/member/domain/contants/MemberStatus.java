@@ -1,6 +1,5 @@
 package akuma.whiplash.domains.member.domain.contants;
 
-public enum SocialType {
-
-    GOOGLE, APPLE, KAKAO, MOCK;
+public enum MemberStatus {
+    ACTIVE, INACTIVE, DELETED
 }
