@@ -5,7 +5,7 @@
 
 ## 예외
 `throw ApplicationException.from(XxxErrorCode.SOME_ERROR);`
-ErrorCode enum: `NAME(HttpStatus.STATUS, "Domain_x001", "~입니다.")`
+ErrorCode enum: `NAME(HttpStatus.STATUS, "Domain_{에러코드맨뒤숫자1개}01", "~입니다.")`
 허용 상태: 400 / 401 / 403 / 404 / 409
 
 ## 응답

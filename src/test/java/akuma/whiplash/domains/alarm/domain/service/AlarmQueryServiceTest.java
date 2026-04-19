@@ -48,7 +48,7 @@ class AlarmQueryServiceTest {
             AlarmEntity alarm = AlarmFixture.ALARM_11.toMockEntity();
             given(memberRepository.findById(member.getId())).willReturn(Optional.of(member));
             given(alarmRepository.findAllByMemberId(member.getId())).willReturn(List.of(alarm));
-            given(alarmOccurrenceRepository.findTopByAlarmIdAndDeactivateTypeInOrderByDateDescTimeDesc(anyLong(), anyList()))
+            given(alarmOccurrenceRepository.findTopByAlarmIdAndDeactivateTypeInOrderByOccurrenceDateDescOccurrenceTimeDesc(anyLong(), anyList()))
                 .willReturn(Optional.empty());
 
             // when

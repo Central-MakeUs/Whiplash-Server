@@ -49,8 +49,9 @@ public enum AlarmOccurrenceFixture {
     public AlarmOccurrenceEntity toEntity(AlarmEntity alarm) {
         return AlarmOccurrenceEntity.builder()
             .alarm(alarm)
-            .date(date)
-            .time(time)
+            .occurrenceDate(date)
+            .occurrenceTime(time)
+            .scheduledAt(java.time.LocalDateTime.of(date, time))
             .deactivateType(deactivateType)
             .alarmRinging(false)
             .ringingCount(0)
@@ -61,8 +62,9 @@ public enum AlarmOccurrenceFixture {
     public AlarmOccurrenceEntity toEntity(AlarmEntity alarm, LocalDate date, LocalTime time, DeactivateType deactivateType) {
         return AlarmOccurrenceEntity.builder()
             .alarm(alarm)
-            .date(date)
-            .time(time)
+            .occurrenceDate(date)
+            .occurrenceTime(time)
+            .scheduledAt(java.time.LocalDateTime.of(date, time))
             .deactivateType(deactivateType)
             .alarmRinging(false)
             .ringingCount(0)

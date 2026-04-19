@@ -81,12 +81,27 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
             throw ApplicationException.from(DUPLICATE_ALARM_PURPOSE);
         }
 
+        // 1. 알람 엔티티 생성 및 저장
         AlarmEntity alarm = AlarmMapper.mapToAlarmEntity(request, memberEntity);
         alarmRepository.save(alarm);
 
-        return CreateAlarmResponse.builder()
-            .alarmId(alarm.getId())
-            .build();
+        // 2. 다음 알람 발생 날짜 계산
+        Set<DayOfWeek> repeatDays = alarm.getRepeatDays().stream()
+            .map(Weekday::getDayOfWeek)
+            .collect(Collectors.toSet());
+        
+        // 현재 시각 기준으로 가장 가까운 발생일 계산 (오늘 포함 여부는 getNextOccurrenceDate 내부 로직 따름)
+        LocalDate nextDate = DateUtil.getNextOccurrenceDate(repeatDays, LocalDateTime.now(), alarm.getTime());
+        LocalDateTime nextScheduledTime = LocalDateTime.of(nextDate, alarm.getTime());
+
+        // 3. 첫 알람 발생 내역 생성 및 저장
+        AlarmOccurrenceEntity occurrence = AlarmMapper.mapToFirstAlarmOccurrenceEntity(alarm, nextDate, alarm.getTime());
+        alarmOccurrenceRepository.save(occurrence);
+
+        // 4. 알람의 다음 예정 시각 업데이트
+        alarm.updateNextScheduledTime(nextScheduledTime);
+
+        return AlarmMapper.mapToCreateAlarmResponse(alarm, occurrence);
     }
 
     @Override
@@ -190,7 +205,7 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
 
         // 아직 비활성화되지 않은 알람 발생 이력 중 가장 최근 것을 가져옴.
         AlarmOccurrenceEntity occurrence = alarmOccurrenceRepository
-            .findTopByAlarmIdAndDeactivateTypeInOrderByDateDescTimeDesc(
+            .findTopByAlarmIdAndDeactivateTypeInOrderByOccurrenceDateDescOccurrenceTimeDesc(
                 alarmId,
                 List.of(DeactivateType.NONE)
             )
@@ -198,7 +213,7 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
 
         // 아직 알람이 울릴 시간이 아니라면 예외 발생
         LocalDateTime now = LocalDateTime.now();
-        LocalDateTime scheduledDateTime = LocalDateTime.of(occurrence.getDate(), occurrence.getTime());
+        LocalDateTime scheduledDateTime = LocalDateTime.of(occurrence.getOccurrenceDate(), occurrence.getOccurrenceTime());
         if (now.isBefore(scheduledDateTime)) {
             throw ApplicationException.from(NOT_ALARM_TIME);
         }

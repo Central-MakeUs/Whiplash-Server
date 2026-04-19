@@ -75,7 +75,7 @@ class AlarmControllerTest {
     @MockitoBean
     private AlarmUseCase alarmUseCase;
 
-    private static final String BASE = "/api/alarms";
+    private static final String BASE = "/api/v1/alarms";
 
     private void setSecurityContext(MemberContext context) {
         UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
@@ -108,7 +108,7 @@ class AlarmControllerTest {
 
 
     @Nested
-    @DisplayName("[POST] /api/alarms - 알람 등록")
+    @DisplayName("[POST] /api/v1/alarms - 알람 등록")
     class CreateAlarmTest {
 
         @Test
@@ -118,11 +118,13 @@ class AlarmControllerTest {
             // given
             AlarmFixture fixture = AlarmFixture.ALARM_03;
             AlarmRegisterRequest request = new AlarmRegisterRequest(
-                fixture.getAddress(),
-                fixture.getLatitude(),
-                fixture.getLongitude(),
+                new akuma.whiplash.domains.alarm.application.dto.request.PlaceRequest(
+                    fixture.getAddress(),
+                    fixture.getLatitude(),
+                    fixture.getLongitude()
+                ),
                 fixture.getAlarmPurpose(),
-                fixture.getTime(),
+                LocalTime.parse("08:30"),
                 fixture.getRepeatDays().stream().map(Weekday::getDescription).toList(),
                 fixture.getSoundType().getDescription()
             );
@@ -132,7 +134,7 @@ class AlarmControllerTest {
             // when
             when(alarmUseCase.createAlarm(any(AlarmRegisterRequest.class), anyLong())).thenReturn(response);
 
-            mockMvc.perform(post("/api/alarms")
+            mockMvc.perform(post(BASE)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk());
@@ -149,13 +151,15 @@ class AlarmControllerTest {
             setSecurityContext(buildContext(MEMBER_3));
             String json = """
                 {
-                  \"address\": \"서울시 중구 퇴계로 24\",
-                  \"latitude\": 37.564213,
-                  \"longitude\": 127.001698,
-                  \"alarmPurpose\": \"도서관 정기 출석 알람\",
-                  \"time\": \"24:30\",
-                  \"repeatDays\": [\"월\"],
-                  \"soundType\": \"알람 소리1\"
+                  "place": {
+                    "address": "서울시 중구 퇴계로 24",
+                    "latitude": 37.564213,
+                    "longitude": 127.001698
+                  },
+                  "alarmPurpose": "도서관 정기 출석 알람",
+                  "alarmTime": "24:30",
+                  "repeatDays": ["월"],
+                  "soundType": "알람 소리1"
                 }
                 """;
             CreateAlarmResponse response = CreateAlarmResponse.builder().alarmId(1L).build();
@@ -163,7 +167,7 @@ class AlarmControllerTest {
             // when
             when(alarmUseCase.createAlarm(any(AlarmRegisterRequest.class), anyLong())).thenReturn(response);
 
-            mockMvc.perform(post("/api/alarms")
+            mockMvc.perform(post(BASE)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(json))
                 .andExpect(status().isOk());
@@ -171,7 +175,7 @@ class AlarmControllerTest {
             // then
             ArgumentCaptor<AlarmRegisterRequest> captor = ArgumentCaptor.forClass(AlarmRegisterRequest.class);
             verify(alarmUseCase, times(1)).createAlarm(captor.capture(), eq(MEMBER_3.getId()));
-            assertThat(captor.getValue().time()).isEqualTo(LocalTime.of(0, 30));
+            assertThat(captor.getValue().alarmTime()).isEqualTo(LocalTime.of(0, 30));
         }
 
         @Test
@@ -181,9 +185,11 @@ class AlarmControllerTest {
             // given
             AlarmFixture fixture = AlarmFixture.ALARM_04;
             AlarmRegisterRequest request = new AlarmRegisterRequest(
-                fixture.getAddress(),
-                fixture.getLatitude(),
-                fixture.getLongitude(),
+                new akuma.whiplash.domains.alarm.application.dto.request.PlaceRequest(
+                    fixture.getAddress(),
+                    fixture.getLatitude(),
+                    fixture.getLongitude()
+                ),
                 fixture.getAlarmPurpose(),
                 fixture.getTime(),
                 fixture.getRepeatDays().stream().map(Weekday::getDescription).toList(),
@@ -195,7 +201,7 @@ class AlarmControllerTest {
             when(alarmUseCase.createAlarm(any(AlarmRegisterRequest.class), anyLong()))
                 .thenThrow(ApplicationException.from(MemberErrorCode.MEMBER_NOT_FOUND));
 
-            mockMvc.perform(post("/api/alarms")
+            mockMvc.perform(post(BASE)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isNotFound());
@@ -209,9 +215,11 @@ class AlarmControllerTest {
         // given
         AlarmFixture fixture = AlarmFixture.ALARM_03;
         AlarmRegisterRequest request = new AlarmRegisterRequest(
-            fixture.getAddress(),
-            fixture.getLatitude(),
-            fixture.getLongitude(),
+            new akuma.whiplash.domains.alarm.application.dto.request.PlaceRequest(
+                fixture.getAddress(),
+                fixture.getLatitude(),
+                fixture.getLongitude()
+            ),
             fixture.getAlarmPurpose(),
             fixture.getTime(),
             fixture.getRepeatDays().stream().map(Weekday::getDescription).toList(),
@@ -223,14 +231,14 @@ class AlarmControllerTest {
         when(alarmUseCase.createAlarm(any(AlarmRegisterRequest.class), anyLong()))
             .thenThrow(ApplicationException.from(AlarmErrorCode.DUPLICATE_ALARM_PURPOSE));
 
-        mockMvc.perform(post("/api/alarms")
+        mockMvc.perform(post(BASE)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
             .andExpect(status().isConflict());
     }
 
     @Nested
-    @DisplayName("[POST] /api/alarms/{id}/ring - 알람 울림")
+    @DisplayName("[POST] /api/v1/alarms/{id}/ring - 알람 울림")
     class RingAlarmTest {
 
         @Test
@@ -241,7 +249,7 @@ class AlarmControllerTest {
             setSecurityContext(buildContext(MEMBER_3));
 
             // when
-            mockMvc.perform(post("/api/alarms/{alarmId}/ring", 1L))
+            mockMvc.perform(post(BASE + "/{alarmId}/ring", 1L))
                 .andExpect(status().isOk());
 
             // then
@@ -261,13 +269,13 @@ class AlarmControllerTest {
                 .ringAlarm(eq(MEMBER_3.getId()), eq(1L));
 
             // then
-            mockMvc.perform(post("/api/alarms/{alarmId}/ring", 1L))
+            mockMvc.perform(post(BASE + "/{alarmId}/ring", 1L))
                 .andExpect(status().isBadRequest());
         }
     }
 
     @Nested
-    @DisplayName("[POST] /api/alarms/{alarmId}/checkin - 도착 인증")
+    @DisplayName("[POST] /api/v1/alarms/{alarmId}/checkin - 도착 인증")
     class CheckinTest {
 
         @Test
@@ -278,7 +286,7 @@ class AlarmControllerTest {
             AlarmCheckinRequest request = new AlarmCheckinRequest(37.0, 127.0);
 
             // when & then
-            mockMvc.perform(post("/api/alarms/{alarmId}/checkin", 1L)
+            mockMvc.perform(post(BASE + "/{alarmId}/checkin", 1L)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk());
@@ -298,7 +306,7 @@ class AlarmControllerTest {
             AlarmCheckinRequest request = new AlarmCheckinRequest(37.0, 127.0);
 
             // when & then
-            mockMvc.perform(post("/api/alarms/{alarmId}/checkin", 1L)
+            mockMvc.perform(post(BASE + "/{alarmId}/checkin", 1L)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isNotFound());
@@ -315,7 +323,7 @@ class AlarmControllerTest {
             AlarmCheckinRequest request = new AlarmCheckinRequest(37.0, 127.0);
 
             // when & then
-            mockMvc.perform(post("/api/alarms/{alarmId}/checkin", 1L)
+            mockMvc.perform(post(BASE + "/{alarmId}/checkin", 1L)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isForbidden());
@@ -332,7 +340,7 @@ class AlarmControllerTest {
             AlarmCheckinRequest request = new AlarmCheckinRequest(37.0, 127.0);
 
             // when & then
-            mockMvc.perform(post("/api/alarms/{alarmId}/checkin", 1L)
+            mockMvc.perform(post(BASE + "/{alarmId}/checkin", 1L)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest());
@@ -349,7 +357,7 @@ class AlarmControllerTest {
             AlarmCheckinRequest request = new AlarmCheckinRequest(37.0, 127.0);
 
             // when & then
-            mockMvc.perform(post("/api/alarms/{alarmId}/checkin", 1L)
+            mockMvc.perform(post(BASE + "/{alarmId}/checkin", 1L)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest());
@@ -366,7 +374,7 @@ class AlarmControllerTest {
             AlarmCheckinRequest request = new AlarmCheckinRequest(37.0, 127.0);
 
             // when & then
-            mockMvc.perform(post("/api/alarms/{alarmId}/checkin", 1L)
+            mockMvc.perform(post(BASE + "/{alarmId}/checkin", 1L)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest());
@@ -374,7 +382,7 @@ class AlarmControllerTest {
     }
 
     @Nested
-    @DisplayName("[DELETE] /api/alarms/{alarmId} - 알람 삭제")
+    @DisplayName("[DELETE] /api/v1/alarms/{alarmId} - 알람 삭제")
     class RemoveAlarmTest {
 
         @Test
@@ -385,7 +393,7 @@ class AlarmControllerTest {
             setSecurityContext(buildContext(MEMBER_5));
 
             // when & then
-            mockMvc.perform(delete("/api/alarms/{alarmId}", 1L)
+            mockMvc.perform(delete(BASE + "/{alarmId}", 1L)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk());
@@ -404,7 +412,7 @@ class AlarmControllerTest {
                 .when(alarmUseCase).removeAlarm(anyLong(), anyLong(), anyString());
 
             // when & then
-            mockMvc.perform(delete("/api/alarms/{alarmId}", 1L)
+            mockMvc.perform(delete(BASE + "/{alarmId}", 1L)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isNotFound());
@@ -420,7 +428,7 @@ class AlarmControllerTest {
                 .when(alarmUseCase).removeAlarm(anyLong(), anyLong(), anyString());
 
             // when & then
-            mockMvc.perform(delete("/api/alarms/{alarmId}", 1L)
+            mockMvc.perform(delete(BASE + "/{alarmId}", 1L)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isForbidden());
@@ -434,7 +442,7 @@ class AlarmControllerTest {
             setSecurityContext(buildContext(MEMBER_8));
 
             // when & then
-            mockMvc.perform(delete("/api/alarms/{alarmId}", 1L)
+            mockMvc.perform(delete(BASE + "/{alarmId}", 1L)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest());
@@ -442,7 +450,7 @@ class AlarmControllerTest {
     }
 
     @Nested
-    @DisplayName("[GET] /api/alarms - 알람 목록 조회")
+    @DisplayName("[GET] /api/v1/alarms - 알람 목록 조회")
     class GetAlarmsTest {
 
         @Test

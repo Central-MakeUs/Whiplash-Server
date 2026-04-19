@@ -2,7 +2,11 @@ package akuma.whiplash.domains.alarm.application.mapper;
 
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmRegisterRequest;
 import akuma.whiplash.domains.alarm.application.dto.response.CreateAlarmOccurrenceResponse;
+import akuma.whiplash.domains.alarm.application.dto.response.CreateAlarmResponse;
+import akuma.whiplash.domains.alarm.application.dto.response.NextOccurrenceResponse;
+import akuma.whiplash.domains.alarm.domain.constant.AlarmStatus;
 import akuma.whiplash.domains.alarm.domain.constant.DeactivateType;
+import akuma.whiplash.domains.alarm.domain.constant.OccurrenceStatus;
 import akuma.whiplash.domains.alarm.domain.constant.SoundType;
 import akuma.whiplash.domains.alarm.domain.constant.Weekday;
 import akuma.whiplash.domains.alarm.exception.AlarmErrorCode;
@@ -11,9 +15,11 @@ import akuma.whiplash.domains.alarm.persistence.entity.AlarmOccurrenceEntity;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmRingingLogEntity;
 import akuma.whiplash.domains.member.persistence.entity.MemberEntity;
 import akuma.whiplash.global.exception.ApplicationException;
+import akuma.whiplash.global.util.date.DateUtil;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.Objects;
 
@@ -23,12 +29,40 @@ public class AlarmMapper {
         return AlarmEntity.builder()
             .member(memberEntity)
             .alarmPurpose(request.alarmPurpose())
-            .time(request.time())
+            .time(request.alarmTime())
             .repeatDays(mapToWeekdays(request.repeatDays()))
             .soundType(SoundType.from(request.soundType()))
-            .latitude(request.latitude())
-            .longitude(request.longitude())
-            .address(request.address())
+            .latitude(request.place().latitude())
+            .longitude(request.place().longitude())
+            .address(request.place().address())
+            .status(AlarmStatus.ACTIVE)
+            .revision(1)
+            .build();
+    }
+
+    public static AlarmOccurrenceEntity mapToFirstAlarmOccurrenceEntity(AlarmEntity alarm, LocalDate nextDate, LocalTime alarmTime) {
+        return AlarmOccurrenceEntity.builder()
+            .alarm(alarm)
+            .occurrenceDate(nextDate)
+            .occurrenceTime(alarmTime)
+            .scheduledAt(LocalDateTime.of(nextDate, alarmTime))
+            .status(OccurrenceStatus.SCHEDULED)
+            .deactivateType(DeactivateType.NONE)
+            .alarmRinging(false)
+            .ringingCount(0)
+            .reminderSent(false)
+            .build();
+    }
+
+    public static CreateAlarmResponse mapToCreateAlarmResponse(AlarmEntity alarm, AlarmOccurrenceEntity occurrence) {
+        return CreateAlarmResponse.builder()
+            .alarmId(alarm.getId())
+            .alarmRevision(alarm.getRevision())
+            .nextOccurrence(NextOccurrenceResponse.builder()
+                .occurrenceId(occurrence.getId())
+                .scheduledAt(occurrence.getScheduledAt())
+                .dayOfWeek(DateUtil.getKoreanDayOfWeek(occurrence.getOccurrenceDate()))
+                .build())
             .build();
     }
 
@@ -45,8 +79,10 @@ public class AlarmMapper {
 
         return AlarmOccurrenceEntity.builder()
             .alarm(alarmEntity)
-            .date(today)
-            .time(alarmEntity.getTime())
+            .occurrenceDate(today)
+            .occurrenceTime(alarmEntity.getTime())
+            .scheduledAt(LocalDateTime.of(today, alarmEntity.getTime()))
+            .status(OccurrenceStatus.RINGING)
             .deactivateType(DeactivateType.NONE)
             .checkinTime(null)
             .alarmRinging(true)
@@ -59,8 +95,10 @@ public class AlarmMapper {
     public static AlarmOccurrenceEntity mapToAlarmOccurrenceForDate(AlarmEntity alarm, LocalDate date) {
         return AlarmOccurrenceEntity.builder()
             .alarm(alarm)
-            .date(date)
-            .time(alarm.getTime())
+            .occurrenceDate(date)
+            .occurrenceTime(alarm.getTime())
+            .scheduledAt(LocalDateTime.of(date, alarm.getTime()))
+            .status(OccurrenceStatus.SCHEDULED)
             .deactivateType(DeactivateType.NONE)
             .deactivatedAt(null)
             .checkinTime(null)

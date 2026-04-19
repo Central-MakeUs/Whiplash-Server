@@ -30,7 +30,7 @@ import org.springframework.web.bind.annotation.RestController;
 @Slf4j
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/api/alarms")
+@RequestMapping("/api/v1/alarms")
 public class AlarmController {
 
     private final AlarmUseCase alarmUseCase;

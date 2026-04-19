@@ -20,7 +20,7 @@ public interface AlarmOccurrenceRepository extends JpaRepository<AlarmOccurrence
     SELECT CASE WHEN COUNT(ao) > 0 THEN true ELSE false END
     FROM AlarmOccurrenceEntity ao
     WHERE ao.alarm.id = :alarmId
-      AND ao.date = :date
+      AND ao.occurrenceDate = :date
     """)
     boolean existsByAlarmIdAndDate(
         @Param("alarmId") Long alarmId,
@@ -31,14 +31,14 @@ public interface AlarmOccurrenceRepository extends JpaRepository<AlarmOccurrence
     SELECT ao
     FROM AlarmOccurrenceEntity ao
     WHERE ao.alarm.id = :alarmId
-      AND ao.date = :date
+      AND ao.occurrenceDate = :date
     """)
     Optional<AlarmOccurrenceEntity> findByAlarmIdAndDate(
         @Param("alarmId") Long alarmId,
         @Param("date") LocalDate date
     );
 
-    Optional<AlarmOccurrenceEntity> findTopByAlarmIdAndDeactivateTypeInOrderByDateDescTimeDesc(
+    Optional<AlarmOccurrenceEntity> findTopByAlarmIdAndDeactivateTypeInOrderByOccurrenceDateDescOccurrenceTimeDesc(
         Long alarmId, List<DeactivateType> deactivateTypes
     );
 
@@ -52,7 +52,7 @@ public interface AlarmOccurrenceRepository extends JpaRepository<AlarmOccurrence
     @Query("""
     SELECT ao.alarm.id
     FROM AlarmOccurrenceEntity ao
-    WHERE ao.date = :date
+    WHERE ao.occurrenceDate = :date
     """)
     Set<Long> findAlarmIdsByDate(@Param("date") LocalDate date);
 
@@ -63,14 +63,13 @@ public interface AlarmOccurrenceRepository extends JpaRepository<AlarmOccurrence
     """)
     void deleteByMemberId(@Param("memberId") Long memberId);
 
-    // import 생략: 파라미터 바인딩이면 JPQL에 FQN 필요 없음
     @Query("""
     SELECT new akuma.whiplash.domains.alarm.application.dto.etc.OccurrencePushInfo(o.id, m.id, a.address)
     FROM AlarmOccurrenceEntity o
     JOIN o.alarm a
     JOIN a.member m
-    WHERE o.date = :date
-      AND o.time BETWEEN :start AND :end
+    WHERE o.occurrenceDate = :date
+      AND o.occurrenceTime BETWEEN :start AND :end
       AND o.deactivateType = :status
       AND o.reminderSent = false
 """)
@@ -86,8 +85,8 @@ public interface AlarmOccurrenceRepository extends JpaRepository<AlarmOccurrence
     FROM AlarmOccurrenceEntity o
     JOIN o.alarm a
     JOIN a.member m
-    WHERE o.date = :date
-      AND o.time >= :start
+    WHERE o.occurrenceDate = :date
+      AND o.occurrenceTime >= :start
       AND o.deactivateType = :status
       AND o.reminderSent = false
 """)
@@ -102,8 +101,8 @@ public interface AlarmOccurrenceRepository extends JpaRepository<AlarmOccurrence
     FROM AlarmOccurrenceEntity o
     JOIN o.alarm a
     JOIN a.member m
-    WHERE o.date = :date
-      AND o.time <= :end
+    WHERE o.occurrenceDate = :date
+      AND o.occurrenceTime <= :end
       AND o.deactivateType = :status
       AND o.reminderSent = false
 """)

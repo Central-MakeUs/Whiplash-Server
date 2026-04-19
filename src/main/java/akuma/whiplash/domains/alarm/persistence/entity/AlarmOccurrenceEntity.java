@@ -2,6 +2,7 @@ package akuma.whiplash.domains.alarm.persistence.entity;
 
 
 import akuma.whiplash.domains.alarm.domain.constant.DeactivateType;
+import akuma.whiplash.domains.alarm.domain.constant.OccurrenceStatus;
 import akuma.whiplash.global.entity.BaseTimeEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -19,6 +20,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import lombok.AccessLevel;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.experimental.SuperBuilder;
@@ -34,7 +36,7 @@ import org.hibernate.annotations.DynamicInsert;
     uniqueConstraints = {
         @UniqueConstraint(
             name = "uk_alarm_date",
-            columnNames = {"alarm_id", "date"}
+            columnNames = {"alarm_id", "occurrence_date"}
         )
     }
 )
@@ -48,11 +50,19 @@ public class AlarmOccurrenceEntity extends BaseTimeEntity {
     @JoinColumn(name = "alarm_id", nullable = false)
     private AlarmEntity alarm;
 
-    @Column(nullable = false)
-    private LocalDate date; // 알람이 원래 울려야 했던 날짜
+    @Column(name = "occurrence_date", nullable = false)
+    private LocalDate occurrenceDate; // 알람이 원래 울려야 했던 날짜
 
-    @Column(nullable = false)
-    private LocalTime time; // 알람이 원래 울려야 했던 시간
+    @Column(name = "occurrence_time", nullable = false)
+    private LocalTime occurrenceTime; // 알람이 원래 울려야 했던 시간
+
+    @Column(name = "scheduled_at", nullable = false)
+    private LocalDateTime scheduledAt; // 예정 일시 (date + time)
+
+    @Enumerated(EnumType.STRING)
+    @Builder.Default
+    @Column(name = "status", length = 30, nullable = false)
+    private OccurrenceStatus status = OccurrenceStatus.SCHEDULED;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "deactivate_type", length = 20, nullable = false)

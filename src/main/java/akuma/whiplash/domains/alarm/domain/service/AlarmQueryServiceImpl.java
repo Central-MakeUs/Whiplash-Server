@@ -87,7 +87,7 @@ public class AlarmQueryServiceImpl implements AlarmQueryService {
     private AlarmInfoPreviewResponse buildPreviewResponse(AlarmEntity alarm, LocalDate today) {
         // 1. 가장 최근 OFF 또는 CHECKIN 이력 조회
         Optional<AlarmOccurrenceEntity> recentOccurrenceOpt =
-            alarmOccurrenceRepository.findTopByAlarmIdAndDeactivateTypeInOrderByDateDescTimeDesc(
+            alarmOccurrenceRepository.findTopByAlarmIdAndDeactivateTypeInOrderByOccurrenceDateDescOccurrenceTimeDesc(
                 alarm.getId(),
                 List.of(DeactivateType.OFF, DeactivateType.CHECKIN)
             );
@@ -118,7 +118,7 @@ public class AlarmQueryServiceImpl implements AlarmQueryService {
 
         // 4. 다음 알람일(firstUpcomingDate), 다음+1 알람일(secondUpcomingDate) 결정
         boolean isCurrentDeactivated = recentOccurrenceOpt
-            .map(occ -> occ.getDate().equals(firstDate))
+            .map(occ -> occ.getOccurrenceDate().equals(firstDate))
             .orElse(false);
 
         boolean isOff = recentOccurrenceOpt
