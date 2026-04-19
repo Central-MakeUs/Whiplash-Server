@@ -5,6 +5,8 @@ spring:
       - swagger.yml
       - oauth.yml
       - naver.yml
+      - sentry.yml
+      - redis.yml
       - optional:classpath:env-test.properties
 
   datasource:
@@ -15,7 +17,7 @@ spring:
 
   jpa:
     hibernate:
-      ddl-auto: create-drop  # 또는 create
+      ddl-auto: create-drop
     show-sql: true
     properties:
       hibernate:

@@ -1,6 +1,6 @@
 package akuma.whiplash.domains.auth.application.utils;
 
-import akuma.whiplash.domains.auth.application.dto.etc.SocialMemberInfo;
+import  akuma.whiplash.domains.auth.application.dto.etc.SocialMemberInfo;
 import akuma.whiplash.domains.auth.application.dto.request.SocialLoginRequest;
 import akuma.whiplash.domains.member.domain.contants.SocialType;
 import akuma.whiplash.global.exception.ApplicationException;
@@ -34,26 +34,25 @@ public class GoogleVerifier implements SocialVerifier{
     @Override
     public SocialMemberInfo verify(SocialLoginRequest request) {
         try {
-            GoogleIdToken idToken = verifier.verify(request.token());
+            GoogleIdToken idToken = verifier.verify(request.providerAccessToken());
 
-            // TODO: 여기서 에러
             if (idToken == null) {
                 log.warn("Google idToken verification failed");
                 throw ApplicationException.from(CommonErrorCode.BAD_REQUEST);
             }
 
             GoogleIdToken.Payload payload = idToken.getPayload();
-
-            String socialId = SocialType.GOOGLE + "_" + payload.getSubject();
+            String providerUserId = payload.getSubject();
             String email = payload.getEmail();
             String name = (String) payload.get("name");
 
-            log.info("Google API user info: socialId={}, email={}, name={}", socialId, email, name);
+            log.info("Google API user info: providerUserId={}, email={}, name={}", providerUserId, email, name);
 
             return SocialMemberInfo.builder()
-                .socialId(SocialType.GOOGLE + "_" + payload.getSubject())
-                .email(payload.getEmail())
-                .name((String) payload.get("name"))
+                .provider(SocialType.GOOGLE)
+                .providerUserId(providerUserId)
+                .email(email)
+                .name(name)
                 .build();
         } catch (Exception e) {
             log.warn("Google idToken verification failed", e);

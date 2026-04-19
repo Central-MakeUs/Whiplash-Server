@@ -94,7 +94,7 @@ class AlarmControllerTest {
         return MemberContext.builder()
             .memberId(fixture.getId())
             .role(fixture.getRole())
-            .socialId(fixture.getSocialId())
+            .provider(fixture.getProvider())
             .email(fixture.getEmail())
             .nickname(fixture.getNickname())
             .deviceId("mock_device_id")

@@ -30,9 +30,11 @@ public class RequestMatcherHolder {
 
 
         // auth
-        new RequestInfo(POST, "/api/auth/social-login", null),
-        new RequestInfo(POST, "/api/auth/logout", USER),
-        new RequestInfo(POST, "/api/auth/reissue", USER),
+        new RequestInfo(POST, "/api/v1/auth/social-login", null),
+        new RequestInfo(GET, "/api/v1/auth/*", null),
+        new RequestInfo(POST, "/api/v1/auth/*", USER),
+        new RequestInfo(PUT, "/api/v1/auth/*", USER),
+        new RequestInfo(DELETE, "/api/v1/auth/*", USER),
 
         // swagger
         new RequestInfo(GET, "/api/nuntteo/swagger-ui.html", null),              // 진입점
@@ -58,10 +60,16 @@ public class RequestMatcherHolder {
         new RequestInfo(DELETE, "/api/alarms/**",USER),
 
         // member
-        new RequestInfo(GET, "/api/members/**", USER),
-        new RequestInfo(POST, "/api/members/**", USER),
-        new RequestInfo(PUT, "/api/members/**", USER),
-        new RequestInfo(DELETE, "/api/members/**", USER),
+        new RequestInfo(GET, "/api/v1/members/**", USER),
+        new RequestInfo(POST, "/api/v1/members/**", USER),
+        new RequestInfo(PUT, "/api/v1/members/**", USER),
+        new RequestInfo(DELETE, "/api/v1/members/**", USER),
+
+        // device
+        new RequestInfo(GET, "/api/v1/devices/**", USER),
+        new RequestInfo(POST, "/api/v1/devices/**", USER),
+        new RequestInfo(PUT, "/api/v1/devices/**", USER),
+        new RequestInfo(DELETE, "/api/v1/devices/**", USER),
 
         // place
         new RequestInfo(GET, "/api/places/**", USER),

@@ -30,27 +30,7 @@ public class MemberCommandServiceImpl implements MemberCommandService {
     private final ArchiveService archiveService;
 
     @Override
-    public void modifyPrivacyPolicy(Long memberId, boolean privacyPolicy) {
-        MemberEntity member = memberRepository.findById(memberId)
-            .orElseThrow(() -> ApplicationException.from(MemberErrorCode.MEMBER_NOT_FOUND));
-
-        if (member.isPrivacyPolicy() != privacyPolicy) {
-            member.updatePrivacyPolicy(privacyPolicy);
-        }
-    }
-
-    @Override
-    public void modifyPushNotificationPolicy(Long memberId, boolean pushNotificationPolicy) {
-        MemberEntity member = memberRepository.findById(memberId)
-            .orElseThrow(() -> ApplicationException.from(MemberErrorCode.MEMBER_NOT_FOUND));
-
-        if (member.isPushNotificationPolicy() != pushNotificationPolicy) {
-            member.updatePushNotificationPolicy(pushNotificationPolicy);
-        }
-    }
-
-    @Override
-    public void hardDeleteMember(Long memberId, String deviceId) {
+    public void softDeleteMember(Long memberId, String deviceId) {
         MemberEntity member = memberRepository.findById(memberId)
             .orElseThrow(() -> ApplicationException.from(MemberErrorCode.MEMBER_NOT_FOUND));
 
