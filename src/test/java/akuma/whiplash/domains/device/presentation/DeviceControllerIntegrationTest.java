@@ -15,6 +15,7 @@ import akuma.whiplash.domains.member.persistence.entity.MemberEntity;
 import akuma.whiplash.domains.member.persistence.repository.MemberDeviceRepository;
 import akuma.whiplash.domains.member.persistence.repository.MemberRepository;
 import akuma.whiplash.infrastructure.redis.RedisService;
+import akuma.whiplash.global.config.security.jwt.JwtProvider;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
@@ -24,6 +25,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -44,6 +46,7 @@ class DeviceControllerIntegrationTest {
     @Autowired private MemberDeviceRepository memberDeviceRepository;
     @Autowired private RedisService redisService;
     @Autowired private ObjectMapper objectMapper;
+    @Autowired private JwtProvider jwtProvider;
 
     private static final String BASE = "/api/v1/devices";
 
@@ -61,6 +64,10 @@ class DeviceControllerIntegrationTest {
     private void cleanup() {
         memberDeviceRepository.deleteAll();
         memberRepository.deleteAll();
+    }
+
+    private String buildAccessToken(MemberEntity member, String deviceId) {
+        return jwtProvider.generateAccessToken(member.getId(), member.getRole(), deviceId);
     }
 
     private void setSecurityContext(MemberEntity member, String deviceId) {
@@ -108,6 +115,7 @@ class DeviceControllerIntegrationTest {
 
             // when
             mockMvc.perform(put(BASE + "/me/fcm-token")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + buildAccessToken(member, deviceId))
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
@@ -135,6 +143,7 @@ class DeviceControllerIntegrationTest {
 
             // when & then
             mockMvc.perform(put(BASE + "/me/fcm-token")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + buildAccessToken(member, unknownDeviceId))
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isNotFound())

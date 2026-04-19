@@ -29,7 +29,7 @@ public class DateUtil {
      * ISO-8601 주 기준: 주 시작일은 월요일
      */
     public static boolean isSameWeek(LocalDate date1, LocalDate date2) {
-        WeekFields weekFields = WeekFields.of(Locale.KOREA);
+        WeekFields weekFields = WeekFields.ISO;
         int week1 = date1.get(weekFields.weekOfWeekBasedYear());
         int week2 = date2.get(weekFields.weekOfWeekBasedYear());
         int year1 = date1.get(weekFields.weekBasedYear());

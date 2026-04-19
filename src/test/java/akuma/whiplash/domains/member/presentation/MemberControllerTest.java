@@ -85,7 +85,7 @@ class MemberControllerTest {
             setSecurityContext(context);
 
             // when & then
-            mockMvc.perform(delete("/api/members"))
+            mockMvc.perform(delete("/api/v1/members"))
                 .andExpect(status().isOk());
 
             verify(memberUseCase).softDeleteMember(context);
@@ -101,7 +101,7 @@ class MemberControllerTest {
                 .when(memberUseCase).softDeleteMember(context);
 
             // when & then
-            mockMvc.perform(delete("/api/members"))
+            mockMvc.perform(delete("/api/v1/members"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value(MEMBER_NOT_FOUND.getCustomCode()));
         }
