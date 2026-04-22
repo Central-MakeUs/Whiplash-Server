@@ -7,7 +7,7 @@ import akuma.whiplash.domains.alarm.application.dto.request.AlarmRegisterRequest
 import akuma.whiplash.domains.alarm.application.dto.response.CreateAlarmOccurrenceResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.CreateAlarmResponse;
 import akuma.whiplash.domains.alarm.application.mapper.AlarmMapper;
-import akuma.whiplash.domains.alarm.domain.constant.DeactivateType;
+import akuma.whiplash.domains.alarm.domain.constant.OccurrenceStatus;
 import akuma.whiplash.domains.alarm.domain.constant.Weekday;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmEntity;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmOccurrenceEntity;
@@ -176,8 +176,9 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
             .orElseGet(() -> alarmOccurrenceRepository.save(
                 AlarmMapper.mapToAlarmOccurrenceForDate(alarm, targetDate)));
 
-        // 5. 이미 끄기/체크인 처리되었으면 예외
-        if (occurrence.getDeactivateType() != DeactivateType.NONE) {
+        // 5. 이미 처리된 회차이면 예외
+        if (occurrence.getStatus() != OccurrenceStatus.SCHEDULED
+                && occurrence.getStatus() != OccurrenceStatus.RINGING) {
             throw ApplicationException.from(ALREADY_DEACTIVATED);
         }
 
@@ -203,11 +204,11 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
         AlarmEntity alarm = findAlarmById(alarmId);
         validAlarmOwner(memberId, alarm.getMember().getId());
 
-        // 아직 비활성화되지 않은 알람 발생 이력 중 가장 최근 것을 가져옴.
+        // 아직 처리되지 않은 알람 발생 이력 중 가장 최근 것을 가져옴.
         AlarmOccurrenceEntity occurrence = alarmOccurrenceRepository
-            .findTopByAlarmIdAndDeactivateTypeInOrderByOccurrenceDateDescOccurrenceTimeDesc(
+            .findTopByAlarmIdAndStatusInOrderByOccurrenceDateDescOccurrenceTimeDesc(
                 alarmId,
-                List.of(DeactivateType.NONE)
+                List.of(OccurrenceStatus.SCHEDULED, OccurrenceStatus.RINGING)
             )
             .orElseThrow(() -> ApplicationException.from(ALARM_OCCURRENCE_NOT_FOUND));
 

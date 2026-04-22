@@ -77,6 +77,9 @@ public class RequestMatcherHolder {
         // actuator
         new RequestInfo(GET, "/actuator/**", null),
 
+        // 로컬 테스트
+        new RequestInfo(POST, "/api/dev/auth/login", null),
+
         // QA 전용 토큰 발급 (SecurityConfig에서 qa 프로파일에서만 등록)
         new RequestInfo(POST, "/qa/auth/token", null),
 

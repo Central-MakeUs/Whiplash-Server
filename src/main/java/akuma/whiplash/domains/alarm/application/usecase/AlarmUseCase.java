@@ -2,13 +2,12 @@ package akuma.whiplash.domains.alarm.application.usecase;
 
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmCheckinRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmRegisterRequest;
-import akuma.whiplash.domains.alarm.application.dto.response.AlarmInfoPreviewResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.CreateAlarmOccurrenceResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.CreateAlarmResponse;
+import akuma.whiplash.domains.alarm.application.dto.response.GetAlarmsResponse;
 import akuma.whiplash.domains.alarm.domain.service.AlarmCommandService;
 import akuma.whiplash.domains.alarm.domain.service.AlarmQueryService;
 import akuma.whiplash.global.annotation.architecture.UseCase;
-import java.util.List;
 import lombok.RequiredArgsConstructor;
 
 @UseCase
@@ -38,8 +37,7 @@ public class AlarmUseCase {
         alarmCommandService.ringAlarm(memberId, alarmId);
     }
 
-    public List<AlarmInfoPreviewResponse> getAlarms(Long memberId) {
+    public GetAlarmsResponse getAlarms(Long memberId) {
         return alarmQueryService.getAlarms(memberId);
     }
-
 }

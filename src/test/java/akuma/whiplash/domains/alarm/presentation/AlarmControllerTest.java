@@ -21,8 +21,9 @@ import akuma.whiplash.common.fixture.MemberFixture;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmCheckinRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmRegisterRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmRemoveRequest;
-import akuma.whiplash.domains.alarm.application.dto.response.AlarmInfoPreviewResponse;
+import akuma.whiplash.domains.alarm.application.dto.response.AlarmPreviewDto;
 import akuma.whiplash.domains.alarm.application.dto.response.CreateAlarmResponse;
+import akuma.whiplash.domains.alarm.application.dto.response.GetAlarmsResponse;
 import akuma.whiplash.domains.alarm.application.usecase.AlarmUseCase;
 import akuma.whiplash.domains.alarm.domain.constant.Weekday;
 import akuma.whiplash.domains.alarm.exception.AlarmErrorCode;
@@ -454,27 +455,32 @@ class AlarmControllerTest {
     class GetAlarmsTest {
 
         @Test
-        @DisplayName("성공: 200 OK와 알람 목록을 반환한다")
+        @DisplayName("성공: 200 OK와 result.alarms 래퍼로 알람 목록을 반환한다")
         void success() throws Exception {
             // given
             setSecurityContext(buildContext(MEMBER_3));
-            AlarmInfoPreviewResponse response = AlarmInfoPreviewResponse.builder()
+            AlarmPreviewDto dto = AlarmPreviewDto.builder()
                 .alarmId(1L)
                 .alarmPurpose("출근")
-                .repeatsDays(List.of("월"))
-                .time("07:00")
+                .repeatDays(List.of("월"))
+                .alarmTime("07:00")
                 .address("서울")
-                .latitude(0.0)
-                .longitude(0.0)
-                .isToggleOn(true)
-                .firstUpcomingDay(LocalDate.now())
-                .firstUpcomingDayOfWeek("월요일")
-                .secondUpcomingDay(LocalDate.now().plusDays(1))
-                .secondUpcomingDayOfWeek("화요일")
+                .status("활성화")
+                .arrivalCheckEnabled(false)
+                .nextOccurrence(AlarmPreviewDto.OccurrenceInfo.builder()
+                    .occurrenceId(null)
+                    .scheduledDate(LocalDate.now())
+                    .dayOfWeek("월")
+                    .build())
+                .nextNextOccurrence(AlarmPreviewDto.OccurrenceInfo.builder()
+                    .occurrenceId(null)
+                    .scheduledDate(LocalDate.now().plusDays(7))
+                    .dayOfWeek("월")
+                    .build())
                 .build();
 
             when(alarmUseCase.getAlarms(anyLong()))
-                .thenReturn(List.of(response));
+                .thenReturn(GetAlarmsResponse.builder().alarms(List.of(dto)).build());
 
             // when & then
             mockMvc.perform(get(BASE))

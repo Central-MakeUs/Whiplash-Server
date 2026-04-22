@@ -15,7 +15,7 @@ import akuma.whiplash.domains.alarm.application.dto.request.AlarmCheckinRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmRegisterRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmRemoveRequest;
 import akuma.whiplash.domains.alarm.application.mapper.AlarmMapper;
-import akuma.whiplash.domains.alarm.domain.constant.DeactivateType;
+import akuma.whiplash.domains.alarm.domain.constant.OccurrenceStatus;
 import akuma.whiplash.domains.alarm.domain.constant.SoundType;
 import akuma.whiplash.domains.alarm.domain.constant.Weekday;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmEntity;
@@ -194,7 +194,7 @@ class AlarmControllerIntegrationTest {
                 .occurrenceDate(now.toLocalDate())
                 .occurrenceTime(now.toLocalTime().minusMinutes(1)) // ← now보다 과거
                 .scheduledAt(now.minusMinutes(1))
-                .deactivateType(DeactivateType.NONE)
+                .status(OccurrenceStatus.SCHEDULED)
                 .alarmRinging(false)
                 .ringingCount(0)
                 .reminderSent(false)
@@ -308,7 +308,7 @@ class AlarmControllerIntegrationTest {
             AlarmOccurrenceEntity occurrence = alarmOccurrenceRepository
                 .findByAlarmIdAndDate(alarm.getId(), LocalDate.now())
                 .orElseThrow();
-            assertThat(occurrence.getDeactivateType()).isEqualTo(DeactivateType.CHECKIN);
+            assertThat(occurrence.getStatus()).isEqualTo(OccurrenceStatus.CHECKIN);
         }
 
         @Test
@@ -503,7 +503,7 @@ class AlarmControllerIntegrationTest {
             mockMvc.perform(get(BASE)
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.result[0].alarmPurpose").value(fixture.getAlarmPurpose()));
+                .andExpect(jsonPath("$.result.alarms[0].alarmPurpose").value(fixture.getAlarmPurpose()));
         }
 
 /*        @Test

@@ -4,8 +4,8 @@ import akuma.whiplash.domains.alarm.application.dto.request.AlarmRegisterRequest
 import akuma.whiplash.domains.alarm.application.dto.response.CreateAlarmOccurrenceResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.CreateAlarmResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.NextOccurrenceResponse;
+import akuma.whiplash.domains.alarm.application.dto.response.AlarmPreviewDto;
 import akuma.whiplash.domains.alarm.domain.constant.AlarmStatus;
-import akuma.whiplash.domains.alarm.domain.constant.DeactivateType;
 import akuma.whiplash.domains.alarm.domain.constant.OccurrenceStatus;
 import akuma.whiplash.domains.alarm.domain.constant.SoundType;
 import akuma.whiplash.domains.alarm.domain.constant.Weekday;
@@ -20,7 +20,9 @@ import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 public class AlarmMapper {
@@ -47,7 +49,6 @@ public class AlarmMapper {
             .occurrenceTime(alarmTime)
             .scheduledAt(LocalDateTime.of(nextDate, alarmTime))
             .status(OccurrenceStatus.SCHEDULED)
-            .deactivateType(DeactivateType.NONE)
             .alarmRinging(false)
             .ringingCount(0)
             .reminderSent(false)
@@ -83,7 +84,6 @@ public class AlarmMapper {
             .occurrenceTime(alarmEntity.getTime())
             .scheduledAt(LocalDateTime.of(today, alarmEntity.getTime()))
             .status(OccurrenceStatus.RINGING)
-            .deactivateType(DeactivateType.NONE)
             .checkinTime(null)
             .alarmRinging(true)
             .deactivatedAt(null)
@@ -99,7 +99,6 @@ public class AlarmMapper {
             .occurrenceTime(alarm.getTime())
             .scheduledAt(LocalDateTime.of(date, alarm.getTime()))
             .status(OccurrenceStatus.SCHEDULED)
-            .deactivateType(DeactivateType.NONE)
             .deactivatedAt(null)
             .checkinTime(null)
             .alarmRinging(false)
@@ -123,6 +122,50 @@ public class AlarmMapper {
     public static CreateAlarmOccurrenceResponse mapToCreateAlarmOccurrenceResponse(Long occurrenceId) {
         return CreateAlarmOccurrenceResponse.builder()
             .occurrenceId(occurrenceId)
+            .build();
+    }
+
+    public static AlarmPreviewDto mapToAlarmPreviewDto(
+        AlarmEntity alarm,
+        LocalDateTime now,
+        AlarmOccurrenceEntity latestProcessedOccurrence,
+        LocalDate firstDate,
+        LocalDate secondDate,
+        LocalDate thirdDate,
+        Map<LocalDate, Long> occurrenceIdsByDate
+    ) {
+        boolean isCurrentOccurrenceProcessed = latestProcessedOccurrence != null
+            && latestProcessedOccurrence.getOccurrenceDate().isEqual(firstDate);
+
+        String status = alarm.getStatus() == AlarmStatus.INACTIVE ? "비활성화" : "활성화";
+
+        LocalDate resolvedNext     = isCurrentOccurrenceProcessed ? secondDate : firstDate;
+        LocalDate resolvedNextNext = isCurrentOccurrenceProcessed ? thirdDate : secondDate;
+
+        boolean arrivalCheckEnabled = false;
+        if ("활성화".equals(status)) {
+            LocalDateTime alarmDateTime = LocalDateTime.of(resolvedNext, alarm.getTime());
+            arrivalCheckEnabled = !now.isBefore(alarmDateTime.minusHours(3));
+        }
+
+        return AlarmPreviewDto.builder()
+            .alarmId(alarm.getId())
+            .alarmPurpose(alarm.getAlarmPurpose())
+            .alarmTime(alarm.getTime().format(DateTimeFormatter.ofPattern("HH:mm")))
+            .repeatDays(alarm.getRepeatDays().stream().map(Weekday::getDescription).toList())
+            .address(alarm.getAddress())
+            .status(status)
+            .arrivalCheckEnabled(arrivalCheckEnabled)
+            .nextOccurrence(AlarmPreviewDto.OccurrenceInfo.builder()
+                .occurrenceId(occurrenceIdsByDate.get(resolvedNext))
+                .scheduledDate(resolvedNext)
+                .dayOfWeek(Weekday.getDescriptionOfDayOfWeek(resolvedNext.getDayOfWeek()))
+                .build())
+            .nextNextOccurrence(AlarmPreviewDto.OccurrenceInfo.builder()
+                .occurrenceId(occurrenceIdsByDate.get(resolvedNextNext))
+                .scheduledDate(resolvedNextNext)
+                .dayOfWeek(Weekday.getDescriptionOfDayOfWeek(resolvedNextNext.getDayOfWeek()))
+                .build())
             .build();
     }
 

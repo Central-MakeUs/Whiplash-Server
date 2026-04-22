@@ -2,7 +2,7 @@ package akuma.whiplash.domains.alarm.persistence.repository;
 
 import akuma.whiplash.domains.alarm.application.dto.etc.OccurrencePushInfo;
 import akuma.whiplash.domains.alarm.application.dto.etc.RingingPushInfo;
-import akuma.whiplash.domains.alarm.domain.constant.DeactivateType;
+import akuma.whiplash.domains.alarm.domain.constant.OccurrenceStatus;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmOccurrenceEntity;
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -38,8 +38,8 @@ public interface AlarmOccurrenceRepository extends JpaRepository<AlarmOccurrence
         @Param("date") LocalDate date
     );
 
-    Optional<AlarmOccurrenceEntity> findTopByAlarmIdAndDeactivateTypeInOrderByOccurrenceDateDescOccurrenceTimeDesc(
-        Long alarmId, List<DeactivateType> deactivateTypes
+    Optional<AlarmOccurrenceEntity> findTopByAlarmIdAndStatusInOrderByOccurrenceDateDescOccurrenceTimeDesc(
+        Long alarmId, List<OccurrenceStatus> statuses
     );
 
     @Query("""
@@ -70,14 +70,14 @@ public interface AlarmOccurrenceRepository extends JpaRepository<AlarmOccurrence
     JOIN a.member m
     WHERE o.occurrenceDate = :date
       AND o.occurrenceTime BETWEEN :start AND :end
-      AND o.deactivateType = :status
+      AND o.status = :status
       AND o.reminderSent = false
 """)
     List<OccurrencePushInfo> findPreNotificationTargetsSameDay(
         @Param("date") LocalDate date,
         @Param("start") LocalTime start,
         @Param("end") LocalTime end,
-        @Param("status") DeactivateType status
+        @Param("status") OccurrenceStatus status
     );
 
     @Query("""
@@ -87,13 +87,13 @@ public interface AlarmOccurrenceRepository extends JpaRepository<AlarmOccurrence
     JOIN a.member m
     WHERE o.occurrenceDate = :date
       AND o.occurrenceTime >= :start
-      AND o.deactivateType = :status
+      AND o.status = :status
       AND o.reminderSent = false
 """)
     List<OccurrencePushInfo> findPreNotificationTargetsFromTime(
         @Param("date") LocalDate date,
         @Param("start") LocalTime start,
-        @Param("status") DeactivateType status
+        @Param("status") OccurrenceStatus status
     );
 
     @Query("""
@@ -103,13 +103,13 @@ public interface AlarmOccurrenceRepository extends JpaRepository<AlarmOccurrence
     JOIN a.member m
     WHERE o.occurrenceDate = :date
       AND o.occurrenceTime <= :end
-      AND o.deactivateType = :status
+      AND o.status = :status
       AND o.reminderSent = false
 """)
     List<OccurrencePushInfo> findPreNotificationTargetsUntilTime(
         @Param("date") LocalDate date,
         @Param("end") LocalTime end,
-        @Param("status") DeactivateType status
+        @Param("status") OccurrenceStatus status
     );
 
     @Modifying
@@ -126,7 +126,33 @@ public interface AlarmOccurrenceRepository extends JpaRepository<AlarmOccurrence
     JOIN o.alarm a
     JOIN a.member m
     WHERE o.alarmRinging = true
-      AND o.deactivateType = :status
+      AND o.status = 'RINGING'
     """)
-    List<RingingPushInfo> findRingingNotificationTargets(@Param("status") DeactivateType status);
+    List<RingingPushInfo> findRingingNotificationTargets();
+
+    @Query("""
+    SELECT ao FROM AlarmOccurrenceEntity ao
+    WHERE ao.alarm.id IN :alarmIds
+      AND ao.status IN :statuses
+      AND ao.occurrenceDate = (
+          SELECT MAX(ao2.occurrenceDate)
+          FROM AlarmOccurrenceEntity ao2
+          WHERE ao2.alarm.id = ao.alarm.id
+            AND ao2.status IN :statuses
+      )
+    """)
+    List<AlarmOccurrenceEntity> findLatestProcessedByAlarmIds(
+        @Param("alarmIds") List<Long> alarmIds,
+        @Param("statuses") List<OccurrenceStatus> statuses
+    );
+
+    @Query("""
+    SELECT ao FROM AlarmOccurrenceEntity ao
+    WHERE ao.alarm.id IN :alarmIds
+      AND ao.occurrenceDate IN :dates
+    """)
+    List<AlarmOccurrenceEntity> findByAlarmIdsAndOccurrenceDates(
+        @Param("alarmIds") List<Long> alarmIds,
+        @Param("dates") List<LocalDate> dates
+    );
 }

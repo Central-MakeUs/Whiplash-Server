@@ -14,7 +14,7 @@ import akuma.whiplash.common.fixture.MemberFixture;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmCheckinRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmRegisterRequest;
 import akuma.whiplash.domains.alarm.application.mapper.AlarmMapper;
-import akuma.whiplash.domains.alarm.domain.constant.DeactivateType;
+import akuma.whiplash.domains.alarm.domain.constant.OccurrenceStatus;
 import akuma.whiplash.domains.alarm.domain.constant.SoundType;
 import akuma.whiplash.domains.alarm.domain.constant.Weekday;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmEntity;
@@ -180,7 +180,7 @@ class AlarmCommandServiceTest {
             alarmCommandService.checkinAlarm(member.getId(), alarm.getId(), request);
 
             // then
-            assertThat(occurrence.getDeactivateType()).isEqualTo(DeactivateType.CHECKIN);
+            assertThat(occurrence.getStatus()).isEqualTo(OccurrenceStatus.CHECKIN);
         }
 
         @Test
@@ -348,7 +348,7 @@ class AlarmCommandServiceTest {
                 .occurrenceDate(LocalDate.now())
                 .occurrenceTime(LocalTime.NOON)
                 .scheduledAt(LocalDateTime.of(LocalDate.now(), LocalTime.NOON))
-                .deactivateType(DeactivateType.NONE)
+                .status(OccurrenceStatus.SCHEDULED)
                 .alarmRinging(false)
                 .ringingCount(0)
                 .reminderSent(false)
@@ -428,7 +428,7 @@ class AlarmCommandServiceTest {
                     .alarm(alarm)
                     .occurrenceDate(LocalDate.now().minusDays(1)) // 과거 날짜 → 알람 시각 이미 지남
                     .occurrenceTime(LocalTime.of(0, 0))
-                    .deactivateType(DeactivateType.NONE)
+                    .status(OccurrenceStatus.SCHEDULED)
                     .alarmRinging(false)
                     .ringingCount(0)
                     .reminderSent(false)
@@ -436,7 +436,7 @@ class AlarmCommandServiceTest {
 
             given(alarmRepository.findById(alarm.getId())).willReturn(Optional.of(alarm));
             given(alarmOccurrenceRepository
-                    .findTopByAlarmIdAndDeactivateTypeInOrderByOccurrenceDateDescOccurrenceTimeDesc(eq(alarm.getId()), anyList()))
+                    .findTopByAlarmIdAndStatusInOrderByOccurrenceDateDescOccurrenceTimeDesc(eq(alarm.getId()), anyList()))
                     .willReturn(Optional.of(occurrence));
 
             // when
@@ -474,7 +474,7 @@ class AlarmCommandServiceTest {
                 .occurrenceDate(LocalDate.now().plusDays(1))  // 미래 날짜 → 아직 울릴 시간 아님
                 .occurrenceTime(LocalTime.now().plusHours(1))
                 .scheduledAt(LocalDateTime.of(LocalDate.now().plusDays(1), LocalTime.now().plusHours(1)))
-                .deactivateType(DeactivateType.NONE)
+                .status(OccurrenceStatus.SCHEDULED)
                 .alarmRinging(false)
                 .ringingCount(0)
                 .reminderSent(false)
@@ -483,7 +483,7 @@ class AlarmCommandServiceTest {
             given(alarmRepository.findById(alarm.getId())).willReturn(Optional.of(alarm));
             given(
                 alarmOccurrenceRepository
-                    .findTopByAlarmIdAndDeactivateTypeInOrderByOccurrenceDateDescOccurrenceTimeDesc(eq(alarm.getId()), anyList())
+                    .findTopByAlarmIdAndStatusInOrderByOccurrenceDateDescOccurrenceTimeDesc(eq(alarm.getId()), anyList())
             ).willReturn(Optional.of(occurrence));
 
             // when & then

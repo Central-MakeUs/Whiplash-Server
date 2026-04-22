@@ -6,7 +6,7 @@ import akuma.whiplash.common.config.PersistenceTest;
 import akuma.whiplash.common.fixture.AlarmFixture;
 import akuma.whiplash.common.fixture.MemberFixture;
 import akuma.whiplash.domains.alarm.application.mapper.AlarmMapper;
-import akuma.whiplash.domains.alarm.domain.constant.DeactivateType;
+import akuma.whiplash.domains.alarm.domain.constant.OccurrenceStatus;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmEntity;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmOccurrenceEntity;
 import akuma.whiplash.domains.member.persistence.entity.MemberEntity;
@@ -82,7 +82,7 @@ class AlarmOccurrenceRepositoryTest {
             AlarmOccurrenceEntity found = alarmOccurrenceRepository.findByAlarmIdAndDate(alarm.getId(), today).orElseThrow();
 
             // then
-            assertThat(found.getDeactivateType()).isEqualTo(DeactivateType.CHECKIN);
+            assertThat(found.getStatus()).isEqualTo(OccurrenceStatus.CHECKIN);
             assertThat(found.getCheckinTime()).isNotNull();
         }
     }
