@@ -22,6 +22,8 @@ import akuma.whiplash.domains.alarm.application.dto.request.AlarmCheckinRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmRegisterRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmRemoveRequest;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmPreviewDto;
+import akuma.whiplash.domains.alarm.application.dto.response.AlarmSyncItemDto;
+import akuma.whiplash.domains.alarm.application.dto.response.AlarmSyncResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.CreateAlarmResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.GetAlarmsResponse;
 import akuma.whiplash.domains.alarm.application.usecase.AlarmUseCase;
@@ -35,6 +37,7 @@ import akuma.whiplash.global.config.security.jwt.JwtAuthenticationFilter;
 import akuma.whiplash.global.exception.ApplicationException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
@@ -500,6 +503,58 @@ class AlarmControllerTest {
 
             // when & then
             mockMvc.perform(get(BASE))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value(MemberErrorCode.MEMBER_NOT_FOUND.getCustomCode()));
+        }
+    }
+
+    @Nested
+    @DisplayName("[GET] /api/v1/alarms/sync - 알람 전체 동기화 조회")
+    class SyncAlarmsTest {
+
+        @Test
+        @DisplayName("성공: 200 OK와 서버 시간 및 동기화 알람 목록을 반환한다")
+        void success() throws Exception {
+            // given
+            setSecurityContext(buildContext(MEMBER_3));
+            LocalDateTime scheduledAt = LocalDateTime.now().plusDays(1);
+            AlarmSyncItemDto dto = AlarmSyncItemDto.builder()
+                .alarmId(1L)
+                .alarmRevision(2)
+                .status("활성화")
+                .nextOccurrence(AlarmSyncItemDto.NextOccurrenceInfo.builder()
+                    .occurrenceId(10L)
+                    .scheduledAt(scheduledAt)
+                    .build())
+                .build();
+            when(alarmUseCase.getSyncAlarms(anyLong()))
+                .thenReturn(AlarmSyncResponse.builder()
+                    .serverTime(LocalDateTime.now())
+                    .alarms(List.of(dto))
+                    .build());
+
+            // when & then
+            mockMvc.perform(get(BASE + "/sync"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.serverTime").exists())
+                .andExpect(jsonPath("$.result.alarms[0].alarmId").value(1L))
+                .andExpect(jsonPath("$.result.alarms[0].alarmRevision").value(2))
+                .andExpect(jsonPath("$.result.alarms[0].status").value("활성화"))
+                .andExpect(jsonPath("$.result.alarms[0].nextOccurrence.occurrenceId").value(10L));
+
+            verify(alarmUseCase, times(1)).getSyncAlarms(eq(MEMBER_3.getId()));
+        }
+
+        @Test
+        @DisplayName("실패: 회원이 없으면 404와 에러 코드를 반환한다")
+        void fail_memberNotFound() throws Exception {
+            // given
+            setSecurityContext(buildContext(MEMBER_4));
+            when(alarmUseCase.getSyncAlarms(anyLong()))
+                .thenThrow(ApplicationException.from(MemberErrorCode.MEMBER_NOT_FOUND));
+
+            // when & then
+            mockMvc.perform(get(BASE + "/sync"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value(MemberErrorCode.MEMBER_NOT_FOUND.getCustomCode()));
         }

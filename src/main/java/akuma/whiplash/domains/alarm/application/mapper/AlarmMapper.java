@@ -1,6 +1,8 @@
 package akuma.whiplash.domains.alarm.application.mapper;
 
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmRegisterRequest;
+import akuma.whiplash.domains.alarm.application.dto.response.AlarmSyncItemDto;
+import akuma.whiplash.domains.alarm.application.dto.response.AlarmSyncResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.CreateAlarmOccurrenceResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.CreateAlarmResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.NextOccurrenceResponse;
@@ -167,6 +169,29 @@ public class AlarmMapper {
                 .dayOfWeek(Weekday.getDescriptionOfDayOfWeek(resolvedNextNext.getDayOfWeek()))
                 .build())
             .build();
+    }
+
+    public static AlarmSyncItemDto mapToSyncItem(AlarmEntity alarm, AlarmOccurrenceEntity nextOccurrence) {
+        return AlarmSyncItemDto.builder()
+            .alarmId(alarm.getId())
+            .alarmRevision(alarm.getRevision())
+            .status(mapToStatusDescription(alarm.getStatus()))
+            .nextOccurrence(nextOccurrence == null ? null : AlarmSyncItemDto.NextOccurrenceInfo.builder()
+                .occurrenceId(nextOccurrence.getId())
+                .scheduledAt(nextOccurrence.getScheduledAt())
+                .build())
+            .build();
+    }
+
+    public static AlarmSyncResponse mapToSyncResponse(LocalDateTime serverTime, List<AlarmSyncItemDto> alarms) {
+        return AlarmSyncResponse.builder()
+            .serverTime(serverTime)
+            .alarms(alarms)
+            .build();
+    }
+
+    private static String mapToStatusDescription(AlarmStatus status) {
+        return status == AlarmStatus.INACTIVE ? "비활성화" : "활성화";
     }
 
     private static List<Weekday> mapToWeekdays(List<String> repeatDays) {

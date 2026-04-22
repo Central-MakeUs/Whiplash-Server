@@ -6,12 +6,17 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.then;
+import static org.mockito.Mockito.never;
 
 import akuma.whiplash.common.fixture.AlarmFixture;
 import akuma.whiplash.common.fixture.MemberFixture;
+import akuma.whiplash.domains.alarm.application.dto.response.AlarmSyncResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.GetAlarmsResponse;
 import akuma.whiplash.domains.alarm.domain.constant.AlarmStatus;
 import akuma.whiplash.domains.alarm.domain.constant.OccurrenceStatus;
+import akuma.whiplash.domains.alarm.domain.constant.SoundType;
+import akuma.whiplash.domains.alarm.domain.constant.Weekday;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmEntity;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmOccurrenceEntity;
 import akuma.whiplash.domains.alarm.persistence.repository.AlarmOccurrenceRepository;
@@ -21,6 +26,8 @@ import akuma.whiplash.domains.member.persistence.entity.MemberEntity;
 import akuma.whiplash.domains.member.persistence.repository.MemberRepository;
 import akuma.whiplash.global.exception.ApplicationException;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
@@ -148,6 +155,93 @@ class AlarmQueryServiceTest {
 
             // when & then
             assertThatThrownBy(() -> alarmQueryService.getAlarms(memberId))
+                .isInstanceOf(ApplicationException.class)
+                .hasFieldOrPropertyWithValue("code", MemberErrorCode.MEMBER_NOT_FOUND);
+        }
+    }
+
+    @Nested
+    @DisplayName("getSyncAlarms - 알람 전체 동기화 조회")
+    class GetSyncAlarmsTest {
+
+        @Test
+        @DisplayName("성공: 삭제되지 않은 알람과 다음 예정 회차를 반환한다")
+        void success() {
+            // given
+            MemberEntity member = MemberFixture.MEMBER_11.toMockEntity();
+            AlarmEntity activeAlarm = AlarmFixture.ALARM_11.toMockEntity();
+            AlarmEntity inactiveAlarm = AlarmEntity.builder()
+                .id(12L)
+                .member(member)
+                .alarmPurpose("휴식")
+                .time(LocalTime.of(9, 0))
+                .repeatDays(List.of(Weekday.MONDAY))
+                .soundType(SoundType.ONE)
+                .latitude(37.0)
+                .longitude(127.0)
+                .address("서울")
+                .revision(3)
+                .status(AlarmStatus.INACTIVE)
+                .build();
+            AlarmOccurrenceEntity nextOccurrence = AlarmOccurrenceEntity.builder()
+                .id(100L)
+                .alarm(activeAlarm)
+                .occurrenceDate(LocalDate.now().plusDays(1))
+                .occurrenceTime(activeAlarm.getTime())
+                .scheduledAt(LocalDateTime.now().plusDays(1))
+                .status(OccurrenceStatus.SCHEDULED)
+                .alarmRinging(false)
+                .ringingCount(0)
+                .reminderSent(false)
+                .build();
+
+            given(memberRepository.findById(member.getId())).willReturn(Optional.of(member));
+            given(alarmRepository.findAllByMemberIdAndStatusNot(member.getId(), AlarmStatus.DELETED))
+                .willReturn(List.of(activeAlarm, inactiveAlarm));
+            given(alarmOccurrenceRepository.findNextScheduledByAlarmIds(anyList(), any(), any(LocalDateTime.class)))
+                .willReturn(List.of(nextOccurrence));
+
+            // when
+            AlarmSyncResponse result = alarmQueryService.getSyncAlarms(member.getId());
+
+            // then
+            assertThat(result.serverTime()).isNotNull();
+            assertThat(result.alarms()).hasSize(2);
+            assertThat(result.alarms().get(0).alarmId()).isEqualTo(activeAlarm.getId());
+            assertThat(result.alarms().get(0).status()).isEqualTo("활성화");
+            assertThat(result.alarms().get(0).nextOccurrence().occurrenceId()).isEqualTo(nextOccurrence.getId());
+            assertThat(result.alarms().get(1).status()).isEqualTo("비활성화");
+            assertThat(result.alarms().get(1).nextOccurrence()).isNull();
+        }
+
+        @Test
+        @DisplayName("성공: 알람이 없으면 회차 조회 없이 빈 목록을 반환한다")
+        void success_emptyAlarms() {
+            // given
+            MemberEntity member = MemberFixture.MEMBER_11.toMockEntity();
+            given(memberRepository.findById(member.getId())).willReturn(Optional.of(member));
+            given(alarmRepository.findAllByMemberIdAndStatusNot(member.getId(), AlarmStatus.DELETED))
+                .willReturn(List.of());
+
+            // when
+            AlarmSyncResponse result = alarmQueryService.getSyncAlarms(member.getId());
+
+            // then
+            assertThat(result.serverTime()).isNotNull();
+            assertThat(result.alarms()).isEmpty();
+            then(alarmOccurrenceRepository).should(never())
+                .findNextScheduledByAlarmIds(anyList(), any(), any(LocalDateTime.class));
+        }
+
+        @Test
+        @DisplayName("실패: 회원이 존재하지 않으면 예외를 던진다")
+        void fail_memberNotFound() {
+            // given
+            long memberId = 999L;
+            given(memberRepository.findById(memberId)).willReturn(Optional.empty());
+
+            // when & then
+            assertThatThrownBy(() -> alarmQueryService.getSyncAlarms(memberId))
                 .isInstanceOf(ApplicationException.class)
                 .hasFieldOrPropertyWithValue("code", MemberErrorCode.MEMBER_NOT_FOUND);
         }

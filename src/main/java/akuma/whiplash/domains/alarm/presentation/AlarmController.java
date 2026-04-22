@@ -7,6 +7,7 @@ import static akuma.whiplash.domains.member.exception.MemberErrorCode.MEMBER_NOT
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmCheckinRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmRemoveRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmRegisterRequest;
+import akuma.whiplash.domains.alarm.application.dto.response.AlarmSyncResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.CreateAlarmResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.GetAlarmsResponse;
 import akuma.whiplash.domains.alarm.application.usecase.AlarmUseCase;
@@ -80,6 +81,13 @@ public class AlarmController {
     @GetMapping
     public ApplicationResponse<GetAlarmsResponse> getAlarms(@AuthenticationPrincipal MemberContext memberContext) {
         return ApplicationResponse.onSuccess(alarmUseCase.getAlarms(memberContext.memberId()));
+    }
+
+    @CustomErrorCodes(memberErrorCodes = {MEMBER_NOT_FOUND})
+    @Operation(summary = "알람 전체 동기화 조회", description = "서버 기준 알람 상태를 조회하여 로컬 알람과 동기화합니다.")
+    @GetMapping("/sync")
+    public ApplicationResponse<AlarmSyncResponse> syncAlarms(@AuthenticationPrincipal MemberContext memberContext) {
+        return ApplicationResponse.onSuccess(alarmUseCase.getSyncAlarms(memberContext.memberId()));
     }
 
     @CustomErrorCodes(

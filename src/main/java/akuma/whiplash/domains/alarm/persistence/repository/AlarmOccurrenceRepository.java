@@ -5,6 +5,7 @@ import akuma.whiplash.domains.alarm.application.dto.etc.RingingPushInfo;
 import akuma.whiplash.domains.alarm.domain.constant.OccurrenceStatus;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmOccurrenceEntity;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.Optional;
@@ -154,5 +155,24 @@ public interface AlarmOccurrenceRepository extends JpaRepository<AlarmOccurrence
     List<AlarmOccurrenceEntity> findByAlarmIdsAndOccurrenceDates(
         @Param("alarmIds") List<Long> alarmIds,
         @Param("dates") List<LocalDate> dates
+    );
+
+    @Query("""
+    SELECT ao FROM AlarmOccurrenceEntity ao
+    WHERE ao.alarm.id IN :alarmIds
+      AND ao.status = :status
+      AND ao.scheduledAt >= :now
+      AND ao.scheduledAt = (
+          SELECT MIN(ao2.scheduledAt)
+          FROM AlarmOccurrenceEntity ao2
+          WHERE ao2.alarm.id = ao.alarm.id
+            AND ao2.status = :status
+            AND ao2.scheduledAt >= :now
+      )
+    """)
+    List<AlarmOccurrenceEntity> findNextScheduledByAlarmIds(
+        @Param("alarmIds") List<Long> alarmIds,
+        @Param("status") OccurrenceStatus status,
+        @Param("now") LocalDateTime now
     );
 }

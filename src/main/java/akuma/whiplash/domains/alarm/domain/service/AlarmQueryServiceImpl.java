@@ -2,6 +2,7 @@ package akuma.whiplash.domains.alarm.domain.service;
 
 import akuma.whiplash.domains.alarm.application.dto.etc.OccurrencePushInfo;
 import akuma.whiplash.domains.alarm.application.dto.etc.RingingPushInfo;
+import akuma.whiplash.domains.alarm.application.dto.response.AlarmSyncResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.GetAlarmsResponse;
 import akuma.whiplash.domains.alarm.application.mapper.AlarmMapper;
 import akuma.whiplash.domains.alarm.domain.constant.AlarmStatus;
@@ -123,6 +124,40 @@ public class AlarmQueryServiceImpl implements AlarmQueryService {
                 ))
                 .toList())
             .build();
+    }
+
+    @Override
+    public AlarmSyncResponse getSyncAlarms(Long memberId) {
+        // 동기화는 회원 기준 데이터이므로, 먼저 유효한 회원인지 확인한다.
+        memberRepository.findById(memberId)
+            .orElseThrow(() -> ApplicationException.from(MemberErrorCode.MEMBER_NOT_FOUND));
+
+        // 삭제된 알람은 클라이언트 로컬 예약 대상이 아니므로 제외한다.
+        List<AlarmEntity> alarms = alarmRepository.findAllByMemberIdAndStatusNot(memberId, AlarmStatus.DELETED);
+        LocalDateTime now = LocalDateTime.now();
+
+        if (alarms.isEmpty()) {
+            return AlarmMapper.mapToSyncResponse(now, List.of());
+        }
+
+        // 각 알람의 다음 예정 회차를 한 번에 조회해 N+1 쿼리를 방지한다.
+        List<Long> alarmIds = alarms.stream().map(AlarmEntity::getId).toList();
+        Map<Long, AlarmOccurrenceEntity> nextOccurrenceMap = alarmOccurrenceRepository
+            .findNextScheduledByAlarmIds(alarmIds, OccurrenceStatus.SCHEDULED, now)
+            .stream()
+            .collect(Collectors.toMap(
+                ao -> ao.getAlarm().getId(),
+                ao -> ao,
+                (a, b) -> a
+            ));
+
+        // 다음 회차가 없는 알람은 nextOccurrence=null로 내려 클라이언트가 예약을 생략하게 한다.
+        return AlarmMapper.mapToSyncResponse(
+            now,
+            alarms.stream()
+                .map(alarm -> AlarmMapper.mapToSyncItem(alarm, nextOccurrenceMap.get(alarm.getId())))
+                .toList()
+        );
     }
 
     @Override

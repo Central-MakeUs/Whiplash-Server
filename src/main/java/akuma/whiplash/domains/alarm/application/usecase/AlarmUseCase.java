@@ -2,6 +2,7 @@ package akuma.whiplash.domains.alarm.application.usecase;
 
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmCheckinRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmRegisterRequest;
+import akuma.whiplash.domains.alarm.application.dto.response.AlarmSyncResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.CreateAlarmOccurrenceResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.CreateAlarmResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.GetAlarmsResponse;
@@ -39,5 +40,9 @@ public class AlarmUseCase {
 
     public GetAlarmsResponse getAlarms(Long memberId) {
         return alarmQueryService.getAlarms(memberId);
+    }
+
+    public AlarmSyncResponse getSyncAlarms(Long memberId) {
+        return alarmQueryService.getSyncAlarms(memberId);
     }
 }
