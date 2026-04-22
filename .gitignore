@@ -47,3 +47,6 @@ src/main/resources/db/
 
 # log
 logs/
+
+# 문서
+docs/
