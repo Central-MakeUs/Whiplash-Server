@@ -37,6 +37,19 @@ excludeFilters = @Filter(type = ASSIGNABLE_TYPE,
 - `AlarmFixture` ALARM_01~20
 - `AlarmOccurrenceFixture`
 
+### Fixture 작성 원칙
+- 테스트 클래스 내부에 `buildOccurrence()`, `buildAlarm()` 같은 엔티티 생성 헬퍼를 만들지 않는다.
+- 엔티티가 필요하면 먼저 Fixture의 `toMockEntity()` / `toEntity()`를 사용한다.
+- 기존 Fixture로 표현이 안 되는 케이스가 있으면 테스트 안에서 빌더를 직접 쓰지 말고 Fixture에 `toEntity(...)` 오버로드나 전용 메서드를 추가한다.
+- 테스트 본문은 아래처럼 Fixture 호출만으로 읽히는 형태를 우선한다.
+
+```java
+AlarmEntity alarm = AlarmFixture.ALARM_01.toMockEntity();
+AlarmEntity savedAlarm = alarmRepository.save(AlarmFixture.ALARM_01.toEntity(member));
+AlarmOccurrenceEntity occurrence =
+    AlarmOccurrenceFixture.ALARM_OCCURRENCE_01.toEntity(savedAlarm);
+```
+
 ## FCM 테스트
 `local` 프로파일 → `MockFcmService(@Primary)` 자동 등록, FCM 실제 호출 없음
 `INVALID_` prefix 토큰 → 실패 처리
@@ -48,3 +61,4 @@ excludeFilters = @Filter(type = ASSIGNABLE_TYPE,
 - [ ] `@DisplayName` 문장형, "~테스트" 없는가?
 - [ ] `// given` / `// when` / `// then` 있는가?
 - [ ] 서비스→`toMockEntity()`, Persistence→`toEntity()` 구분했는가?
+- [ ] 테스트 내부 생성 헬퍼 대신 Fixture 메서드를 사용했는가?

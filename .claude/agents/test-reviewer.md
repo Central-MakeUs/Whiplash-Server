@@ -48,6 +48,9 @@ tools: Read, Grep, Glob
 - [ ] 서비스 테스트에서 `toMockEntity()` 사용했는가?
 - [ ] Persistence/Integration 테스트에서 `toEntity()` 사용했는가?
 - [ ] 사용 가능한 Fixture가 있는데 직접 빌더로 만들고 있지 않은가?
+- [ ] 테스트 클래스 내부에 `buildOccurrence()`, `buildAlarm()` 같은 엔티티 생성 헬퍼를 새로 만들지 않았는가?
+- [ ] Fixture만으로 표현이 어려운 케이스는 테스트 안에서 빌더를 만들지 말고 `AlarmOccurrenceFixture.toEntity(...)` 같은 오버로드를 Fixture에 추가했는가?
+- [ ] 테스트 본문에서는 `AlarmFixture.ALARM_01.toEntity(...)`, `AlarmOccurrenceFixture.ALARM_OCCURRENCE_01.toEntity(...)`처럼 Fixture 호출 형태를 우선 사용했는가?
 
 ---
 
