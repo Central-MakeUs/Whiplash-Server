@@ -14,30 +14,18 @@ import java.util.List;
 @Schema(description = "알람 등록 요청 DTO")
 public record AlarmRegisterRequest(
 
-    @Schema(description = "장소", example = "서울시 중구 퇴계로 24")
-    @NotBlank(message = "장소를 입력해주세요.")
-    String address,
-
-    @Schema(description = "위도", example = "37.564213")
-    @NotNull(message = "위도를 입력해주세요.")
-    @DecimalMin(value = "-90.0", message = "위도는 -90 이상이어야 합니다.")
-    @DecimalMax(value = "90.0", message = "위도는 90 이하이어야 합니다.")
-    double latitude,
-
-    @Schema(description = "경도", example = "127.001698")
-    @NotNull(message = "경도를 입력해주세요.")
-    @DecimalMin(value = "-180.0", message = "경도는 -180 이상이어야 합니다.")
-    @DecimalMax(value = "180.0", message = "경도는 180 이하이어야 합니다.")
-    double longitude,
+    @Schema(description = "장소 정보")
+    @NotNull(message = "장소 정보를 입력해주세요.")
+    PlaceRequest place,
 
     @Schema(description = "알람 목적", example = "도서관 정기 출석 알람")
     @NotBlank(message = "알람 목적을 입력해주세요.")
     String alarmPurpose,
 
-    @Schema(description = "알람 시간", example = "08:30")
-    @NotNull(message = "알람 시간을 선택해주세요.")
+    @Schema(description = "알람 시간 (HH:mm)", example = "08:30")
+    @NotNull(message = "알람 시간을 입력해주세요.")
     @JsonDeserialize(using = LocalTime24HourDeserializer.class)
-    LocalTime time,
+    LocalTime alarmTime,
 
     // TODO: 월~일 요일 검증 필요
     @Schema(description = "반복 요일 리스트 (월~일)", example = "[\"월\", \"수\", \"금\"]")

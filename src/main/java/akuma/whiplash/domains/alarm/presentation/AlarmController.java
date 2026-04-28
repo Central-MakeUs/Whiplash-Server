@@ -7,15 +7,16 @@ import static akuma.whiplash.domains.member.exception.MemberErrorCode.MEMBER_NOT
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmCheckinRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmRemoveRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmRegisterRequest;
-import akuma.whiplash.domains.alarm.application.dto.response.AlarmInfoPreviewResponse;
+import akuma.whiplash.domains.alarm.application.dto.response.AlarmCheckinResponse;
+import akuma.whiplash.domains.alarm.application.dto.response.AlarmSyncResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.CreateAlarmResponse;
+import akuma.whiplash.domains.alarm.application.dto.response.GetAlarmsResponse;
 import akuma.whiplash.domains.alarm.application.usecase.AlarmUseCase;
 import akuma.whiplash.domains.auth.application.dto.etc.MemberContext;
 import akuma.whiplash.global.annotation.swagger.CustomErrorCodes;
 import akuma.whiplash.global.response.ApplicationResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
-import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -30,7 +31,7 @@ import org.springframework.web.bind.annotation.RestController;
 @Slf4j
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/api/alarms")
+@RequestMapping("/api/v1/alarms")
 public class AlarmController {
 
     private final AlarmUseCase alarmUseCase;
@@ -45,17 +46,6 @@ public class AlarmController {
         CreateAlarmResponse response = alarmUseCase.createAlarm(request, memberContext.memberId());
         return ApplicationResponse.onSuccess(response);
     }
-
-    // @CustomErrorCodes(
-    //     alarmErrorCodes = {ALARM_NOT_FOUND, TODAY_IS_NOT_ALARM_DAY, ALREADY_OCCURRED_EXISTS},
-    //     authErrorCodes = {PERMISSION_DENIED}
-    // )
-    // @Operation(summary = "알람 발생 내역 생성", description = "오늘 울려야할 알람이 처음 울렸을 때 호출하는 API입니다. 알람당 하루에 발생 내역은 1개만 생성할 수 있습니다.")
-    // @PostMapping("/{alarmId}/occurrences")
-    // public ApplicationResponse<CreateAlarmOccurrenceResponse> createAlarmOccurrence(@AuthenticationPrincipal MemberContext memberContext, @PathVariable Long alarmId) {
-    //     CreateAlarmOccurrenceResponse response = alarmUseCase.createAlarmOccurrence(memberContext.memberId(), alarmId);
-    //     return ApplicationResponse.onSuccess(response);
-    // }
 
     @CustomErrorCodes(
         alarmErrorCodes = {ALARM_NOT_FOUND, ALARM_DELETE_NOT_AVAILABLE},
@@ -73,26 +63,37 @@ public class AlarmController {
     }
 
     @CustomErrorCodes(
-        alarmErrorCodes = {ALARM_NOT_FOUND, ALARM_OCCURRENCE_NOT_FOUND, CHECKIN_OUT_OF_RANGE, ALREADY_DEACTIVATED},
+        alarmErrorCodes = {
+            ALARM_NOT_FOUND,
+            ALARM_OCCURRENCE_NOT_FOUND,
+            CHECKIN_OUT_OF_RANGE,
+            ALREADY_DEACTIVATED,
+            CHECKIN_NOT_YET_AVAILABLE
+        },
         authErrorCodes = {PERMISSION_DENIED}
     )
-    @Operation(summary = "알람 도착 인증", description = "알람 도착 인증을 합니다. 도착 위치 반경 100m 내에 들어와야 도착 인증이 가능합니다.")
+    @Operation(summary = "알람 도착 인증", description = "알람 도착 인증을 합니다. 도착 위치 반경 50m 내에 들어와야 도착 인증이 가능합니다.")
     @PostMapping("/{alarmId}/checkin")
-    public ApplicationResponse<Void> checkin(
+    public ApplicationResponse<AlarmCheckinResponse> checkin(
         @PathVariable Long alarmId,
         @RequestBody @Valid AlarmCheckinRequest request,
         @AuthenticationPrincipal MemberContext memberContext
     ) {
-        alarmUseCase.checkinAlarm(memberContext.memberId(), alarmId, request);
-        return ApplicationResponse.onSuccess();
+        return ApplicationResponse.onSuccess(alarmUseCase.checkinAlarm(memberContext.memberId(), alarmId, request));
     }
 
     @CustomErrorCodes(memberErrorCodes = {MEMBER_NOT_FOUND})
     @Operation(summary = "알람 목록 조회", description = "사용자가 등록한 알람 목록을 조회합니다.")
     @GetMapping
-    public ApplicationResponse<List<AlarmInfoPreviewResponse>> getAlarms(@AuthenticationPrincipal MemberContext memberContext) {
-        List<AlarmInfoPreviewResponse> alarms = alarmUseCase.getAlarms(memberContext.memberId());
-        return ApplicationResponse.onSuccess(alarms);
+    public ApplicationResponse<GetAlarmsResponse> getAlarms(@AuthenticationPrincipal MemberContext memberContext) {
+        return ApplicationResponse.onSuccess(alarmUseCase.getAlarms(memberContext.memberId()));
+    }
+
+    @CustomErrorCodes(memberErrorCodes = {MEMBER_NOT_FOUND})
+    @Operation(summary = "알람 전체 동기화 조회", description = "서버 기준 알람 상태를 조회하여 로컬 알람과 동기화합니다.")
+    @GetMapping("/sync")
+    public ApplicationResponse<AlarmSyncResponse> syncAlarms(@AuthenticationPrincipal MemberContext memberContext) {
+        return ApplicationResponse.onSuccess(alarmUseCase.getSyncAlarms(memberContext.memberId()));
     }
 
     @CustomErrorCodes(

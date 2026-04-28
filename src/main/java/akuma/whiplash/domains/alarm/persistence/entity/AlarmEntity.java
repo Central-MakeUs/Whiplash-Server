@@ -1,5 +1,6 @@
 package akuma.whiplash.domains.alarm.persistence.entity;
 
+import akuma.whiplash.domains.alarm.domain.constant.AlarmStatus;
 import akuma.whiplash.domains.alarm.domain.constant.SoundType;
 import akuma.whiplash.domains.alarm.domain.constant.Weekday;
 import akuma.whiplash.domains.alarm.domain.util.RepeatDaysConverter;
@@ -17,6 +18,8 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
 import lombok.AccessLevel;
@@ -46,7 +49,7 @@ public class AlarmEntity extends BaseTimeEntity {
     @Column(name = "alarm_purpose", length = 50, nullable = false)
     private String alarmPurpose;
 
-    @Column(nullable = false)
+    @Column(name = "alarm_time", nullable = false)
     private LocalTime time;
 
     @Convert(converter = RepeatDaysConverter.class)
@@ -66,4 +69,24 @@ public class AlarmEntity extends BaseTimeEntity {
 
     @Column(length = 50, nullable = false)
     private String address;
+
+    @Builder.Default
+    @Column(name = "revision", nullable = false)
+    private int revision = 1;
+
+    @Builder.Default
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", length = 20, nullable = false)
+    private AlarmStatus status = AlarmStatus.ACTIVE;
+
+    @Column(name = "next_scheduled_time")
+    private LocalDateTime nextScheduledTime;
+
+    public void updateNextScheduledTime(LocalDateTime nextScheduledTime) {
+        this.nextScheduledTime = nextScheduledTime;
+    }
+
+    public void incrementRevision() {
+        this.revision++;
+    }
 }

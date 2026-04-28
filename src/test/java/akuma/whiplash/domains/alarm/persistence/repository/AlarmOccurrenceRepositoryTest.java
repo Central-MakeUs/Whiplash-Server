@@ -6,13 +6,14 @@ import akuma.whiplash.common.config.PersistenceTest;
 import akuma.whiplash.common.fixture.AlarmFixture;
 import akuma.whiplash.common.fixture.MemberFixture;
 import akuma.whiplash.domains.alarm.application.mapper.AlarmMapper;
-import akuma.whiplash.domains.alarm.domain.constant.DeactivateType;
+import akuma.whiplash.domains.alarm.domain.constant.OccurrenceStatus;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmEntity;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmOccurrenceEntity;
 import akuma.whiplash.domains.member.persistence.entity.MemberEntity;
 import akuma.whiplash.domains.member.persistence.repository.MemberRepository;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -82,8 +83,65 @@ class AlarmOccurrenceRepositoryTest {
             AlarmOccurrenceEntity found = alarmOccurrenceRepository.findByAlarmIdAndDate(alarm.getId(), today).orElseThrow();
 
             // then
-            assertThat(found.getDeactivateType()).isEqualTo(DeactivateType.CHECKIN);
+            assertThat(found.getStatus()).isEqualTo(OccurrenceStatus.CHECKIN);
             assertThat(found.getCheckinTime()).isNotNull();
         }
+    }
+
+    @Nested
+    @DisplayName("findNextScheduledByAlarmIds - 다음 예정 회차 벌크 조회")
+    class FindNextScheduledByAlarmIdsTest {
+
+        @Test
+        @DisplayName("성공: 알람별 현재 이후 가장 빠른 SCHEDULED 회차만 조회한다")
+        void success() {
+            // given
+            MemberEntity member = memberRepository.save(MemberFixture.MEMBER_10.toEntity());
+            AlarmEntity firstAlarm = alarmRepository.save(AlarmFixture.ALARM_10.toEntity(member));
+            AlarmEntity secondAlarm = alarmRepository.save(AlarmFixture.ALARM_11.toEntity(member));
+            LocalDateTime now = LocalDateTime.now();
+
+            AlarmOccurrenceEntity pastScheduled = buildOccurrence(firstAlarm, now.minusDays(1), OccurrenceStatus.SCHEDULED);
+            AlarmOccurrenceEntity nextScheduled = buildOccurrence(firstAlarm, now.plusDays(1), OccurrenceStatus.SCHEDULED);
+            AlarmOccurrenceEntity laterScheduled = buildOccurrence(firstAlarm, now.plusDays(2), OccurrenceStatus.SCHEDULED);
+            AlarmOccurrenceEntity processed = buildOccurrence(secondAlarm, now.plusDays(1), OccurrenceStatus.CHECKIN);
+            AlarmOccurrenceEntity secondNextScheduled = buildOccurrence(secondAlarm, now.plusDays(3), OccurrenceStatus.SCHEDULED);
+            alarmOccurrenceRepository.saveAll(List.of(
+                pastScheduled,
+                nextScheduled,
+                laterScheduled,
+                processed,
+                secondNextScheduled
+            ));
+
+            // when
+            List<AlarmOccurrenceEntity> result = alarmOccurrenceRepository.findNextScheduledByAlarmIds(
+                List.of(firstAlarm.getId(), secondAlarm.getId()),
+                OccurrenceStatus.SCHEDULED,
+                now
+            );
+
+            // then
+            assertThat(result)
+                .extracting(AlarmOccurrenceEntity::getId)
+                .containsExactlyInAnyOrder(nextScheduled.getId(), secondNextScheduled.getId());
+        }
+    }
+
+    private AlarmOccurrenceEntity buildOccurrence(
+        AlarmEntity alarm,
+        LocalDateTime scheduledAt,
+        OccurrenceStatus status
+    ) {
+        return AlarmOccurrenceEntity.builder()
+            .alarm(alarm)
+            .occurrenceDate(scheduledAt.toLocalDate())
+            .occurrenceTime(scheduledAt.toLocalTime())
+            .scheduledAt(scheduledAt)
+            .status(status)
+            .alarmRinging(false)
+            .ringingCount(0)
+            .reminderSent(false)
+            .build();
     }
 }

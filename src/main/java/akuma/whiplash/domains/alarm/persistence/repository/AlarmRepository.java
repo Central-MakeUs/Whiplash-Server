@@ -1,5 +1,6 @@
 package akuma.whiplash.domains.alarm.persistence.repository;
 
+import akuma.whiplash.domains.alarm.domain.constant.AlarmStatus;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmEntity;
 import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -10,6 +11,8 @@ import org.springframework.data.repository.query.Param;
 public interface AlarmRepository extends JpaRepository<AlarmEntity, Long> {
 
     List<AlarmEntity> findAllByMemberId(Long memberId);
+
+    List<AlarmEntity> findAllByMemberIdAndStatusNot(Long memberId, AlarmStatus status);
 
     boolean existsByMemberIdAndAlarmPurpose(Long memberId, String alarmPurpose);
 

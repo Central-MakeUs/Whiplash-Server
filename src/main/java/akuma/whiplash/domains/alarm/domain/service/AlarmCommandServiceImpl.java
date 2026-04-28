@@ -2,12 +2,14 @@ package akuma.whiplash.domains.alarm.domain.service;
 
 import static akuma.whiplash.domains.alarm.exception.AlarmErrorCode.*;
 
+import akuma.whiplash.domains.alarm.application.event.AlarmCheckinCompletedEvent;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmCheckinRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmRegisterRequest;
+import akuma.whiplash.domains.alarm.application.dto.response.AlarmCheckinResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.CreateAlarmOccurrenceResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.CreateAlarmResponse;
 import akuma.whiplash.domains.alarm.application.mapper.AlarmMapper;
-import akuma.whiplash.domains.alarm.domain.constant.DeactivateType;
+import akuma.whiplash.domains.alarm.domain.constant.OccurrenceStatus;
 import akuma.whiplash.domains.alarm.domain.constant.Weekday;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmEntity;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmOccurrenceEntity;
@@ -44,6 +46,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -60,6 +63,7 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
     private final MemberRepository memberRepository;
     private final ArchiveService archiveService;
     private final RingingAlarmRedisRepository ringingAlarmRedisRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Value("${oauth.google.sheet.id}")
     private String spreadsheetsId;
@@ -70,7 +74,7 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
     @Value("${oauth.google.sheet.range}")
     private String sheetRange;
 
-    private static final double CHECKIN_RADIUS_METERS = 100.0;
+    private static final double CHECKIN_RADIUS_METERS = 50.0;
 
     @Override
     public CreateAlarmResponse createAlarm(AlarmRegisterRequest request, Long memberId) {
@@ -81,12 +85,27 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
             throw ApplicationException.from(DUPLICATE_ALARM_PURPOSE);
         }
 
+        // 1. 알람 엔티티 생성 및 저장
         AlarmEntity alarm = AlarmMapper.mapToAlarmEntity(request, memberEntity);
         alarmRepository.save(alarm);
 
-        return CreateAlarmResponse.builder()
-            .alarmId(alarm.getId())
-            .build();
+        // 2. 다음 알람 발생 날짜 계산
+        Set<DayOfWeek> repeatDays = alarm.getRepeatDays().stream()
+            .map(Weekday::getDayOfWeek)
+            .collect(Collectors.toSet());
+        
+        // 현재 시각 기준으로 가장 가까운 발생일 계산 (오늘 포함 여부는 getNextOccurrenceDate 내부 로직 따름)
+        LocalDate nextDate = DateUtil.getNextOccurrenceDate(repeatDays, LocalDateTime.now(), alarm.getTime());
+        LocalDateTime nextScheduledTime = LocalDateTime.of(nextDate, alarm.getTime());
+
+        // 3. 첫 알람 발생 내역 생성 및 저장
+        AlarmOccurrenceEntity occurrence = AlarmMapper.mapToFirstAlarmOccurrenceEntity(alarm, nextDate, alarm.getTime());
+        alarmOccurrenceRepository.save(occurrence);
+
+        // 4. 알람의 다음 예정 시각 업데이트
+        alarm.updateNextScheduledTime(nextScheduledTime);
+
+        return AlarmMapper.mapToCreateAlarmResponse(alarm, occurrence);
     }
 
     @Override
@@ -136,37 +155,31 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
         alarmRepository.delete(alarm);
     }
 
-    // TODO: 사용자가 알람이 울리는 날 알람을 끄지 않아 그 다음날로 넘어간 경우에 어떻게 처리할건지
     @Override
-    public void checkinAlarm(Long memberId, Long alarmId, AlarmCheckinRequest request) {
-        // 1. 알람 조회 및 소유자 검증
+    public AlarmCheckinResponse checkinAlarm(Long memberId, Long alarmId, AlarmCheckinRequest request) {
+        // 1. 알람과 회차를 조회하고 요청 사용자가 소유자인지 확인한다.
         AlarmEntity alarm = findAlarmById(alarmId);
-        validAlarmOwner(memberId, alarm.getMember().getId());
+        MemberEntity member = alarm.getMember();
+        validAlarmOwner(memberId, member.getId());
 
-        // 2. 오늘 날짜 기준으로 다음 알람 발생 날짜 계산
-        LocalDate today = LocalDate.now();
-        Set<DayOfWeek> repeatDays = alarm.getRepeatDays().stream()
-            .map(Weekday::getDayOfWeek)
-            .collect(Collectors.toSet());
-
-        // TODO: 요청일보다 이전 날짜에 울려야할 알람을 꺼야하는 경우도 처리해야함(사용자가 알람을 안꺼서)
-        LocalDate targetDate = DateUtil.getNextOccurrenceDate(repeatDays, today);
-
-        // 3. 요청일과 끄려고 하는 날짜가 같은 주인지 검증
-        validSameWeek(targetDate, today);
-
-        // 4. 해당 날짜의 발생 내역이 없으면 생성
         AlarmOccurrenceEntity occurrence = alarmOccurrenceRepository
-            .findByAlarmIdAndDate(alarmId, targetDate)
-            .orElseGet(() -> alarmOccurrenceRepository.save(
-                AlarmMapper.mapToAlarmOccurrenceForDate(alarm, targetDate)));
+            .findByIdAndAlarmId(request.occurrenceId(), alarmId)
+            .orElseThrow(() -> ApplicationException.from(ALARM_OCCURRENCE_NOT_FOUND));
 
-        // 5. 이미 끄기/체크인 처리되었으면 예외
-        if (occurrence.getDeactivateType() != DeactivateType.NONE) {
+        // 2. 이미 처리된 회차는 다시 체크인할 수 없다.
+        if (occurrence.getStatus() != OccurrenceStatus.SCHEDULED
+            && occurrence.getStatus() != OccurrenceStatus.RINGING) {
             throw ApplicationException.from(ALREADY_DEACTIVATED);
         }
 
-        // 6. 위치 반경 내 도달했는지 검증
+        // 3. 위치 인증은 예정 시각 3시간 전부터만 허용한다.
+        LocalDateTime requestedAt = request.requestedAt();
+        LocalDateTime checkinAvailableAt = occurrence.getScheduledAt().minusHours(3);
+        if (requestedAt.isBefore(checkinAvailableAt)) {
+            throw ApplicationException.from(CHECKIN_NOT_YET_AVAILABLE);
+        }
+
+        // 4. 사용자가 알람 목적지 반경 50m 안에 있는지 검증한다.
         boolean isInRange = isWithinDistance(
             alarm.getLatitude(), alarm.getLongitude(),
             request.latitude(), request.longitude(), CHECKIN_RADIUS_METERS);
@@ -175,12 +188,35 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
             throw ApplicationException.from(CHECKIN_OUT_OF_RANGE);
         }
 
-        // 7. 체크인 처리
-        occurrence.checkin(LocalDateTime.now());
+        // 5. 체크인 완료 시각을 기록하고 회차 상태를 CHECKIN으로 전환한다.
+        LocalDateTime processedAt = LocalDateTime.now();
+        occurrence.checkin(processedAt);
 
-        // 체크인으로 알람이 비활성화됐으므로 Redis Sorted Set에서 제거.
-        // 항목이 없어도 ZREM은 no-op이므로 항상 안전하게 호출한다.
+        // 6. 더 이상 울리는 알람이 아니므로 캐시에서 제거하고 알람 revision을 증가시킨다.
         ringingAlarmRedisRepository.remove(alarmId, memberId);
+
+        alarm.incrementRevision();
+
+        // 7. 클라이언트 동기화를 위해 다음 예정 회차를 함께 조회한다.
+        AlarmOccurrenceEntity nextOccurrence = alarmOccurrenceRepository
+            .findNextScheduledByAlarmIds(List.of(alarmId), OccurrenceStatus.SCHEDULED, processedAt)
+            .stream()
+            .findFirst()
+            .orElse(null);
+
+        // 8. 체크인 로그는 본 처리와 분리해 커밋 후 별도 트랜잭션에서 best-effort로 저장한다.
+        eventPublisher.publishEvent(new AlarmCheckinCompletedEvent(
+            occurrence.getId(),
+            member.getId(),
+            request.deviceId(),
+            request.latitude(),
+            request.longitude(),
+            request.requestedAt(),
+            processedAt
+        ));
+
+        // 9. revision과 다음 회차 정보를 포함한 응답을 반환한다.
+        return AlarmMapper.mapToAlarmCheckinResponse(alarm, nextOccurrence);
     }
 
     @Override
@@ -188,17 +224,17 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
         AlarmEntity alarm = findAlarmById(alarmId);
         validAlarmOwner(memberId, alarm.getMember().getId());
 
-        // 아직 비활성화되지 않은 알람 발생 이력 중 가장 최근 것을 가져옴.
+        // 아직 처리되지 않은 알람 발생 이력 중 가장 최근 것을 가져옴.
         AlarmOccurrenceEntity occurrence = alarmOccurrenceRepository
-            .findTopByAlarmIdAndDeactivateTypeInOrderByDateDescTimeDesc(
+            .findTopByAlarmIdAndStatusInOrderByOccurrenceDateDescOccurrenceTimeDesc(
                 alarmId,
-                List.of(DeactivateType.NONE)
+                List.of(OccurrenceStatus.SCHEDULED, OccurrenceStatus.RINGING)
             )
             .orElseThrow(() -> ApplicationException.from(ALARM_OCCURRENCE_NOT_FOUND));
 
         // 아직 알람이 울릴 시간이 아니라면 예외 발생
         LocalDateTime now = LocalDateTime.now();
-        LocalDateTime scheduledDateTime = LocalDateTime.of(occurrence.getDate(), occurrence.getTime());
+        LocalDateTime scheduledDateTime = LocalDateTime.of(occurrence.getOccurrenceDate(), occurrence.getOccurrenceTime());
         if (now.isBefore(scheduledDateTime)) {
             throw ApplicationException.from(NOT_ALARM_TIME);
         }
@@ -231,21 +267,21 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
     /**
      * 위치 인증 반경 내 도착 여부 계산
      *
-     * @param lat1 기준 위도 (알람 설정 위치)
-     * @param lon1 기준 경도
-     * @param lat2 사용자 위도
-     * @param lon2 사용자 경도
+     * @param targetLat 기준 위도 (알람 설정 위치)
+     * @param targetLon 기준 경도
+     * @param reqLat 사용자 위도
+     * @param reqLon 사용자 경도
      * @param radiusMeters 반경(m)
      * @return true if within radius
      */
-    private boolean isWithinDistance(double lat1, double lon1, double lat2, double lon2, double radiusMeters) {
+    private boolean isWithinDistance(double targetLat, double targetLon, double reqLat, double reqLon, double radiusMeters) {
         double earthRadius = 6371000; // meters
 
-        double dLat = Math.toRadians(lat2 - lat1);
-        double dLon = Math.toRadians(lon2 - lon1);
+        double dLat = Math.toRadians(reqLat - targetLat);
+        double dLon = Math.toRadians(reqLon - targetLon);
 
         double a = Math.sin(dLat / 2) * Math.sin(dLat / 2)
-            + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
+            + Math.cos(Math.toRadians(targetLat)) * Math.cos(Math.toRadians(reqLat))
             * Math.sin(dLon / 2) * Math.sin(dLon / 2);
 
         double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
@@ -297,12 +333,6 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
     private AlarmEntity findAlarmById(Long alarmId) {
         return alarmRepository.findById(alarmId)
             .orElseThrow(() -> ApplicationException.from(ALARM_NOT_FOUND));
-    }
-
-    private static void validSameWeek(LocalDate offTargetDate, LocalDate clientDate) {
-        if (!DateUtil.isSameWeek(offTargetDate, clientDate)) {
-            throw ApplicationException.from(NEXT_WEEK_ALARM_DEACTIVATION_NOT_ALLOWED);
-        }
     }
 
     private static void validAlarmOwner(Long reqMemberId, Long alarmMemberId) {
