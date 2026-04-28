@@ -7,6 +7,7 @@ import static akuma.whiplash.domains.member.exception.MemberErrorCode.MEMBER_NOT
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmCheckinRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmRemoveRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmRegisterRequest;
+import akuma.whiplash.domains.alarm.application.dto.response.AlarmCheckinResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmSyncResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.CreateAlarmResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.GetAlarmsResponse;
@@ -62,18 +63,23 @@ public class AlarmController {
     }
 
     @CustomErrorCodes(
-        alarmErrorCodes = {ALARM_NOT_FOUND, ALARM_OCCURRENCE_NOT_FOUND, CHECKIN_OUT_OF_RANGE, ALREADY_DEACTIVATED},
+        alarmErrorCodes = {
+            ALARM_NOT_FOUND,
+            ALARM_OCCURRENCE_NOT_FOUND,
+            CHECKIN_OUT_OF_RANGE,
+            ALREADY_DEACTIVATED,
+            CHECKIN_NOT_YET_AVAILABLE
+        },
         authErrorCodes = {PERMISSION_DENIED}
     )
-    @Operation(summary = "알람 도착 인증", description = "알람 도착 인증을 합니다. 도착 위치 반경 100m 내에 들어와야 도착 인증이 가능합니다.")
+    @Operation(summary = "알람 도착 인증", description = "알람 도착 인증을 합니다. 도착 위치 반경 50m 내에 들어와야 도착 인증이 가능합니다.")
     @PostMapping("/{alarmId}/checkin")
-    public ApplicationResponse<Void> checkin(
+    public ApplicationResponse<AlarmCheckinResponse> checkin(
         @PathVariable Long alarmId,
         @RequestBody @Valid AlarmCheckinRequest request,
         @AuthenticationPrincipal MemberContext memberContext
     ) {
-        alarmUseCase.checkinAlarm(memberContext.memberId(), alarmId, request);
-        return ApplicationResponse.onSuccess();
+        return ApplicationResponse.onSuccess(alarmUseCase.checkinAlarm(memberContext.memberId(), alarmId, request));
     }
 
     @CustomErrorCodes(memberErrorCodes = {MEMBER_NOT_FOUND})

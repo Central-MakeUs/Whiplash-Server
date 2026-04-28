@@ -105,6 +105,10 @@ class AlarmControllerTest {
             .build();
     }
 
+    private AlarmCheckinRequest buildCheckinRequest() {
+        return new AlarmCheckinRequest(501L, "device-uuid", 37.0, 127.0, LocalDateTime.now());
+    }
+
     @AfterEach
     void clearSecurityContext() {
         SecurityContextHolder.clearContext();
@@ -201,10 +205,11 @@ class AlarmControllerTest {
             );
             setSecurityContext(buildContext(MEMBER_4));
 
-            // when & then
+            // when
             when(alarmUseCase.createAlarm(any(AlarmRegisterRequest.class), anyLong()))
                 .thenThrow(ApplicationException.from(MemberErrorCode.MEMBER_NOT_FOUND));
 
+            // then
             mockMvc.perform(post(BASE)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
@@ -287,7 +292,7 @@ class AlarmControllerTest {
         void success() throws Exception {
             // given
             setSecurityContext(buildContext(MemberFixture.MEMBER_8));
-            AlarmCheckinRequest request = new AlarmCheckinRequest(37.0, 127.0);
+            AlarmCheckinRequest request = buildCheckinRequest();
 
             // when & then
             mockMvc.perform(post(BASE + "/{alarmId}/checkin", 1L)
@@ -307,7 +312,7 @@ class AlarmControllerTest {
             doThrow(ApplicationException.from(AlarmErrorCode.ALARM_NOT_FOUND))
                 .when(alarmUseCase)
                 .checkinAlarm(anyLong(), anyLong(), any(AlarmCheckinRequest.class));
-            AlarmCheckinRequest request = new AlarmCheckinRequest(37.0, 127.0);
+            AlarmCheckinRequest request = buildCheckinRequest();
 
             // when & then
             mockMvc.perform(post(BASE + "/{alarmId}/checkin", 1L)
@@ -324,7 +329,7 @@ class AlarmControllerTest {
             doThrow(ApplicationException.from(AuthErrorCode.PERMISSION_DENIED))
                 .when(alarmUseCase)
                 .checkinAlarm(anyLong(), anyLong(), any(AlarmCheckinRequest.class));
-            AlarmCheckinRequest request = new AlarmCheckinRequest(37.0, 127.0);
+            AlarmCheckinRequest request = buildCheckinRequest();
 
             // when & then
             mockMvc.perform(post(BASE + "/{alarmId}/checkin", 1L)
@@ -341,7 +346,7 @@ class AlarmControllerTest {
             doThrow(ApplicationException.from(AlarmErrorCode.ALREADY_DEACTIVATED))
                 .when(alarmUseCase)
                 .checkinAlarm(anyLong(), anyLong(), any(AlarmCheckinRequest.class));
-            AlarmCheckinRequest request = new AlarmCheckinRequest(37.0, 127.0);
+            AlarmCheckinRequest request = buildCheckinRequest();
 
             // when & then
             mockMvc.perform(post(BASE + "/{alarmId}/checkin", 1L)
@@ -358,7 +363,7 @@ class AlarmControllerTest {
             doThrow(ApplicationException.from(AlarmErrorCode.CHECKIN_OUT_OF_RANGE))
                 .when(alarmUseCase)
                 .checkinAlarm(anyLong(), anyLong(), any(AlarmCheckinRequest.class));
-            AlarmCheckinRequest request = new AlarmCheckinRequest(37.0, 127.0);
+            AlarmCheckinRequest request = buildCheckinRequest();
 
             // when & then
             mockMvc.perform(post(BASE + "/{alarmId}/checkin", 1L)
@@ -368,14 +373,14 @@ class AlarmControllerTest {
         }
 
         @Test
-        @DisplayName("실패: 다음 주 알람에는 도착 인증할 수 없다")
-        void fail_nextWeek() throws Exception {
+        @DisplayName("실패: 인증 가능 시간 전이면 400을 반환한다")
+        void fail_notYetAvailable() throws Exception {
             // given
             setSecurityContext(buildContext(MemberFixture.MEMBER_13));
-            doThrow(ApplicationException.from(AlarmErrorCode.NEXT_WEEK_ALARM_DEACTIVATION_NOT_ALLOWED))
+            doThrow(ApplicationException.from(AlarmErrorCode.CHECKIN_NOT_YET_AVAILABLE))
                 .when(alarmUseCase)
                 .checkinAlarm(anyLong(), anyLong(), any(AlarmCheckinRequest.class));
-            AlarmCheckinRequest request = new AlarmCheckinRequest(37.0, 127.0);
+            AlarmCheckinRequest request = buildCheckinRequest();
 
             // when & then
             mockMvc.perform(post(BASE + "/{alarmId}/checkin", 1L)
@@ -510,7 +515,7 @@ class AlarmControllerTest {
 
     @Nested
     @DisplayName("[GET] /api/v1/alarms/sync - 알람 전체 동기화 조회")
-    class SyncAlarmsTest {
+    class GetSyncAlarmsTest {
 
         @Test
         @DisplayName("성공: 200 OK와 서버 시간 및 동기화 알람 목록을 반환한다")
@@ -533,7 +538,7 @@ class AlarmControllerTest {
                     .alarms(List.of(dto))
                     .build());
 
-            // when & then
+            // when
             mockMvc.perform(get(BASE + "/sync"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.result.serverTime").exists())
@@ -542,6 +547,7 @@ class AlarmControllerTest {
                 .andExpect(jsonPath("$.result.alarms[0].status").value("활성화"))
                 .andExpect(jsonPath("$.result.alarms[0].nextOccurrence.occurrenceId").value(10L));
 
+            // then
             verify(alarmUseCase, times(1)).getSyncAlarms(eq(MEMBER_3.getId()));
         }
 

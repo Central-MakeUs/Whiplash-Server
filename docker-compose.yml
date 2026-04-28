@@ -88,13 +88,13 @@ services:
 
   # Redis
   redis:
-    image: redis:latest
+    image: redis:7.4
     container_name: redis-server
     ports:
-      - "63790:6379"
+      - "16379:6379"
     env_file:
       - src/main/resources/env.properties
-    command: redis-server --requirepass ${REDIS_PASSWORD}
+    command: [ "sh", "-c", "redis-server --requirepass \"$REDIS_PASSWORD\"" ]
     volumes:
       - redis_data:/data
     networks:
@@ -111,9 +111,9 @@ services:
     container_name: redis_exporter
     ports:
       - "9121:9121"
-    command:
-      - '--redis.addr=redis://redis:6379'
-      - '--redis.password=${REDIS_PASSWORD}'
+    env_file:
+      - src/main/resources/env.properties
+    command: [ "sh", "-c", "redis_exporter --redis.addr=redis://redis:6379 --redis.password=\"$REDIS_PASSWORD\"" ]
     depends_on:
       - redis
     networks:

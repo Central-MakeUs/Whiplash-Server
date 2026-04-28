@@ -153,8 +153,11 @@ class AlarmQueryServiceTest {
             long memberId = 999L;
             given(memberRepository.findById(memberId)).willReturn(Optional.empty());
 
-            // when & then
-            assertThatThrownBy(() -> alarmQueryService.getAlarms(memberId))
+            // when
+            var thrown = assertThatThrownBy(() -> alarmQueryService.getAlarms(memberId));
+
+            // then
+            thrown
                 .isInstanceOf(ApplicationException.class)
                 .hasFieldOrPropertyWithValue("code", MemberErrorCode.MEMBER_NOT_FOUND);
         }
@@ -214,23 +217,28 @@ class AlarmQueryServiceTest {
             assertThat(result.alarms().get(1).nextOccurrence()).isNull();
         }
 
-        @Test
-        @DisplayName("성공: 알람이 없으면 회차 조회 없이 빈 목록을 반환한다")
-        void success_emptyAlarms() {
-            // given
-            MemberEntity member = MemberFixture.MEMBER_11.toMockEntity();
-            given(memberRepository.findById(member.getId())).willReturn(Optional.of(member));
-            given(alarmRepository.findAllByMemberIdAndStatusNot(member.getId(), AlarmStatus.DELETED))
-                .willReturn(List.of());
+        @Nested
+        @DisplayName("빈 알람")
+        class EmptyAlarmsTest {
 
-            // when
-            AlarmSyncResponse result = alarmQueryService.getSyncAlarms(member.getId());
+            @Test
+            @DisplayName("성공: 알람이 없으면 회차 조회 없이 빈 목록을 반환한다")
+            void success() {
+                // given
+                MemberEntity member = MemberFixture.MEMBER_11.toMockEntity();
+                given(memberRepository.findById(member.getId())).willReturn(Optional.of(member));
+                given(alarmRepository.findAllByMemberIdAndStatusNot(member.getId(), AlarmStatus.DELETED))
+                    .willReturn(List.of());
 
-            // then
-            assertThat(result.serverTime()).isNotNull();
-            assertThat(result.alarms()).isEmpty();
-            then(alarmOccurrenceRepository).should(never())
-                .findNextScheduledByAlarmIds(anyList(), any(), any(LocalDateTime.class));
+                // when
+                AlarmSyncResponse result = alarmQueryService.getSyncAlarms(member.getId());
+
+                // then
+                assertThat(result.serverTime()).isNotNull();
+                assertThat(result.alarms()).isEmpty();
+                then(alarmOccurrenceRepository).should(never())
+                    .findNextScheduledByAlarmIds(anyList(), any(), any(LocalDateTime.class));
+            }
         }
 
         @Test
@@ -240,8 +248,11 @@ class AlarmQueryServiceTest {
             long memberId = 999L;
             given(memberRepository.findById(memberId)).willReturn(Optional.empty());
 
-            // when & then
-            assertThatThrownBy(() -> alarmQueryService.getSyncAlarms(memberId))
+            // when
+            var thrown = assertThatThrownBy(() -> alarmQueryService.getSyncAlarms(memberId));
+
+            // then
+            thrown
                 .isInstanceOf(ApplicationException.class)
                 .hasFieldOrPropertyWithValue("code", MemberErrorCode.MEMBER_NOT_FOUND);
         }

@@ -87,6 +87,23 @@ class AlarmControllerIntegrationTest {
         return jwtProvider.generateAccessToken(member.getId(), member.getRole(), "mock_device_id");
     }
 
+    private AlarmOccurrenceEntity saveOccurrence(AlarmEntity alarm, LocalDateTime scheduledAt, OccurrenceStatus status) {
+        return alarmOccurrenceRepository.save(AlarmOccurrenceEntity.builder()
+            .alarm(alarm)
+            .occurrenceDate(scheduledAt.toLocalDate())
+            .occurrenceTime(scheduledAt.toLocalTime())
+            .scheduledAt(scheduledAt)
+            .status(status)
+            .alarmRinging(status == OccurrenceStatus.RINGING)
+            .ringingCount(status == OccurrenceStatus.RINGING ? 1 : 0)
+            .reminderSent(false)
+            .build());
+    }
+
+    private AlarmCheckinRequest buildCheckinRequest(AlarmOccurrenceEntity occurrence, Double latitude, Double longitude, LocalDateTime requestedAt) {
+        return new AlarmCheckinRequest(occurrence.getId(), "device-uuid", latitude, longitude, requestedAt);
+    }
+
     @Nested
     @DisplayName("[POST] /api/v1/alarms - 알람 등록")
     class CreateAlarmTest {
@@ -294,7 +311,9 @@ class AlarmControllerIntegrationTest {
             // given
             MemberEntity member = memberRepository.save(MemberFixture.MEMBER_1.toEntity());
             AlarmEntity alarm = saveAlarmForToday(member);
-            AlarmCheckinRequest request = new AlarmCheckinRequest(alarm.getLatitude(), alarm.getLongitude());
+            AlarmOccurrenceEntity occurrence = saveOccurrence(alarm, LocalDateTime.now().plusHours(1), OccurrenceStatus.SCHEDULED);
+            saveOccurrence(alarm, LocalDateTime.now().plusDays(1), OccurrenceStatus.SCHEDULED);
+            AlarmCheckinRequest request = buildCheckinRequest(occurrence, alarm.getLatitude(), alarm.getLongitude(), LocalDateTime.now());
             String accessToken = buildAccessToken(member);
 
             // when
@@ -305,10 +324,10 @@ class AlarmControllerIntegrationTest {
                 .andExpect(status().isOk());
 
             // then
-            AlarmOccurrenceEntity occurrence = alarmOccurrenceRepository
-                .findByAlarmIdAndDate(alarm.getId(), LocalDate.now())
+            AlarmOccurrenceEntity savedOccurrence = alarmOccurrenceRepository
+                .findById(occurrence.getId())
                 .orElseThrow();
-            assertThat(occurrence.getStatus()).isEqualTo(OccurrenceStatus.CHECKIN);
+            assertThat(savedOccurrence.getStatus()).isEqualTo(OccurrenceStatus.CHECKIN);
         }
 
         @Test
@@ -317,7 +336,7 @@ class AlarmControllerIntegrationTest {
             // given
             MemberEntity member = memberRepository.save(MemberFixture.MEMBER_2.toEntity());
             String accessToken = buildAccessToken(member);
-            AlarmCheckinRequest request = new AlarmCheckinRequest(0.0, 0.0);
+            AlarmCheckinRequest request = new AlarmCheckinRequest(999L, "device-uuid", 0.0, 0.0, LocalDateTime.now());
 
             // when & then
             mockMvc.perform(post(BASE + "/{alarmId}/checkin", 999L)
@@ -334,8 +353,9 @@ class AlarmControllerIntegrationTest {
             MemberEntity owner = memberRepository.save(MemberFixture.MEMBER_3.toEntity());
             MemberEntity other = memberRepository.save(MemberFixture.MEMBER_4.toEntity());
             AlarmEntity alarm = saveAlarmForToday(owner);
+            AlarmOccurrenceEntity occurrence = saveOccurrence(alarm, LocalDateTime.now().plusHours(1), OccurrenceStatus.SCHEDULED);
             String accessToken = buildAccessToken(other);
-            AlarmCheckinRequest request = new AlarmCheckinRequest(alarm.getLatitude(), alarm.getLongitude());
+            AlarmCheckinRequest request = buildCheckinRequest(occurrence, alarm.getLatitude(), alarm.getLongitude(), LocalDateTime.now());
 
             // when & then
             mockMvc.perform(post(BASE + "/{alarmId}/checkin", alarm.getId())
@@ -351,12 +371,11 @@ class AlarmControllerIntegrationTest {
             // given
             MemberEntity member = memberRepository.save(MemberFixture.MEMBER_5.toEntity());
             AlarmEntity alarm = saveAlarmForToday(member);
-            LocalDate targetDate = LocalDate.now();
-            AlarmOccurrenceEntity occurrence = AlarmMapper.mapToAlarmOccurrenceForDate(alarm, targetDate);
+            AlarmOccurrenceEntity occurrence = saveOccurrence(alarm, LocalDateTime.now().plusHours(1), OccurrenceStatus.SCHEDULED);
             occurrence.checkin(LocalDateTime.now());
             alarmOccurrenceRepository.save(occurrence);
             String accessToken = buildAccessToken(member);
-            AlarmCheckinRequest request = new AlarmCheckinRequest(alarm.getLatitude(), alarm.getLongitude());
+            AlarmCheckinRequest request = buildCheckinRequest(occurrence, alarm.getLatitude(), alarm.getLongitude(), LocalDateTime.now());
 
             // when & then
             mockMvc.perform(post(BASE + "/{alarmId}/checkin", alarm.getId())
@@ -372,10 +391,13 @@ class AlarmControllerIntegrationTest {
             // given
             MemberEntity member = memberRepository.save(MemberFixture.MEMBER_6.toEntity());
             AlarmEntity alarm = saveAlarmForToday(member);
+            AlarmOccurrenceEntity occurrence = saveOccurrence(alarm, LocalDateTime.now().plusHours(1), OccurrenceStatus.SCHEDULED);
             String accessToken = buildAccessToken(member);
-            AlarmCheckinRequest request = new AlarmCheckinRequest(
+            AlarmCheckinRequest request = buildCheckinRequest(
+                occurrence,
                 alarm.getLatitude() + 1,
-                alarm.getLongitude() + 1
+                alarm.getLongitude() + 1,
+                LocalDateTime.now()
             );
 
             // when & then
@@ -387,19 +409,19 @@ class AlarmControllerIntegrationTest {
         }
 
         @Test
-        @DisplayName("실패: 다음 주 알람에는 체크인할 수 없다")
-        void fail_nextWeek() throws Exception {
-            // ISO 기준(월~일) 월요일 실행 시 이번 주 내에는 '다음 주 알람'이 존재하지 않아 테스트가 항상 성공(200 OK)하게 됨.
-            // 따라서 월요일인 경우 테스트를 스킵한다.
-            if (LocalDate.now().getDayOfWeek() == DayOfWeek.MONDAY) {
-                return;
-            }
-
+        @DisplayName("실패: 인증 가능 시간 전이면 400을 반환한다")
+        void fail_notYetAvailable() throws Exception {
             // given
             MemberEntity member = memberRepository.save(MemberFixture.MEMBER_7.toEntity());
-            AlarmEntity alarm = saveAlarmForNextWeek(member);
+            AlarmEntity alarm = saveAlarmForToday(member);
+            AlarmOccurrenceEntity occurrence = saveOccurrence(alarm, LocalDateTime.now().plusHours(6), OccurrenceStatus.SCHEDULED);
             String accessToken = buildAccessToken(member);
-            AlarmCheckinRequest request = new AlarmCheckinRequest(alarm.getLatitude(), alarm.getLongitude());
+            AlarmCheckinRequest request = buildCheckinRequest(
+                occurrence,
+                alarm.getLatitude(),
+                alarm.getLongitude(),
+                occurrence.getScheduledAt().minusHours(4)
+            );
 
             // when & then
             mockMvc.perform(post(BASE + "/{alarmId}/checkin", alarm.getId())

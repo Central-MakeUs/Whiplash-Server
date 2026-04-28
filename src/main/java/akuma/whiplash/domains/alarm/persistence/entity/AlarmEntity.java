@@ -85,4 +85,8 @@ public class AlarmEntity extends BaseTimeEntity {
     public void updateNextScheduledTime(LocalDateTime nextScheduledTime) {
         this.nextScheduledTime = nextScheduledTime;
     }
+
+    public void incrementRevision() {
+        this.revision++;
+    }
 }

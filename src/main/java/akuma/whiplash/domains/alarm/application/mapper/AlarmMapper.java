@@ -1,18 +1,21 @@
 package akuma.whiplash.domains.alarm.application.mapper;
 
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmRegisterRequest;
+import akuma.whiplash.domains.alarm.application.dto.response.AlarmCheckinResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmSyncItemDto;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmSyncResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.CreateAlarmOccurrenceResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.CreateAlarmResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.NextOccurrenceResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmPreviewDto;
+import akuma.whiplash.domains.alarm.domain.constant.DeactivateType;
 import akuma.whiplash.domains.alarm.domain.constant.AlarmStatus;
 import akuma.whiplash.domains.alarm.domain.constant.OccurrenceStatus;
 import akuma.whiplash.domains.alarm.domain.constant.SoundType;
 import akuma.whiplash.domains.alarm.domain.constant.Weekday;
 import akuma.whiplash.domains.alarm.exception.AlarmErrorCode;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmEntity;
+import akuma.whiplash.domains.alarm.persistence.entity.AlarmDeactivationLogEntity;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmOccurrenceEntity;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmRingingLogEntity;
 import akuma.whiplash.domains.member.persistence.entity.MemberEntity;
@@ -127,6 +130,44 @@ public class AlarmMapper {
             .build();
     }
 
+    public static AlarmDeactivationLogEntity mapToAlarmDeactivationLogEntity(
+        AlarmOccurrenceEntity occurrence,
+        MemberEntity member,
+        String deviceId,
+        Double latitude,
+        Double longitude,
+        LocalDateTime requestedAt,
+        LocalDateTime processedAt
+    ) {
+        return AlarmDeactivationLogEntity.builder()
+            .alarmOccurrence(occurrence)
+            .member(member)
+            .paymentId(null)
+            .deactivateType(DeactivateType.CHECKIN)
+            .requestLatitude(latitude)
+            .requestLongitude(longitude)
+            .requestDeviceId(deviceId)
+            .requestedAt(requestedAt)
+            .processedAt(processedAt)
+            .result("SUCCESS")
+            .failReason("")
+            .build();
+    }
+
+    public static AlarmCheckinResponse mapToAlarmCheckinResponse(
+        AlarmEntity alarm,
+        AlarmOccurrenceEntity nextOccurrence
+    ) {
+        return AlarmCheckinResponse.builder()
+            .alarmId(alarm.getId())
+            .alarmRevision(alarm.getRevision())
+            .nextOccurrence(nextOccurrence == null ? null : AlarmCheckinResponse.NextOccurrenceInfo.builder()
+                .occurrenceId(nextOccurrence.getId())
+                .scheduledAt(nextOccurrence.getScheduledAt())
+                .build())
+            .build();
+    }
+
     public static AlarmPreviewDto mapToAlarmPreviewDto(
         AlarmEntity alarm,
         LocalDateTime now,
@@ -139,13 +180,13 @@ public class AlarmMapper {
         boolean isCurrentOccurrenceProcessed = latestProcessedOccurrence != null
             && latestProcessedOccurrence.getOccurrenceDate().isEqual(firstDate);
 
-        String status = alarm.getStatus() == AlarmStatus.INACTIVE ? "비활성화" : "활성화";
+        String status = mapToStatusLabel(alarm.getStatus());
 
         LocalDate resolvedNext     = isCurrentOccurrenceProcessed ? secondDate : firstDate;
         LocalDate resolvedNextNext = isCurrentOccurrenceProcessed ? thirdDate : secondDate;
 
         boolean arrivalCheckEnabled = false;
-        if ("활성화".equals(status)) {
+        if (alarm.getStatus() != AlarmStatus.INACTIVE) {
             LocalDateTime alarmDateTime = LocalDateTime.of(resolvedNext, alarm.getTime());
             arrivalCheckEnabled = !now.isBefore(alarmDateTime.minusHours(3));
         }
@@ -175,7 +216,7 @@ public class AlarmMapper {
         return AlarmSyncItemDto.builder()
             .alarmId(alarm.getId())
             .alarmRevision(alarm.getRevision())
-            .status(mapToStatusDescription(alarm.getStatus()))
+            .status(mapToStatusLabel(alarm.getStatus()))
             .nextOccurrence(nextOccurrence == null ? null : AlarmSyncItemDto.NextOccurrenceInfo.builder()
                 .occurrenceId(nextOccurrence.getId())
                 .scheduledAt(nextOccurrence.getScheduledAt())
@@ -190,7 +231,7 @@ public class AlarmMapper {
             .build();
     }
 
-    private static String mapToStatusDescription(AlarmStatus status) {
+    private static String mapToStatusLabel(AlarmStatus status) {
         return status == AlarmStatus.INACTIVE ? "비활성화" : "활성화";
     }
 

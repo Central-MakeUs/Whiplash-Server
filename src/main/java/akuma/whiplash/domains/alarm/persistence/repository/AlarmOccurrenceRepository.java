@@ -39,6 +39,17 @@ public interface AlarmOccurrenceRepository extends JpaRepository<AlarmOccurrence
         @Param("date") LocalDate date
     );
 
+    @Query("""
+    SELECT ao
+    FROM AlarmOccurrenceEntity ao
+    WHERE ao.id = :occurrenceId
+      AND ao.alarm.id = :alarmId
+    """)
+    Optional<AlarmOccurrenceEntity> findByIdAndAlarmId(
+        @Param("occurrenceId") Long occurrenceId,
+        @Param("alarmId") Long alarmId
+    );
+
     Optional<AlarmOccurrenceEntity> findTopByAlarmIdAndStatusInOrderByOccurrenceDateDescOccurrenceTimeDesc(
         Long alarmId, List<OccurrenceStatus> statuses
     );
@@ -133,6 +144,7 @@ public interface AlarmOccurrenceRepository extends JpaRepository<AlarmOccurrence
 
     @Query("""
     SELECT ao FROM AlarmOccurrenceEntity ao
+    JOIN FETCH ao.alarm
     WHERE ao.alarm.id IN :alarmIds
       AND ao.status IN :statuses
       AND ao.occurrenceDate = (
@@ -149,6 +161,7 @@ public interface AlarmOccurrenceRepository extends JpaRepository<AlarmOccurrence
 
     @Query("""
     SELECT ao FROM AlarmOccurrenceEntity ao
+    JOIN FETCH ao.alarm
     WHERE ao.alarm.id IN :alarmIds
       AND ao.occurrenceDate IN :dates
     """)
@@ -159,6 +172,7 @@ public interface AlarmOccurrenceRepository extends JpaRepository<AlarmOccurrence
 
     @Query("""
     SELECT ao FROM AlarmOccurrenceEntity ao
+    JOIN FETCH ao.alarm
     WHERE ao.alarm.id IN :alarmIds
       AND ao.status = :status
       AND ao.scheduledAt >= :now
