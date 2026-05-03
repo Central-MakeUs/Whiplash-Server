@@ -1,6 +1,7 @@
 package akuma.whiplash.domains.alarm.persistence.entity;
 
 import akuma.whiplash.domains.alarm.domain.constant.DeactivateType;
+import akuma.whiplash.domains.alarm.domain.constant.DeactivationResult;
 import akuma.whiplash.domains.member.persistence.entity.MemberEntity;
 import akuma.whiplash.global.entity.BaseTimeEntity;
 import jakarta.persistence.Access;
@@ -66,9 +67,10 @@ public class AlarmDeactivationLogEntity extends BaseTimeEntity {
     @Column(name = "processed_at", nullable = false)
     private LocalDateTime processedAt;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "result", length = 20, nullable = false)
-    private String result;
+    private DeactivationResult result;
 
-    @Column(name = "fail_reason", length = 100, nullable = false)
+    @Column(name = "fail_reason", length = 500, nullable = false)
     private String failReason;
 }
