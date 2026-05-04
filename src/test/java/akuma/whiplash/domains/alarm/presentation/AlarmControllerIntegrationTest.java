@@ -10,8 +10,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import akuma.whiplash.common.config.IntegrationTest;
 import akuma.whiplash.common.fixture.AlarmFixture;
 import akuma.whiplash.common.fixture.AlarmOccurrenceFixture;
+import akuma.whiplash.common.fixture.MemberDeviceFixture;
 import akuma.whiplash.common.fixture.MemberFixture;
+import akuma.whiplash.common.fixture.PaymentFixture;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmCheckinRequest;
+import akuma.whiplash.domains.alarm.application.dto.request.AlarmPaymentRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmRegisterRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmRemoveRequest;
 import akuma.whiplash.domains.alarm.application.mapper.AlarmMapper;
@@ -20,10 +23,13 @@ import akuma.whiplash.domains.alarm.domain.constant.SoundType;
 import akuma.whiplash.domains.alarm.domain.constant.Weekday;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmEntity;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmOccurrenceEntity;
+import akuma.whiplash.domains.alarm.persistence.repository.AlarmDeactivationLogRepository;
 import akuma.whiplash.domains.alarm.persistence.repository.AlarmOccurrenceRepository;
 import akuma.whiplash.domains.alarm.persistence.repository.AlarmRepository;
 import akuma.whiplash.domains.member.persistence.entity.MemberEntity;
+import akuma.whiplash.domains.member.persistence.repository.MemberDeviceRepository;
 import akuma.whiplash.domains.member.persistence.repository.MemberRepository;
+import akuma.whiplash.domains.payment.persistence.repository.PaymentRepository;
 import akuma.whiplash.global.config.security.jwt.JwtProvider;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.DayOfWeek;
@@ -49,8 +55,11 @@ class AlarmControllerIntegrationTest {
     @Autowired private MockMvc mockMvc;
     @Autowired private ObjectMapper objectMapper;
     @Autowired private MemberRepository memberRepository;
+    @Autowired private MemberDeviceRepository memberDeviceRepository;
     @Autowired private AlarmRepository alarmRepository;
     @Autowired private AlarmOccurrenceRepository alarmOccurrenceRepository;
+    @Autowired private AlarmDeactivationLogRepository alarmDeactivationLogRepository;
+    @Autowired private PaymentRepository paymentRepository;
 
     private static final String BASE = "/api/v1/alarms";
 
@@ -429,6 +438,102 @@ class AlarmControllerIntegrationTest {
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest());
+        }
+    }
+
+    @Nested
+    @DisplayName("deactivateByPayment - 결제로 알람 끄기")
+    class DeactivateByPaymentTest {
+
+        private static final LocalDateTime PAYMENT_NOW = LocalDateTime.of(2026, 5, 2, 14, 30);
+
+        @Test
+        @DisplayName("성공: 결제 요청이 성공하면 200 OK와 동기화 정보를 반환한다")
+        void success() throws Exception {
+            // given
+            MemberEntity member = memberRepository.save(MemberFixture.MEMBER_8.toEntity());
+            memberDeviceRepository.save(MemberDeviceFixture.ANDROID.toEntity(member));
+            AlarmEntity alarm = alarmRepository.save(AlarmFixture.ALARM_08.toEntity(member));
+            AlarmOccurrenceEntity occurrence = alarmOccurrenceRepository.save(
+                AlarmOccurrenceFixture.ALARM_OCCURRENCE_02.toEntity(alarm, PAYMENT_NOW.plusHours(1), OccurrenceStatus.SCHEDULED)
+            );
+            AlarmPaymentRequest request = new AlarmPaymentRequest(
+                occurrence.getId(),
+                MemberDeviceFixture.ANDROID.getDeviceId(),
+                "integration-payment-success-001",
+                PAYMENT_NOW
+            );
+            String accessToken = buildAccessToken(member);
+
+            // when
+            mockMvc.perform(post(BASE + "/{alarmId}/payment", alarm.getId())
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.alarmId").value(alarm.getId()))
+                .andExpect(jsonPath("$.result.alarmRevision").value(2));
+
+            // then
+            AlarmOccurrenceEntity savedOccurrence = alarmOccurrenceRepository.findById(occurrence.getId()).orElseThrow();
+            assertThat(savedOccurrence.getStatus()).isEqualTo(OccurrenceStatus.PAYMENT);
+            assertThat(paymentRepository.existsByPaymentId(request.paymentId())).isTrue();
+            assertThat(alarmDeactivationLogRepository.findAll()).hasSize(1);
+        }
+
+        @Test
+        @DisplayName("실패: 이미 처리된 결제 ID이면 409와 에러 코드를 반환한다")
+        void fail_duplicatePayment() throws Exception {
+            // given
+            MemberEntity member = memberRepository.save(MemberFixture.MEMBER_9.toEntity());
+            memberDeviceRepository.save(MemberDeviceFixture.ANDROID.toEntity(member));
+            AlarmEntity alarm = alarmRepository.save(AlarmFixture.ALARM_09.toEntity(member));
+            AlarmOccurrenceEntity occurrence = alarmOccurrenceRepository.save(
+                AlarmOccurrenceFixture.ALARM_OCCURRENCE_02.toEntity(alarm, PAYMENT_NOW.plusHours(1), OccurrenceStatus.SCHEDULED)
+            );
+            paymentRepository.save(PaymentFixture.STOP_ALARM_SUCCESS.toEntity(member, alarm));
+            AlarmPaymentRequest request = new AlarmPaymentRequest(
+                occurrence.getId(),
+                MemberDeviceFixture.ANDROID.getDeviceId(),
+                PaymentFixture.STOP_ALARM_SUCCESS.getPaymentId(),
+                PAYMENT_NOW
+            );
+            String accessToken = buildAccessToken(member);
+
+            // when & then
+            mockMvc.perform(post(BASE + "/{alarmId}/payment", alarm.getId())
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("PAYMENT_901"));
+        }
+
+        @Test
+        @DisplayName("실패: 결제 가능 시간 전이면 400과 에러 코드를 반환한다")
+        void fail_notYetAvailable() throws Exception {
+            // given
+            MemberEntity member = memberRepository.save(MemberFixture.MEMBER_10.toEntity());
+            memberDeviceRepository.save(MemberDeviceFixture.ANDROID.toEntity(member));
+            AlarmEntity alarm = alarmRepository.save(AlarmFixture.ALARM_10.toEntity(member));
+            AlarmOccurrenceEntity occurrence = alarmOccurrenceRepository.save(
+                AlarmOccurrenceFixture.ALARM_OCCURRENCE_02.toEntity(alarm, PAYMENT_NOW.plusHours(6), OccurrenceStatus.SCHEDULED)
+            );
+            AlarmPaymentRequest request = new AlarmPaymentRequest(
+                occurrence.getId(),
+                MemberDeviceFixture.ANDROID.getDeviceId(),
+                "integration-payment-not-yet-available",
+                PAYMENT_NOW
+            );
+            String accessToken = buildAccessToken(member);
+
+            // when & then
+            mockMvc.perform(post(BASE + "/{alarmId}/payment", alarm.getId())
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("ALARM_013"));
         }
     }
 
