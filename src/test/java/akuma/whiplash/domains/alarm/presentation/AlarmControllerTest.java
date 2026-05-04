@@ -4,7 +4,6 @@ import static akuma.whiplash.common.fixture.MemberFixture.*;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
@@ -19,8 +18,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import akuma.whiplash.common.fixture.AlarmFixture;
 import akuma.whiplash.common.fixture.MemberFixture;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmCheckinRequest;
+import akuma.whiplash.domains.alarm.application.dto.request.AlarmDeleteByPaymentRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmRegisterRequest;
-import akuma.whiplash.domains.alarm.application.dto.request.AlarmRemoveRequest;
+import akuma.whiplash.domains.alarm.application.dto.response.AlarmDeleteByPaymentResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmPreviewDto;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmSyncItemDto;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmSyncResponse;
@@ -32,6 +32,7 @@ import akuma.whiplash.domains.alarm.exception.AlarmErrorCode;
 import akuma.whiplash.domains.auth.application.dto.etc.MemberContext;
 import akuma.whiplash.domains.auth.exception.AuthErrorCode;
 import akuma.whiplash.domains.member.exception.MemberErrorCode;
+import akuma.whiplash.domains.payment.exception.PaymentErrorCode;
 import akuma.whiplash.global.config.security.SecurityConfig;
 import akuma.whiplash.global.config.security.jwt.JwtAuthenticationFilter;
 import akuma.whiplash.global.exception.ApplicationException;
@@ -391,34 +392,41 @@ class AlarmControllerTest {
     }
 
     @Nested
-    @DisplayName("[DELETE] /api/v1/alarms/{alarmId} - 알람 삭제")
-    class RemoveAlarmTest {
+    @DisplayName("[DELETE] /api/v1/alarms/{alarmId} - 결제로 알람 삭제")
+    class RemoveAlarmByPaymentTest {
 
         @Test
-        @DisplayName("성공: 알람 삭제 요청이 성공하면 200을 반환한다")
+        @DisplayName("성공: 결제 삭제 요청이 성공하면 200과 삭제 시각을 반환한다")
         void success() throws Exception {
             // given
-            AlarmRemoveRequest request = new AlarmRemoveRequest("사유");
+            AlarmDeleteByPaymentRequest request = new AlarmDeleteByPaymentRequest("device-uuid", "payment-id");
+            AlarmDeleteByPaymentResponse response = AlarmDeleteByPaymentResponse.builder()
+                .alarmId(1L)
+                .deletedAt(LocalDateTime.of(2026, 5, 2, 14, 30))
+                .build();
             setSecurityContext(buildContext(MEMBER_5));
+            when(alarmUseCase.removeAlarmByPayment(eq(MEMBER_5.getId()), eq(1L), any(AlarmDeleteByPaymentRequest.class)))
+                .thenReturn(response);
 
             // when & then
             mockMvc.perform(delete(BASE + "/{alarmId}", 1L)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isOk());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.alarmId").value(1L));
 
             verify(alarmUseCase, times(1))
-                .removeAlarm(eq(MEMBER_5.getId()), eq(1L), anyString());
+                .removeAlarmByPayment(eq(MEMBER_5.getId()), eq(1L), any(AlarmDeleteByPaymentRequest.class));
         }
 
         @Test
         @DisplayName("실패: 알람이 존재하지 않으면 404를 반환한다")
         void fail_alarmNotFound() throws Exception {
             // given
-            AlarmRemoveRequest request = new AlarmRemoveRequest("사유");
+            AlarmDeleteByPaymentRequest request = new AlarmDeleteByPaymentRequest("device-uuid", "payment-id");
             setSecurityContext(buildContext(MEMBER_6));
-            org.mockito.Mockito.doThrow(ApplicationException.from(akuma.whiplash.domains.alarm.exception.AlarmErrorCode.ALARM_NOT_FOUND))
-                .when(alarmUseCase).removeAlarm(anyLong(), anyLong(), anyString());
+            when(alarmUseCase.removeAlarmByPayment(anyLong(), anyLong(), any(AlarmDeleteByPaymentRequest.class)))
+                .thenThrow(ApplicationException.from(AlarmErrorCode.ALARM_NOT_FOUND));
 
             // when & then
             mockMvc.perform(delete(BASE + "/{alarmId}", 1L)
@@ -431,10 +439,10 @@ class AlarmControllerTest {
         @DisplayName("실패: 소유자가 아니면 403을 반환한다")
         void fail_permissionDenied() throws Exception {
             // given
-            AlarmRemoveRequest request = new AlarmRemoveRequest("사유");
+            AlarmDeleteByPaymentRequest request = new AlarmDeleteByPaymentRequest("device-uuid", "payment-id");
             setSecurityContext(buildContext(MEMBER_7));
-            org.mockito.Mockito.doThrow(ApplicationException.from(AuthErrorCode.PERMISSION_DENIED))
-                .when(alarmUseCase).removeAlarm(anyLong(), anyLong(), anyString());
+            when(alarmUseCase.removeAlarmByPayment(anyLong(), anyLong(), any(AlarmDeleteByPaymentRequest.class)))
+                .thenThrow(ApplicationException.from(AuthErrorCode.PERMISSION_DENIED));
 
             // when & then
             mockMvc.perform(delete(BASE + "/{alarmId}", 1L)
@@ -444,11 +452,27 @@ class AlarmControllerTest {
         }
 
         @Test
-        @DisplayName("실패: 삭제 사유가 비어 있으면 400을 반환한다")
-        void fail_reasonBlank() throws Exception {
+        @DisplayName("실패: 결제 ID가 비어 있으면 400을 반환한다")
+        void fail_paymentIdBlank() throws Exception {
             // given
-            AlarmRemoveRequest request = new AlarmRemoveRequest("");
+            AlarmDeleteByPaymentRequest request = new AlarmDeleteByPaymentRequest("device-uuid", "");
             setSecurityContext(buildContext(MEMBER_8));
+
+            // when & then
+            mockMvc.perform(delete(BASE + "/{alarmId}", 1L)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest());
+        }
+
+        @Test
+        @DisplayName("실패: 결제 검증에 실패하면 400을 반환한다")
+        void fail_paymentVerificationFailed() throws Exception {
+            // given
+            AlarmDeleteByPaymentRequest request = new AlarmDeleteByPaymentRequest("device-uuid", "payment-id");
+            setSecurityContext(buildContext(MEMBER_8));
+            when(alarmUseCase.removeAlarmByPayment(anyLong(), anyLong(), any(AlarmDeleteByPaymentRequest.class)))
+                .thenThrow(ApplicationException.from(PaymentErrorCode.PAYMENT_VERIFICATION_FAILED));
 
             // when & then
             mockMvc.perform(delete(BASE + "/{alarmId}", 1L)

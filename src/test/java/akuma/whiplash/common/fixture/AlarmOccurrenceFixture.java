@@ -74,11 +74,29 @@ public enum AlarmOccurrenceFixture {
     }
 
     public AlarmOccurrenceEntity toMockEntity(AlarmEntity alarm, Long occurrenceId, LocalDateTime scheduledAt, OccurrenceStatus status) {
+        return toMockEntity(
+            alarm,
+            occurrenceId,
+            scheduledAt.toLocalDate(),
+            scheduledAt.toLocalTime(),
+            scheduledAt,
+            status
+        );
+    }
+
+    public AlarmOccurrenceEntity toMockEntity(
+        AlarmEntity alarm,
+        Long occurrenceId,
+        LocalDate occurrenceDate,
+        LocalTime occurrenceTime,
+        LocalDateTime scheduledAt,
+        OccurrenceStatus status
+    ) {
         return AlarmOccurrenceEntity.builder()
             .id(occurrenceId)
             .alarm(alarm)
-            .occurrenceDate(scheduledAt.toLocalDate())
-            .occurrenceTime(scheduledAt.toLocalTime())
+            .occurrenceDate(occurrenceDate)
+            .occurrenceTime(occurrenceTime)
             .scheduledAt(scheduledAt)
             .status(status)
             .alarmRinging(status == OccurrenceStatus.RINGING)

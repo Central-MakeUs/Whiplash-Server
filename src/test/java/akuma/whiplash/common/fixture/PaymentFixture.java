@@ -11,7 +11,9 @@ import lombok.Getter;
 public enum PaymentFixture {
 
     STOP_ALARM_SUCCESS("payment-success-001", PaymentType.STOP_ALARM, PaymentStatus.SUCCESS),
-    STOP_ALARM_FAILED("payment-failed-001", PaymentType.STOP_ALARM, PaymentStatus.FAILED);
+    STOP_ALARM_FAILED("payment-failed-001", PaymentType.STOP_ALARM, PaymentStatus.FAILED),
+    DELETE_ALARM_SUCCESS("pay-delete-success-001", PaymentType.DELETE_ALARM, PaymentStatus.SUCCESS),
+    DELETE_ALARM_FAILED("pay-delete-failed-001", PaymentType.DELETE_ALARM, PaymentStatus.FAILED);
 
     private final String paymentId;
     private final PaymentType paymentType;
