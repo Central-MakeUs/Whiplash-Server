@@ -32,6 +32,7 @@ import akuma.whiplash.domains.member.persistence.repository.MemberDeviceReposito
 import akuma.whiplash.domains.member.persistence.repository.MemberRepository;
 import akuma.whiplash.domains.payment.persistence.repository.PaymentRepository;
 import akuma.whiplash.global.config.security.jwt.JwtProvider;
+import akuma.whiplash.global.util.date.TimeProvider;
 import akuma.whiplash.infrastructure.payment.PaymentVerificationPort;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.DayOfWeek;
@@ -39,6 +40,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -64,11 +66,19 @@ class AlarmControllerIntegrationTest {
     @Autowired private AlarmDeactivationLogRepository alarmDeactivationLogRepository;
     @Autowired private PaymentRepository paymentRepository;
     @MockitoBean private PaymentVerificationPort paymentVerificationPort;
+    @MockitoBean private TimeProvider timeProvider;
 
     private static final String BASE = "/api/v1/alarms";
+    private static final LocalDateTime FIXED_NOW = LocalDateTime.of(2026, 5, 4, 11, 0);
+
+    @BeforeEach
+    void setUpTimeProvider() {
+        given(timeProvider.now()).willReturn(FIXED_NOW);
+        given(timeProvider.today()).willReturn(FIXED_NOW.toLocalDate());
+    }
 
     private AlarmEntity saveAlarmForToday(MemberEntity member) {
-        DayOfWeek today = LocalDate.now().getDayOfWeek();
+        DayOfWeek today = FIXED_NOW.toLocalDate().getDayOfWeek();
         return alarmRepository.save(AlarmEntity.builder()
             .alarmPurpose("test")
             .time(LocalTime.of(7, 0))
@@ -82,7 +92,7 @@ class AlarmControllerIntegrationTest {
     }
 
     private AlarmEntity saveAlarmForNextWeek(MemberEntity member) {
-        DayOfWeek today = LocalDate.now().getDayOfWeek();
+        DayOfWeek today = FIXED_NOW.toLocalDate().getDayOfWeek();
         DayOfWeek previous = today.minus(1);
         return alarmRepository.save(AlarmEntity.builder()
             .alarmPurpose("test")
@@ -218,7 +228,7 @@ class AlarmControllerIntegrationTest {
             MemberEntity member = memberRepository.save(MemberFixture.MEMBER_1.toEntity());
             var alarm = alarmRepository.save(AlarmFixture.ALARM_01.toEntity(member));
 
-            var now = LocalDateTime.now();
+            var now = FIXED_NOW;
             var occurrence = AlarmOccurrenceEntity.builder()
                 .alarm(alarm)
                 .occurrenceDate(now.toLocalDate())
@@ -324,8 +334,8 @@ class AlarmControllerIntegrationTest {
             // given
             MemberEntity member = memberRepository.save(MemberFixture.MEMBER_1.toEntity());
             AlarmEntity alarm = saveAlarmForToday(member);
-            AlarmOccurrenceEntity occurrence = saveOccurrence(alarm, LocalDateTime.now().plusHours(1), OccurrenceStatus.SCHEDULED);
-            saveOccurrence(alarm, LocalDateTime.now().plusDays(1), OccurrenceStatus.SCHEDULED);
+            AlarmOccurrenceEntity occurrence = saveOccurrence(alarm, FIXED_NOW.plusHours(1), OccurrenceStatus.SCHEDULED);
+            saveOccurrence(alarm, FIXED_NOW.plusDays(1), OccurrenceStatus.SCHEDULED);
             AlarmCheckinRequest request = buildCheckinRequest(occurrence, alarm.getLatitude(), alarm.getLongitude());
             String accessToken = buildAccessToken(member);
 
@@ -366,7 +376,7 @@ class AlarmControllerIntegrationTest {
             MemberEntity owner = memberRepository.save(MemberFixture.MEMBER_3.toEntity());
             MemberEntity other = memberRepository.save(MemberFixture.MEMBER_4.toEntity());
             AlarmEntity alarm = saveAlarmForToday(owner);
-            AlarmOccurrenceEntity occurrence = saveOccurrence(alarm, LocalDateTime.now().plusHours(1), OccurrenceStatus.SCHEDULED);
+            AlarmOccurrenceEntity occurrence = saveOccurrence(alarm, FIXED_NOW.plusHours(1), OccurrenceStatus.SCHEDULED);
             String accessToken = buildAccessToken(other);
             AlarmCheckinRequest request = buildCheckinRequest(occurrence, alarm.getLatitude(), alarm.getLongitude());
 
@@ -384,8 +394,8 @@ class AlarmControllerIntegrationTest {
             // given
             MemberEntity member = memberRepository.save(MemberFixture.MEMBER_5.toEntity());
             AlarmEntity alarm = saveAlarmForToday(member);
-            AlarmOccurrenceEntity occurrence = saveOccurrence(alarm, LocalDateTime.now().plusHours(1), OccurrenceStatus.SCHEDULED);
-            occurrence.checkin(LocalDateTime.now());
+            AlarmOccurrenceEntity occurrence = saveOccurrence(alarm, FIXED_NOW.plusHours(1), OccurrenceStatus.SCHEDULED);
+            occurrence.checkin(FIXED_NOW);
             alarmOccurrenceRepository.save(occurrence);
             String accessToken = buildAccessToken(member);
             AlarmCheckinRequest request = buildCheckinRequest(occurrence, alarm.getLatitude(), alarm.getLongitude());
@@ -404,7 +414,7 @@ class AlarmControllerIntegrationTest {
             // given
             MemberEntity member = memberRepository.save(MemberFixture.MEMBER_6.toEntity());
             AlarmEntity alarm = saveAlarmForToday(member);
-            AlarmOccurrenceEntity occurrence = saveOccurrence(alarm, LocalDateTime.now().plusHours(1), OccurrenceStatus.SCHEDULED);
+            AlarmOccurrenceEntity occurrence = saveOccurrence(alarm, FIXED_NOW.plusHours(1), OccurrenceStatus.SCHEDULED);
             String accessToken = buildAccessToken(member);
             AlarmCheckinRequest request = buildCheckinRequest(
                 occurrence,
@@ -426,7 +436,7 @@ class AlarmControllerIntegrationTest {
             // given
             MemberEntity member = memberRepository.save(MemberFixture.MEMBER_7.toEntity());
             AlarmEntity alarm = saveAlarmForToday(member);
-            AlarmOccurrenceEntity occurrence = saveOccurrence(alarm, LocalDateTime.now().plusHours(6), OccurrenceStatus.SCHEDULED);
+            AlarmOccurrenceEntity occurrence = saveOccurrence(alarm, FIXED_NOW.plusHours(6), OccurrenceStatus.SCHEDULED);
             String accessToken = buildAccessToken(member);
             AlarmCheckinRequest request = buildCheckinRequest(
                 occurrence,
@@ -447,8 +457,6 @@ class AlarmControllerIntegrationTest {
     @DisplayName("deactivateByPayment - 결제로 알람 끄기")
     class DeactivateByPaymentTest {
 
-        private static final LocalDateTime PAYMENT_NOW = LocalDateTime.now();
-
         @Test
         @DisplayName("성공: 결제 요청이 성공하면 200 OK와 동기화 정보를 반환한다")
         void success() throws Exception {
@@ -457,7 +465,7 @@ class AlarmControllerIntegrationTest {
             memberDeviceRepository.save(MemberDeviceFixture.ANDROID.toEntity(member));
             AlarmEntity alarm = alarmRepository.save(AlarmFixture.ALARM_08.toEntity(member));
             AlarmOccurrenceEntity occurrence = alarmOccurrenceRepository.save(
-                AlarmOccurrenceFixture.ALARM_OCCURRENCE_02.toEntity(alarm, PAYMENT_NOW.plusHours(1), OccurrenceStatus.SCHEDULED)
+                AlarmOccurrenceFixture.ALARM_OCCURRENCE_02.toEntity(alarm, FIXED_NOW.plusHours(1), OccurrenceStatus.SCHEDULED)
             );
             AlarmPaymentRequest request = new AlarmPaymentRequest(
                 occurrence.getId(),
@@ -492,7 +500,7 @@ class AlarmControllerIntegrationTest {
             memberDeviceRepository.save(MemberDeviceFixture.ANDROID.toEntity(member));
             AlarmEntity alarm = alarmRepository.save(AlarmFixture.ALARM_09.toEntity(member));
             AlarmOccurrenceEntity occurrence = alarmOccurrenceRepository.save(
-                AlarmOccurrenceFixture.ALARM_OCCURRENCE_02.toEntity(alarm, PAYMENT_NOW.plusHours(1), OccurrenceStatus.SCHEDULED)
+                AlarmOccurrenceFixture.ALARM_OCCURRENCE_02.toEntity(alarm, FIXED_NOW.plusHours(1), OccurrenceStatus.SCHEDULED)
             );
             paymentRepository.save(PaymentFixture.STOP_ALARM_SUCCESS.toEntity(member, alarm));
             AlarmPaymentRequest request = new AlarmPaymentRequest(
@@ -519,7 +527,7 @@ class AlarmControllerIntegrationTest {
             memberDeviceRepository.save(MemberDeviceFixture.ANDROID.toEntity(member));
             AlarmEntity alarm = alarmRepository.save(AlarmFixture.ALARM_10.toEntity(member));
             AlarmOccurrenceEntity occurrence = alarmOccurrenceRepository.save(
-                AlarmOccurrenceFixture.ALARM_OCCURRENCE_02.toEntity(alarm, PAYMENT_NOW.plusHours(6), OccurrenceStatus.SCHEDULED)
+                AlarmOccurrenceFixture.ALARM_OCCURRENCE_02.toEntity(alarm, FIXED_NOW.plusHours(6), OccurrenceStatus.SCHEDULED)
             );
             AlarmPaymentRequest request = new AlarmPaymentRequest(
                 occurrence.getId(),
