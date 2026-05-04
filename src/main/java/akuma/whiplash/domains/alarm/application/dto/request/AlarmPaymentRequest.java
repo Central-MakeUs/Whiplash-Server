@@ -3,7 +3,6 @@ package akuma.whiplash.domains.alarm.application.dto.request;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-import java.time.LocalDateTime;
 
 @Schema(description = "결제로 알람 끄기 요청 DTO")
 public record AlarmPaymentRequest(
@@ -18,10 +17,6 @@ public record AlarmPaymentRequest(
 
     @Schema(description = "인앱 결제 영수증 ID", example = "pay_123")
     @NotBlank(message = "결제 ID를 입력해주세요.")
-    String paymentId,
-
-    @Schema(description = "요청 시각 (ISO-8601)", example = "2026-04-15T07:25:00")
-    @NotNull(message = "요청 시각을 입력해주세요.")
-    LocalDateTime requestedAt
+    String paymentId
 ) {
 }

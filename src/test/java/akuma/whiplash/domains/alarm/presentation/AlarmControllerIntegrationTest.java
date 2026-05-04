@@ -113,8 +113,8 @@ class AlarmControllerIntegrationTest {
             .build());
     }
 
-    private AlarmCheckinRequest buildCheckinRequest(AlarmOccurrenceEntity occurrence, Double latitude, Double longitude, LocalDateTime requestedAt) {
-        return new AlarmCheckinRequest(occurrence.getId(), "device-uuid", latitude, longitude, requestedAt);
+    private AlarmCheckinRequest buildCheckinRequest(AlarmOccurrenceEntity occurrence, Double latitude, Double longitude) {
+        return new AlarmCheckinRequest(occurrence.getId(), "device-uuid", latitude, longitude);
     }
 
     @Nested
@@ -326,7 +326,7 @@ class AlarmControllerIntegrationTest {
             AlarmEntity alarm = saveAlarmForToday(member);
             AlarmOccurrenceEntity occurrence = saveOccurrence(alarm, LocalDateTime.now().plusHours(1), OccurrenceStatus.SCHEDULED);
             saveOccurrence(alarm, LocalDateTime.now().plusDays(1), OccurrenceStatus.SCHEDULED);
-            AlarmCheckinRequest request = buildCheckinRequest(occurrence, alarm.getLatitude(), alarm.getLongitude(), LocalDateTime.now());
+            AlarmCheckinRequest request = buildCheckinRequest(occurrence, alarm.getLatitude(), alarm.getLongitude());
             String accessToken = buildAccessToken(member);
 
             // when
@@ -349,7 +349,7 @@ class AlarmControllerIntegrationTest {
             // given
             MemberEntity member = memberRepository.save(MemberFixture.MEMBER_2.toEntity());
             String accessToken = buildAccessToken(member);
-            AlarmCheckinRequest request = new AlarmCheckinRequest(999L, "device-uuid", 0.0, 0.0, LocalDateTime.now());
+            AlarmCheckinRequest request = new AlarmCheckinRequest(999L, "device-uuid", 0.0, 0.0);
 
             // when & then
             mockMvc.perform(post(BASE + "/{alarmId}/checkin", 999L)
@@ -368,7 +368,7 @@ class AlarmControllerIntegrationTest {
             AlarmEntity alarm = saveAlarmForToday(owner);
             AlarmOccurrenceEntity occurrence = saveOccurrence(alarm, LocalDateTime.now().plusHours(1), OccurrenceStatus.SCHEDULED);
             String accessToken = buildAccessToken(other);
-            AlarmCheckinRequest request = buildCheckinRequest(occurrence, alarm.getLatitude(), alarm.getLongitude(), LocalDateTime.now());
+            AlarmCheckinRequest request = buildCheckinRequest(occurrence, alarm.getLatitude(), alarm.getLongitude());
 
             // when & then
             mockMvc.perform(post(BASE + "/{alarmId}/checkin", alarm.getId())
@@ -388,7 +388,7 @@ class AlarmControllerIntegrationTest {
             occurrence.checkin(LocalDateTime.now());
             alarmOccurrenceRepository.save(occurrence);
             String accessToken = buildAccessToken(member);
-            AlarmCheckinRequest request = buildCheckinRequest(occurrence, alarm.getLatitude(), alarm.getLongitude(), LocalDateTime.now());
+            AlarmCheckinRequest request = buildCheckinRequest(occurrence, alarm.getLatitude(), alarm.getLongitude());
 
             // when & then
             mockMvc.perform(post(BASE + "/{alarmId}/checkin", alarm.getId())
@@ -409,8 +409,7 @@ class AlarmControllerIntegrationTest {
             AlarmCheckinRequest request = buildCheckinRequest(
                 occurrence,
                 alarm.getLatitude() + 1,
-                alarm.getLongitude() + 1,
-                LocalDateTime.now()
+                alarm.getLongitude() + 1
             );
 
             // when & then
@@ -432,8 +431,7 @@ class AlarmControllerIntegrationTest {
             AlarmCheckinRequest request = buildCheckinRequest(
                 occurrence,
                 alarm.getLatitude(),
-                alarm.getLongitude(),
-                occurrence.getScheduledAt().minusHours(4)
+                alarm.getLongitude()
             );
 
             // when & then
@@ -464,8 +462,7 @@ class AlarmControllerIntegrationTest {
             AlarmPaymentRequest request = new AlarmPaymentRequest(
                 occurrence.getId(),
                 MemberDeviceFixture.ANDROID.getDeviceId(),
-                "integration-payment-success-001",
-                PAYMENT_NOW
+                "integration-payment-success-001"
             );
             String accessToken = buildAccessToken(member);
             given(paymentVerificationPort.supportedPlatform()).willReturn(MemberDeviceFixture.ANDROID.getPlatform());
@@ -501,8 +498,7 @@ class AlarmControllerIntegrationTest {
             AlarmPaymentRequest request = new AlarmPaymentRequest(
                 occurrence.getId(),
                 MemberDeviceFixture.ANDROID.getDeviceId(),
-                PaymentFixture.STOP_ALARM_SUCCESS.getPaymentId(),
-                PAYMENT_NOW
+                PaymentFixture.STOP_ALARM_SUCCESS.getPaymentId()
             );
             String accessToken = buildAccessToken(member);
 
@@ -528,8 +524,7 @@ class AlarmControllerIntegrationTest {
             AlarmPaymentRequest request = new AlarmPaymentRequest(
                 occurrence.getId(),
                 MemberDeviceFixture.ANDROID.getDeviceId(),
-                "integration-payment-not-yet-available",
-                PAYMENT_NOW
+                "integration-payment-not-yet-available"
             );
             String accessToken = buildAccessToken(member);
 

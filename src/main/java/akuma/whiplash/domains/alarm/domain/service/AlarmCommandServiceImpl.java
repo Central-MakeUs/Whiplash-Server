@@ -194,8 +194,9 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
         }
 
         // 3. 위치 인증은 예정 시각 3시간 전부터만 허용한다.
+        LocalDateTime processedAt = timeProvider.now();
         LocalDateTime checkinAvailableAt = occurrence.getScheduledAt().minusHours(3);
-        if (timeProvider.now().isBefore(checkinAvailableAt)) {
+        if (processedAt.isBefore(checkinAvailableAt)) {
             throw ApplicationException.from(CHECKIN_NOT_YET_AVAILABLE);
         }
 
@@ -209,7 +210,6 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
         }
 
         // 5. 체크인 완료 시각을 기록하고 회차 상태를 CHECKIN으로 전환한다.
-        LocalDateTime processedAt = timeProvider.now();
         occurrence.checkin(processedAt);
 
         // 6. 더 이상 울리는 알람이 아니므로 캐시에서 제거하고 알람 revision을 증가시킨다.
@@ -231,7 +231,7 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
             request.deviceId(),
             request.latitude(),
             request.longitude(),
-            request.requestedAt(),
+            processedAt,
             processedAt
         ));
 
@@ -260,8 +260,9 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
         }
 
         // 4. 결제 비활성화는 알람 예정 시각 3시간 전부터만 허용한다.
+        LocalDateTime processedAt = timeProvider.now();
         LocalDateTime paymentAvailableAt = occurrence.getScheduledAt().minusHours(3);
-        if (timeProvider.now().isBefore(paymentAvailableAt)) {
+        if (processedAt.isBefore(paymentAvailableAt)) {
             throw ApplicationException.from(PaymentErrorCode.PAYMENT_NOT_YET_AVAILABLE);
         }
 
@@ -272,7 +273,6 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
 
         // 6. 요청 디바이스의 플랫폼에 맞는 결제 검증 클라이언트로 영수증을 검증한다.
         PaymentVerificationPort paymentClient = resolvePaymentClient(memberId, request.deviceId());
-        LocalDateTime processedAt = timeProvider.now();
         boolean validPayment;
         String verificationFailReason = "";
         try {
@@ -312,7 +312,7 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
                 member,
                 request.paymentId(),
                 request.deviceId(),
-                request.requestedAt(),
+                processedAt,
                 processedAt,
                 DeactivationResult.FAIL,
                 verificationFailReason
@@ -338,7 +338,7 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
             member,
             request.paymentId(),
             request.deviceId(),
-            request.requestedAt(),
+            processedAt,
             processedAt,
             DeactivationResult.SUCCESS,
             ""

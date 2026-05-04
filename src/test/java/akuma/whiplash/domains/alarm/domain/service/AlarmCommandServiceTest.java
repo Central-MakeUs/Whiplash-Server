@@ -218,8 +218,8 @@ class AlarmCommandServiceTest {
                 .build();
         }
 
-        private AlarmCheckinRequest buildRequest(AlarmOccurrenceEntity occurrence, Double latitude, Double longitude, LocalDateTime requestedAt) {
-            return new AlarmCheckinRequest(occurrence.getId(), "device-uuid", latitude, longitude, requestedAt);
+        private AlarmCheckinRequest buildRequest(AlarmOccurrenceEntity occurrence, Double latitude, Double longitude) {
+            return new AlarmCheckinRequest(occurrence.getId(), "device-uuid", latitude, longitude);
         }
 
         @Test
@@ -237,7 +237,7 @@ class AlarmCommandServiceTest {
             given(alarmOccurrenceRepository.findNextScheduledByAlarmIds(eq(List.of(alarm.getId())), eq(OccurrenceStatus.SCHEDULED), any(LocalDateTime.class)))
                 .willReturn(List.of(nextOccurrence));
 
-            AlarmCheckinRequest request = buildRequest(occurrence, alarm.getLatitude(), alarm.getLongitude(), FIXED_NOW);
+            AlarmCheckinRequest request = buildRequest(occurrence, alarm.getLatitude(), alarm.getLongitude());
 
             // when
             AlarmCheckinResponse response = alarmCommandService.checkinAlarm(member.getId(), alarm.getId(), request);
@@ -262,7 +262,7 @@ class AlarmCommandServiceTest {
             assertThatThrownBy(() -> alarmCommandService.checkinAlarm(
                 1L,
                 1L,
-                new AlarmCheckinRequest(1L, "device-uuid", 0.0, 0.0, LocalDateTime.now())
+                new AlarmCheckinRequest(1L, "device-uuid", 0.0, 0.0)
             ))
                 .isInstanceOf(ApplicationException.class);
         }
@@ -277,7 +277,7 @@ class AlarmCommandServiceTest {
             given(alarmRepository.findById(alarm.getId())).willReturn(Optional.of(alarm));
 
             AlarmOccurrenceEntity occurrence = buildOccurrence(alarm, 601L, FIXED_NOW.plusHours(1), OccurrenceStatus.SCHEDULED);
-            AlarmCheckinRequest request = buildRequest(occurrence, alarm.getLatitude(), alarm.getLongitude(), FIXED_NOW);
+            AlarmCheckinRequest request = buildRequest(occurrence, alarm.getLatitude(), alarm.getLongitude());
 
             // when & then
             assertThatThrownBy(() -> alarmCommandService.checkinAlarm(999L, alarm.getId(), request))
@@ -293,7 +293,7 @@ class AlarmCommandServiceTest {
             given(alarmRepository.findById(alarm.getId())).willReturn(Optional.of(alarm));
             given(alarmOccurrenceRepository.findByIdAndAlarmId(999L, alarm.getId())).willReturn(Optional.empty());
 
-            AlarmCheckinRequest request = new AlarmCheckinRequest(999L, "device-uuid", alarm.getLatitude(), alarm.getLongitude(), FIXED_NOW);
+            AlarmCheckinRequest request = new AlarmCheckinRequest(999L, "device-uuid", alarm.getLatitude(), alarm.getLongitude());
 
             // when & then
             assertThatThrownBy(() -> alarmCommandService.checkinAlarm(member.getId(), alarm.getId(), request))
@@ -312,7 +312,7 @@ class AlarmCommandServiceTest {
             occurrence.checkin(FIXED_NOW);
             given(alarmOccurrenceRepository.findByIdAndAlarmId(occurrence.getId(), alarm.getId())).willReturn(Optional.of(occurrence));
 
-            AlarmCheckinRequest request = buildRequest(occurrence, alarm.getLatitude(), alarm.getLongitude(), FIXED_NOW);
+            AlarmCheckinRequest request = buildRequest(occurrence, alarm.getLatitude(), alarm.getLongitude());
 
             // when & then
             assertThatThrownBy(() -> alarmCommandService.checkinAlarm(member.getId(), alarm.getId(), request))
@@ -333,8 +333,7 @@ class AlarmCommandServiceTest {
             AlarmCheckinRequest request = buildRequest(
                 occurrence,
                 alarm.getLatitude(),
-                alarm.getLongitude(),
-                occurrence.getScheduledAt().minusHours(4)
+                alarm.getLongitude()
             );
 
             // when & then
@@ -353,7 +352,7 @@ class AlarmCommandServiceTest {
             AlarmOccurrenceEntity occurrence = buildOccurrence(alarm, 901L, FIXED_NOW.plusHours(1), OccurrenceStatus.SCHEDULED);
             given(alarmOccurrenceRepository.findByIdAndAlarmId(occurrence.getId(), alarm.getId())).willReturn(Optional.of(occurrence));
 
-            AlarmCheckinRequest request = buildRequest(occurrence, alarm.getLatitude() + 1, alarm.getLongitude() + 1, FIXED_NOW);
+            AlarmCheckinRequest request = buildRequest(occurrence, alarm.getLatitude() + 1, alarm.getLongitude() + 1);
 
             // when & then
             assertThatThrownBy(() -> alarmCommandService.checkinAlarm(member.getId(), alarm.getId(), request))
@@ -379,8 +378,7 @@ class AlarmCommandServiceTest {
             AlarmPaymentRequest request = new AlarmPaymentRequest(
                 occurrence.getId(),
                 device.getDeviceId(),
-                "payment-success-001",
-                FIXED_NOW
+                "payment-success-001"
             );
 
             given(alarmRepository.findById(alarm.getId())).willReturn(Optional.of(alarm));
@@ -420,8 +418,7 @@ class AlarmCommandServiceTest {
             AlarmPaymentRequest request = new AlarmPaymentRequest(
                 occurrence.getId(),
                 MemberDeviceFixture.ANDROID.getDeviceId(),
-                PaymentFixture.STOP_ALARM_SUCCESS.getPaymentId(),
-                FIXED_NOW
+                PaymentFixture.STOP_ALARM_SUCCESS.getPaymentId()
             );
 
             given(alarmRepository.findById(alarm.getId())).willReturn(Optional.of(alarm));
@@ -446,8 +443,7 @@ class AlarmCommandServiceTest {
             AlarmPaymentRequest request = new AlarmPaymentRequest(
                 occurrence.getId(),
                 device.getDeviceId(),
-                PaymentFixture.STOP_ALARM_FAILED.getPaymentId(),
-                FIXED_NOW
+                PaymentFixture.STOP_ALARM_FAILED.getPaymentId()
             );
 
             given(alarmRepository.findById(alarm.getId())).willReturn(Optional.of(alarm));
@@ -487,8 +483,7 @@ class AlarmCommandServiceTest {
             AlarmPaymentRequest request = new AlarmPaymentRequest(
                 occurrence.getId(),
                 MemberDeviceFixture.ANDROID.getDeviceId(),
-                "payment-not-yet-available",
-                FIXED_NOW
+                "payment-not-yet-available"
             );
 
             given(alarmRepository.findById(alarm.getId())).willReturn(Optional.of(alarm));
