@@ -10,7 +10,9 @@ import java.time.LocalTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -45,6 +47,7 @@ public interface AlarmOccurrenceRepository extends JpaRepository<AlarmOccurrence
     WHERE ao.id = :occurrenceId
       AND ao.alarm.id = :alarmId
     """)
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<AlarmOccurrenceEntity> findByIdAndAlarmId(
         @Param("occurrenceId") Long occurrenceId,
         @Param("alarmId") Long alarmId
