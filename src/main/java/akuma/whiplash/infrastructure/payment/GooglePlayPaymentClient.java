@@ -1,13 +1,15 @@
 package akuma.whiplash.infrastructure.payment;
 
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
 @Component
+@Profile({"local", "dev", "qa"})
 public class GooglePlayPaymentClient implements PaymentVerificationPort {
 
     @Override
     public boolean verify(String purchaseToken) {
-        // TODO: Google Play purchases.products.get 연동 전까지 local/dev 검증용 스텁으로 사용한다.
+        // TODO: prod에서는 Google Play purchases.products.get 기반 실제 검증 구현체를 등록한다.
         return purchaseToken != null && !purchaseToken.isBlank();
     }
 

@@ -24,7 +24,7 @@ public class PaymentMapper {
             .alarm(alarm)
             .paymentId(paymentId)
             .paymentType(paymentType)
-            .amount(0)
+            .amount(0) // TODO: 실제 스토어 검증 연동 후 productId/영수증 기준 결제 금액을 저장한다.
             .status(status)
             .build();
     }
