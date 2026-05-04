@@ -2,6 +2,7 @@ package akuma.whiplash.domains.alarm.application.mapper;
 
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmRegisterRequest;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmCheckinResponse;
+import akuma.whiplash.domains.alarm.application.dto.response.AlarmDeleteByPaymentResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmPaymentResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmSyncItemDto;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmSyncResponse;
@@ -12,10 +13,12 @@ import akuma.whiplash.domains.alarm.application.dto.response.AlarmPreviewDto;
 import akuma.whiplash.domains.alarm.domain.constant.DeactivateType;
 import akuma.whiplash.domains.alarm.domain.constant.DeactivationResult;
 import akuma.whiplash.domains.alarm.domain.constant.AlarmStatus;
+import akuma.whiplash.domains.alarm.domain.constant.DeleteType;
 import akuma.whiplash.domains.alarm.domain.constant.OccurrenceStatus;
 import akuma.whiplash.domains.alarm.domain.constant.SoundType;
 import akuma.whiplash.domains.alarm.domain.constant.Weekday;
 import akuma.whiplash.domains.alarm.exception.AlarmErrorCode;
+import akuma.whiplash.domains.alarm.persistence.entity.AlarmDeleteLogEntity;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmEntity;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmDeactivationLogEntity;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmOccurrenceEntity;
@@ -33,6 +36,10 @@ import java.util.Map;
 import java.util.Objects;
 
 public class AlarmMapper {
+
+    private AlarmMapper() {
+        throw new IllegalArgumentException();
+    }
 
     public static AlarmEntity mapToAlarmEntity(AlarmRegisterRequest request, MemberEntity memberEntity) {
         return AlarmEntity.builder()
@@ -74,8 +81,7 @@ public class AlarmMapper {
             .build();
     }
 
-    public static AlarmOccurrenceEntity mapToTodayFirstAlarmOccurrenceEntity(AlarmEntity alarmEntity) {
-        LocalDate today = LocalDate.now();
+    public static AlarmOccurrenceEntity mapToTodayFirstAlarmOccurrenceEntity(AlarmEntity alarmEntity, LocalDate today) {
         DayOfWeek todayDayOfWeek = today.getDayOfWeek();
 
         boolean isTodayAlarmDay = alarmEntity.getRepeatDays().stream()
@@ -186,6 +192,16 @@ public class AlarmMapper {
             .build();
     }
 
+    public static AlarmDeleteByPaymentResponse mapToAlarmDeleteByPaymentResponse(
+        AlarmEntity alarm,
+        LocalDateTime deletedAt
+    ) {
+        return AlarmDeleteByPaymentResponse.builder()
+            .alarmId(alarm.getId())
+            .deletedAt(deletedAt)
+            .build();
+    }
+
     public static AlarmDeactivationLogEntity mapToPaymentDeactivationLogEntity(
         AlarmOccurrenceEntity occurrence,
         MemberEntity member,
@@ -208,6 +224,25 @@ public class AlarmMapper {
             .processedAt(processedAt)
             .result(result)
             .failReason(failReason)
+            .build();
+    }
+
+    public static AlarmDeleteLogEntity mapToPaymentDeleteLogEntity(
+        AlarmEntity alarm,
+        MemberEntity member,
+        String paymentId,
+        String reason,
+        LocalDateTime requestedAt,
+        LocalDateTime deletedAt
+    ) {
+        return AlarmDeleteLogEntity.builder()
+            .alarm(alarm)
+            .member(member)
+            .deleteType(DeleteType.PAYMENT)
+            .reason(reason)
+            .paymentId(paymentId)
+            .requestedAt(requestedAt)
+            .deletedAt(deletedAt)
             .build();
     }
 

@@ -7,10 +7,11 @@ import static akuma.whiplash.domains.member.exception.MemberErrorCode.MEMBER_NOT
 import static akuma.whiplash.domains.payment.exception.PaymentErrorCode.*;
 
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmCheckinRequest;
+import akuma.whiplash.domains.alarm.application.dto.request.AlarmDeleteByPaymentRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmPaymentRequest;
-import akuma.whiplash.domains.alarm.application.dto.request.AlarmRemoveRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmRegisterRequest;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmCheckinResponse;
+import akuma.whiplash.domains.alarm.application.dto.response.AlarmDeleteByPaymentResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmPaymentResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmSyncResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.CreateAlarmResponse;
@@ -52,18 +53,21 @@ public class AlarmController {
     }
 
     @CustomErrorCodes(
-        alarmErrorCodes = {ALARM_NOT_FOUND, ALARM_DELETE_NOT_AVAILABLE},
+        alarmErrorCodes = {ALARM_NOT_FOUND, TODAY_IS_NOT_ALARM_DAY, ALREADY_DEACTIVATED},
+        paymentErrorCodes = {DUPLICATE_PAYMENT, PAYMENT_VERIFICATION_FAILED},
+        deviceErrorCodes = {DEVICE_NOT_FOUND},
         authErrorCodes = {PERMISSION_DENIED}
     )
-    @Operation(summary = "알람 삭제", description = "알람을 삭제합니다.")
+    @Operation(summary = "결제로 알람 삭제", description = "알람 당일 인앱 결제를 통해 알람을 삭제합니다.")
     @DeleteMapping("/{alarmId}")
-    public ApplicationResponse<Void> removeAlarm(
+    public ApplicationResponse<AlarmDeleteByPaymentResponse> removeAlarmByPayment(
         @AuthenticationPrincipal MemberContext memberContext,
         @PathVariable Long alarmId,
-        @RequestBody @Valid AlarmRemoveRequest request
+        @RequestBody @Valid AlarmDeleteByPaymentRequest request
     ) {
-        alarmUseCase.removeAlarm(memberContext.memberId(), alarmId, request.reason());
-        return ApplicationResponse.onSuccess();
+        return ApplicationResponse.onSuccess(
+            alarmUseCase.removeAlarmByPayment(memberContext.memberId(), alarmId, request)
+        );
     }
 
     @CustomErrorCodes(memberErrorCodes = {MEMBER_NOT_FOUND})

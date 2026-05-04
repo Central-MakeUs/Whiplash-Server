@@ -82,11 +82,19 @@ public class AlarmEntity extends BaseTimeEntity {
     @Column(name = "next_scheduled_time")
     private LocalDateTime nextScheduledTime;
 
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
+
     public void updateNextScheduledTime(LocalDateTime nextScheduledTime) {
         this.nextScheduledTime = nextScheduledTime;
     }
 
     public void incrementRevision() {
         this.revision++;
+    }
+
+    public void softDelete(LocalDateTime now) {
+        this.status = AlarmStatus.DELETED;
+        this.deletedAt = now;
     }
 }
