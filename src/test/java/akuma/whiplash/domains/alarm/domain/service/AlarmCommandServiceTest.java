@@ -606,7 +606,7 @@ class AlarmCommandServiceTest {
             AlarmOccurrenceEntity occurrence = AlarmOccurrenceEntity.builder()
                     .id(1L)
                     .alarm(alarm)
-                    .occurrenceDate(LocalDate.now().minusDays(1)) // 과거 날짜 → 알람 시각 이미 지남
+                    .occurrenceDate(FIXED_NOW.toLocalDate().minusDays(1)) // 고정 시각 기준 과거 날짜
                     .occurrenceTime(LocalTime.of(0, 0))
                     .status(OccurrenceStatus.SCHEDULED)
                     .alarmRinging(false)
@@ -651,9 +651,12 @@ class AlarmCommandServiceTest {
             AlarmOccurrenceEntity occurrence = AlarmOccurrenceEntity.builder()
                 .id(1L)
                 .alarm(alarm)
-                .occurrenceDate(LocalDate.now().plusDays(1))  // 미래 날짜 → 아직 울릴 시간 아님
-                .occurrenceTime(LocalTime.now().plusHours(1))
-                .scheduledAt(LocalDateTime.of(LocalDate.now().plusDays(1), LocalTime.now().plusHours(1)))
+                .occurrenceDate(FIXED_NOW.toLocalDate().plusDays(1))  // 고정 시각 기준 미래 날짜
+                .occurrenceTime(FIXED_NOW.toLocalTime().plusHours(1))
+                .scheduledAt(LocalDateTime.of(
+                    FIXED_NOW.toLocalDate().plusDays(1),
+                    FIXED_NOW.toLocalTime().plusHours(1)
+                ))
                 .status(OccurrenceStatus.SCHEDULED)
                 .alarmRinging(false)
                 .ringingCount(0)
