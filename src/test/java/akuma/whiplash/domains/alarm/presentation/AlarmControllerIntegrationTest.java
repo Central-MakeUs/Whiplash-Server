@@ -1,6 +1,7 @@
 package akuma.whiplash.domains.alarm.presentation;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.BDDMockito.given;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -31,6 +32,7 @@ import akuma.whiplash.domains.member.persistence.repository.MemberDeviceReposito
 import akuma.whiplash.domains.member.persistence.repository.MemberRepository;
 import akuma.whiplash.domains.payment.persistence.repository.PaymentRepository;
 import akuma.whiplash.global.config.security.jwt.JwtProvider;
+import akuma.whiplash.infrastructure.payment.PaymentVerificationPort;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
@@ -45,6 +47,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 @IntegrationTest
 @AutoConfigureMockMvc
@@ -60,6 +63,7 @@ class AlarmControllerIntegrationTest {
     @Autowired private AlarmOccurrenceRepository alarmOccurrenceRepository;
     @Autowired private AlarmDeactivationLogRepository alarmDeactivationLogRepository;
     @Autowired private PaymentRepository paymentRepository;
+    @MockitoBean private PaymentVerificationPort paymentVerificationPort;
 
     private static final String BASE = "/api/v1/alarms";
 
@@ -445,7 +449,7 @@ class AlarmControllerIntegrationTest {
     @DisplayName("deactivateByPayment - 결제로 알람 끄기")
     class DeactivateByPaymentTest {
 
-        private static final LocalDateTime PAYMENT_NOW = LocalDateTime.of(2026, 5, 2, 14, 30);
+        private static final LocalDateTime PAYMENT_NOW = LocalDateTime.now();
 
         @Test
         @DisplayName("성공: 결제 요청이 성공하면 200 OK와 동기화 정보를 반환한다")
@@ -464,6 +468,8 @@ class AlarmControllerIntegrationTest {
                 PAYMENT_NOW
             );
             String accessToken = buildAccessToken(member);
+            given(paymentVerificationPort.supportedPlatform()).willReturn(MemberDeviceFixture.ANDROID.getPlatform());
+            given(paymentVerificationPort.verify(request.paymentId())).willReturn(true);
 
             // when
             mockMvc.perform(post(BASE + "/{alarmId}/payment", alarm.getId())
@@ -533,7 +539,7 @@ class AlarmControllerIntegrationTest {
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("ALARM_013"));
+                .andExpect(jsonPath("$.code").value("PAYMENT_001"));
         }
     }
 

@@ -5,7 +5,6 @@ import static akuma.whiplash.domains.auth.exception.AuthErrorCode.*;
 import static akuma.whiplash.domains.device.exception.DeviceErrorCode.*;
 import static akuma.whiplash.domains.member.exception.MemberErrorCode.MEMBER_NOT_FOUND;
 import static akuma.whiplash.domains.payment.exception.PaymentErrorCode.*;
-import static akuma.whiplash.global.response.code.CommonErrorCode.*;
 
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmCheckinRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmPaymentRequest;
@@ -105,11 +104,13 @@ public class AlarmController {
         alarmErrorCodes = {
             ALARM_NOT_FOUND,
             ALARM_OCCURRENCE_NOT_FOUND,
-            ALREADY_DEACTIVATED,
-            CHECKIN_NOT_YET_AVAILABLE
+            ALREADY_DEACTIVATED
         },
-        paymentErrorCodes = {DUPLICATE_PAYMENT},
-        commonErrorCodes = {BAD_REQUEST},
+        paymentErrorCodes = {
+            DUPLICATE_PAYMENT,
+            PAYMENT_NOT_YET_AVAILABLE,
+            PAYMENT_VERIFICATION_FAILED
+        },
         deviceErrorCodes = {DEVICE_NOT_FOUND},
         authErrorCodes = {PERMISSION_DENIED}
     )

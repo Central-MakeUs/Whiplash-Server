@@ -231,13 +231,13 @@ class AlarmCommandServiceTest {
             AlarmEntity alarm = buildAlarm(member, fixture);
             given(alarmRepository.findById(alarm.getId())).willReturn(Optional.of(alarm));
 
-            AlarmOccurrenceEntity occurrence = buildOccurrence(alarm, 501L, LocalDateTime.now().plusHours(1), OccurrenceStatus.SCHEDULED);
-            AlarmOccurrenceEntity nextOccurrence = buildOccurrence(alarm, 502L, LocalDateTime.now().plusDays(1), OccurrenceStatus.SCHEDULED);
+            AlarmOccurrenceEntity occurrence = buildOccurrence(alarm, 501L, FIXED_NOW.plusHours(1), OccurrenceStatus.SCHEDULED);
+            AlarmOccurrenceEntity nextOccurrence = buildOccurrence(alarm, 502L, FIXED_NOW.plusDays(1), OccurrenceStatus.SCHEDULED);
             given(alarmOccurrenceRepository.findByIdAndAlarmId(occurrence.getId(), alarm.getId())).willReturn(Optional.of(occurrence));
             given(alarmOccurrenceRepository.findNextScheduledByAlarmIds(eq(List.of(alarm.getId())), eq(OccurrenceStatus.SCHEDULED), any(LocalDateTime.class)))
                 .willReturn(List.of(nextOccurrence));
 
-            AlarmCheckinRequest request = buildRequest(occurrence, alarm.getLatitude(), alarm.getLongitude(), LocalDateTime.now());
+            AlarmCheckinRequest request = buildRequest(occurrence, alarm.getLatitude(), alarm.getLongitude(), FIXED_NOW);
 
             // when
             AlarmCheckinResponse response = alarmCommandService.checkinAlarm(member.getId(), alarm.getId(), request);
@@ -276,8 +276,8 @@ class AlarmCommandServiceTest {
             AlarmEntity alarm = buildAlarm(owner, fixture);
             given(alarmRepository.findById(alarm.getId())).willReturn(Optional.of(alarm));
 
-            AlarmOccurrenceEntity occurrence = buildOccurrence(alarm, 601L, LocalDateTime.now().plusHours(1), OccurrenceStatus.SCHEDULED);
-            AlarmCheckinRequest request = buildRequest(occurrence, alarm.getLatitude(), alarm.getLongitude(), LocalDateTime.now());
+            AlarmOccurrenceEntity occurrence = buildOccurrence(alarm, 601L, FIXED_NOW.plusHours(1), OccurrenceStatus.SCHEDULED);
+            AlarmCheckinRequest request = buildRequest(occurrence, alarm.getLatitude(), alarm.getLongitude(), FIXED_NOW);
 
             // when & then
             assertThatThrownBy(() -> alarmCommandService.checkinAlarm(999L, alarm.getId(), request))
@@ -293,7 +293,7 @@ class AlarmCommandServiceTest {
             given(alarmRepository.findById(alarm.getId())).willReturn(Optional.of(alarm));
             given(alarmOccurrenceRepository.findByIdAndAlarmId(999L, alarm.getId())).willReturn(Optional.empty());
 
-            AlarmCheckinRequest request = new AlarmCheckinRequest(999L, "device-uuid", alarm.getLatitude(), alarm.getLongitude(), LocalDateTime.now());
+            AlarmCheckinRequest request = new AlarmCheckinRequest(999L, "device-uuid", alarm.getLatitude(), alarm.getLongitude(), FIXED_NOW);
 
             // when & then
             assertThatThrownBy(() -> alarmCommandService.checkinAlarm(member.getId(), alarm.getId(), request))
@@ -308,11 +308,11 @@ class AlarmCommandServiceTest {
             AlarmFixture fixture = AlarmFixture.ALARM_13;
             AlarmEntity alarm = buildAlarm(member, fixture);
             given(alarmRepository.findById(alarm.getId())).willReturn(Optional.of(alarm));
-            AlarmOccurrenceEntity occurrence = buildOccurrence(alarm, 701L, LocalDateTime.now().plusHours(1), OccurrenceStatus.SCHEDULED);
-            occurrence.checkin(LocalDateTime.now());
+            AlarmOccurrenceEntity occurrence = buildOccurrence(alarm, 701L, FIXED_NOW.plusHours(1), OccurrenceStatus.SCHEDULED);
+            occurrence.checkin(FIXED_NOW);
             given(alarmOccurrenceRepository.findByIdAndAlarmId(occurrence.getId(), alarm.getId())).willReturn(Optional.of(occurrence));
 
-            AlarmCheckinRequest request = buildRequest(occurrence, alarm.getLatitude(), alarm.getLongitude(), LocalDateTime.now());
+            AlarmCheckinRequest request = buildRequest(occurrence, alarm.getLatitude(), alarm.getLongitude(), FIXED_NOW);
 
             // when & then
             assertThatThrownBy(() -> alarmCommandService.checkinAlarm(member.getId(), alarm.getId(), request))
@@ -327,7 +327,7 @@ class AlarmCommandServiceTest {
             AlarmFixture fixture = AlarmFixture.ALARM_14;
             AlarmEntity alarm = buildAlarm(member, fixture);
             given(alarmRepository.findById(alarm.getId())).willReturn(Optional.of(alarm));
-            AlarmOccurrenceEntity occurrence = buildOccurrence(alarm, 801L, LocalDateTime.now().plusHours(6), OccurrenceStatus.SCHEDULED);
+            AlarmOccurrenceEntity occurrence = buildOccurrence(alarm, 801L, FIXED_NOW.plusHours(6), OccurrenceStatus.SCHEDULED);
             given(alarmOccurrenceRepository.findByIdAndAlarmId(occurrence.getId(), alarm.getId())).willReturn(Optional.of(occurrence));
 
             AlarmCheckinRequest request = buildRequest(
@@ -350,10 +350,10 @@ class AlarmCommandServiceTest {
             AlarmFixture fixture = AlarmFixture.ALARM_14;
             AlarmEntity alarm = buildAlarm(member, fixture);
             given(alarmRepository.findById(alarm.getId())).willReturn(Optional.of(alarm));
-            AlarmOccurrenceEntity occurrence = buildOccurrence(alarm, 901L, LocalDateTime.now().plusHours(1), OccurrenceStatus.SCHEDULED);
+            AlarmOccurrenceEntity occurrence = buildOccurrence(alarm, 901L, FIXED_NOW.plusHours(1), OccurrenceStatus.SCHEDULED);
             given(alarmOccurrenceRepository.findByIdAndAlarmId(occurrence.getId(), alarm.getId())).willReturn(Optional.of(occurrence));
 
-            AlarmCheckinRequest request = buildRequest(occurrence, alarm.getLatitude() + 1, alarm.getLongitude() + 1, LocalDateTime.now());
+            AlarmCheckinRequest request = buildRequest(occurrence, alarm.getLatitude() + 1, alarm.getLongitude() + 1, FIXED_NOW);
 
             // when & then
             assertThatThrownBy(() -> alarmCommandService.checkinAlarm(member.getId(), alarm.getId(), request))
@@ -461,7 +461,7 @@ class AlarmCommandServiceTest {
             // when & then
             assertThatThrownBy(() -> alarmCommandService.deactivateByPayment(member.getId(), alarm.getId(), request))
                 .isInstanceOf(ApplicationException.class)
-                .hasMessage("잘못된 요청입니다.");
+                .hasMessage("결제 검증에 실패했습니다.");
 
             ArgumentCaptor<PaymentEntity> paymentCaptor = ArgumentCaptor.forClass(PaymentEntity.class);
             ArgumentCaptor<AlarmDeactivationLogEntity> logCaptor = ArgumentCaptor.forClass(AlarmDeactivationLogEntity.class);
@@ -497,7 +497,7 @@ class AlarmCommandServiceTest {
             // when & then
             assertThatThrownBy(() -> alarmCommandService.deactivateByPayment(member.getId(), alarm.getId(), request))
                 .isInstanceOf(ApplicationException.class)
-                .hasMessage("아직 위치 인증이 가능한 시간이 아닙니다.");
+                .hasMessage("아직 결제로 알람을 끌 수 있는 시간이 아닙니다.");
         }
     }
 

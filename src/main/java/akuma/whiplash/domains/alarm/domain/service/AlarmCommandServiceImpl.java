@@ -194,9 +194,8 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
         }
 
         // 3. 위치 인증은 예정 시각 3시간 전부터만 허용한다.
-        LocalDateTime requestedAt = request.requestedAt();
         LocalDateTime checkinAvailableAt = occurrence.getScheduledAt().minusHours(3);
-        if (requestedAt.isBefore(checkinAvailableAt)) {
+        if (timeProvider.now().isBefore(checkinAvailableAt)) {
             throw ApplicationException.from(CHECKIN_NOT_YET_AVAILABLE);
         }
 
@@ -262,8 +261,8 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
 
         // 4. 결제 비활성화는 알람 예정 시각 3시간 전부터만 허용한다.
         LocalDateTime paymentAvailableAt = occurrence.getScheduledAt().minusHours(3);
-        if (request.requestedAt().isBefore(paymentAvailableAt)) {
-            throw ApplicationException.from(CHECKIN_NOT_YET_AVAILABLE);
+        if (timeProvider.now().isBefore(paymentAvailableAt)) {
+            throw ApplicationException.from(PaymentErrorCode.PAYMENT_NOT_YET_AVAILABLE);
         }
 
         // 5. 같은 플랫폼 결제 ID가 이미 처리됐다면 재사용을 막는다.
@@ -318,7 +317,7 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
                 DeactivationResult.FAIL,
                 verificationFailReason
             ));
-            throw ApplicationException.from(CommonErrorCode.BAD_REQUEST);
+            throw ApplicationException.from(PaymentErrorCode.PAYMENT_VERIFICATION_FAILED);
         }
 
         // 8. 검증 성공 시 결제를 성공으로 기록하고 알람 회차를 PAYMENT 상태로 비활성화한다.
