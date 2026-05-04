@@ -79,6 +79,19 @@ public enum AlarmFixture {
             .build();
     }
 
+    public AlarmEntity toMockEntity(MemberEntity member) {
+        return AlarmEntity.builder()
+            .id(id)
+            .alarmPurpose(alarmPurpose)
+            .time(time)
+            .repeatDays(repeatDays)
+            .soundType(soundType)
+            .latitude(latitude)
+            .longitude(longitude)
+            .address(address)
+            .member(member)
+            .build();
+    }
 
     public AlarmEntity toEntity(MemberEntity member) {
         return AlarmEntity.builder()

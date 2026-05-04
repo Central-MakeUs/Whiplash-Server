@@ -106,7 +106,7 @@ class AlarmControllerTest {
     }
 
     private AlarmCheckinRequest buildCheckinRequest() {
-        return new AlarmCheckinRequest(501L, "device-uuid", 37.0, 127.0, LocalDateTime.now());
+        return new AlarmCheckinRequest(501L, "device-uuid", 37.0, 127.0);
     }
 
     @AfterEach

@@ -5,7 +5,6 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotNull;
-import java.time.LocalDateTime;
 
 @Schema(description = "알람 도착 인증 요청 DTO")
 public record AlarmCheckinRequest(
@@ -28,11 +27,7 @@ public record AlarmCheckinRequest(
     @NotNull(message = "현재 사용자 위치의 경도를 입력해주세요.")
     @DecimalMin(value = "-180.0", message = "경도는 -180 이상이어야 합니다.")
     @DecimalMax(value = "180.0", message = "경도는 180 이하이어야 합니다.")
-    Double longitude,
-
-    @Schema(description = "요청 시각", example = "2026-04-15T07:20:00")
-    @NotNull(message = "요청 시각을 입력해주세요.")
-    LocalDateTime requestedAt
+    Double longitude
 ) {
 
 }

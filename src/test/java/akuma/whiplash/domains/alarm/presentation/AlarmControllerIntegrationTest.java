@@ -1,6 +1,7 @@
 package akuma.whiplash.domains.alarm.presentation;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.BDDMockito.given;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -10,8 +11,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import akuma.whiplash.common.config.IntegrationTest;
 import akuma.whiplash.common.fixture.AlarmFixture;
 import akuma.whiplash.common.fixture.AlarmOccurrenceFixture;
+import akuma.whiplash.common.fixture.MemberDeviceFixture;
 import akuma.whiplash.common.fixture.MemberFixture;
+import akuma.whiplash.common.fixture.PaymentFixture;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmCheckinRequest;
+import akuma.whiplash.domains.alarm.application.dto.request.AlarmPaymentRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmRegisterRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmRemoveRequest;
 import akuma.whiplash.domains.alarm.application.mapper.AlarmMapper;
@@ -20,17 +24,23 @@ import akuma.whiplash.domains.alarm.domain.constant.SoundType;
 import akuma.whiplash.domains.alarm.domain.constant.Weekday;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmEntity;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmOccurrenceEntity;
+import akuma.whiplash.domains.alarm.persistence.repository.AlarmDeactivationLogRepository;
 import akuma.whiplash.domains.alarm.persistence.repository.AlarmOccurrenceRepository;
 import akuma.whiplash.domains.alarm.persistence.repository.AlarmRepository;
 import akuma.whiplash.domains.member.persistence.entity.MemberEntity;
+import akuma.whiplash.domains.member.persistence.repository.MemberDeviceRepository;
 import akuma.whiplash.domains.member.persistence.repository.MemberRepository;
+import akuma.whiplash.domains.payment.persistence.repository.PaymentRepository;
 import akuma.whiplash.global.config.security.jwt.JwtProvider;
+import akuma.whiplash.global.util.date.TimeProvider;
+import akuma.whiplash.infrastructure.payment.PaymentVerificationPort;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -39,6 +49,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 @IntegrationTest
 @AutoConfigureMockMvc
@@ -49,13 +60,25 @@ class AlarmControllerIntegrationTest {
     @Autowired private MockMvc mockMvc;
     @Autowired private ObjectMapper objectMapper;
     @Autowired private MemberRepository memberRepository;
+    @Autowired private MemberDeviceRepository memberDeviceRepository;
     @Autowired private AlarmRepository alarmRepository;
     @Autowired private AlarmOccurrenceRepository alarmOccurrenceRepository;
+    @Autowired private AlarmDeactivationLogRepository alarmDeactivationLogRepository;
+    @Autowired private PaymentRepository paymentRepository;
+    @MockitoBean private PaymentVerificationPort paymentVerificationPort;
+    @MockitoBean private TimeProvider timeProvider;
 
     private static final String BASE = "/api/v1/alarms";
+    private static final LocalDateTime FIXED_NOW = LocalDateTime.of(2026, 5, 4, 11, 0);
+
+    @BeforeEach
+    void setUpTimeProvider() {
+        given(timeProvider.now()).willReturn(FIXED_NOW);
+        given(timeProvider.today()).willReturn(FIXED_NOW.toLocalDate());
+    }
 
     private AlarmEntity saveAlarmForToday(MemberEntity member) {
-        DayOfWeek today = LocalDate.now().getDayOfWeek();
+        DayOfWeek today = FIXED_NOW.toLocalDate().getDayOfWeek();
         return alarmRepository.save(AlarmEntity.builder()
             .alarmPurpose("test")
             .time(LocalTime.of(7, 0))
@@ -69,7 +92,7 @@ class AlarmControllerIntegrationTest {
     }
 
     private AlarmEntity saveAlarmForNextWeek(MemberEntity member) {
-        DayOfWeek today = LocalDate.now().getDayOfWeek();
+        DayOfWeek today = FIXED_NOW.toLocalDate().getDayOfWeek();
         DayOfWeek previous = today.minus(1);
         return alarmRepository.save(AlarmEntity.builder()
             .alarmPurpose("test")
@@ -100,8 +123,8 @@ class AlarmControllerIntegrationTest {
             .build());
     }
 
-    private AlarmCheckinRequest buildCheckinRequest(AlarmOccurrenceEntity occurrence, Double latitude, Double longitude, LocalDateTime requestedAt) {
-        return new AlarmCheckinRequest(occurrence.getId(), "device-uuid", latitude, longitude, requestedAt);
+    private AlarmCheckinRequest buildCheckinRequest(AlarmOccurrenceEntity occurrence, Double latitude, Double longitude) {
+        return new AlarmCheckinRequest(occurrence.getId(), "device-uuid", latitude, longitude);
     }
 
     @Nested
@@ -205,7 +228,7 @@ class AlarmControllerIntegrationTest {
             MemberEntity member = memberRepository.save(MemberFixture.MEMBER_1.toEntity());
             var alarm = alarmRepository.save(AlarmFixture.ALARM_01.toEntity(member));
 
-            var now = LocalDateTime.now();
+            var now = FIXED_NOW;
             var occurrence = AlarmOccurrenceEntity.builder()
                 .alarm(alarm)
                 .occurrenceDate(now.toLocalDate())
@@ -311,9 +334,9 @@ class AlarmControllerIntegrationTest {
             // given
             MemberEntity member = memberRepository.save(MemberFixture.MEMBER_1.toEntity());
             AlarmEntity alarm = saveAlarmForToday(member);
-            AlarmOccurrenceEntity occurrence = saveOccurrence(alarm, LocalDateTime.now().plusHours(1), OccurrenceStatus.SCHEDULED);
-            saveOccurrence(alarm, LocalDateTime.now().plusDays(1), OccurrenceStatus.SCHEDULED);
-            AlarmCheckinRequest request = buildCheckinRequest(occurrence, alarm.getLatitude(), alarm.getLongitude(), LocalDateTime.now());
+            AlarmOccurrenceEntity occurrence = saveOccurrence(alarm, FIXED_NOW.plusHours(1), OccurrenceStatus.SCHEDULED);
+            saveOccurrence(alarm, FIXED_NOW.plusDays(1), OccurrenceStatus.SCHEDULED);
+            AlarmCheckinRequest request = buildCheckinRequest(occurrence, alarm.getLatitude(), alarm.getLongitude());
             String accessToken = buildAccessToken(member);
 
             // when
@@ -336,7 +359,7 @@ class AlarmControllerIntegrationTest {
             // given
             MemberEntity member = memberRepository.save(MemberFixture.MEMBER_2.toEntity());
             String accessToken = buildAccessToken(member);
-            AlarmCheckinRequest request = new AlarmCheckinRequest(999L, "device-uuid", 0.0, 0.0, LocalDateTime.now());
+            AlarmCheckinRequest request = new AlarmCheckinRequest(999L, "device-uuid", 0.0, 0.0);
 
             // when & then
             mockMvc.perform(post(BASE + "/{alarmId}/checkin", 999L)
@@ -353,9 +376,9 @@ class AlarmControllerIntegrationTest {
             MemberEntity owner = memberRepository.save(MemberFixture.MEMBER_3.toEntity());
             MemberEntity other = memberRepository.save(MemberFixture.MEMBER_4.toEntity());
             AlarmEntity alarm = saveAlarmForToday(owner);
-            AlarmOccurrenceEntity occurrence = saveOccurrence(alarm, LocalDateTime.now().plusHours(1), OccurrenceStatus.SCHEDULED);
+            AlarmOccurrenceEntity occurrence = saveOccurrence(alarm, FIXED_NOW.plusHours(1), OccurrenceStatus.SCHEDULED);
             String accessToken = buildAccessToken(other);
-            AlarmCheckinRequest request = buildCheckinRequest(occurrence, alarm.getLatitude(), alarm.getLongitude(), LocalDateTime.now());
+            AlarmCheckinRequest request = buildCheckinRequest(occurrence, alarm.getLatitude(), alarm.getLongitude());
 
             // when & then
             mockMvc.perform(post(BASE + "/{alarmId}/checkin", alarm.getId())
@@ -371,11 +394,11 @@ class AlarmControllerIntegrationTest {
             // given
             MemberEntity member = memberRepository.save(MemberFixture.MEMBER_5.toEntity());
             AlarmEntity alarm = saveAlarmForToday(member);
-            AlarmOccurrenceEntity occurrence = saveOccurrence(alarm, LocalDateTime.now().plusHours(1), OccurrenceStatus.SCHEDULED);
-            occurrence.checkin(LocalDateTime.now());
+            AlarmOccurrenceEntity occurrence = saveOccurrence(alarm, FIXED_NOW.plusHours(1), OccurrenceStatus.SCHEDULED);
+            occurrence.checkin(FIXED_NOW);
             alarmOccurrenceRepository.save(occurrence);
             String accessToken = buildAccessToken(member);
-            AlarmCheckinRequest request = buildCheckinRequest(occurrence, alarm.getLatitude(), alarm.getLongitude(), LocalDateTime.now());
+            AlarmCheckinRequest request = buildCheckinRequest(occurrence, alarm.getLatitude(), alarm.getLongitude());
 
             // when & then
             mockMvc.perform(post(BASE + "/{alarmId}/checkin", alarm.getId())
@@ -391,13 +414,12 @@ class AlarmControllerIntegrationTest {
             // given
             MemberEntity member = memberRepository.save(MemberFixture.MEMBER_6.toEntity());
             AlarmEntity alarm = saveAlarmForToday(member);
-            AlarmOccurrenceEntity occurrence = saveOccurrence(alarm, LocalDateTime.now().plusHours(1), OccurrenceStatus.SCHEDULED);
+            AlarmOccurrenceEntity occurrence = saveOccurrence(alarm, FIXED_NOW.plusHours(1), OccurrenceStatus.SCHEDULED);
             String accessToken = buildAccessToken(member);
             AlarmCheckinRequest request = buildCheckinRequest(
                 occurrence,
                 alarm.getLatitude() + 1,
-                alarm.getLongitude() + 1,
-                LocalDateTime.now()
+                alarm.getLongitude() + 1
             );
 
             // when & then
@@ -414,13 +436,12 @@ class AlarmControllerIntegrationTest {
             // given
             MemberEntity member = memberRepository.save(MemberFixture.MEMBER_7.toEntity());
             AlarmEntity alarm = saveAlarmForToday(member);
-            AlarmOccurrenceEntity occurrence = saveOccurrence(alarm, LocalDateTime.now().plusHours(6), OccurrenceStatus.SCHEDULED);
+            AlarmOccurrenceEntity occurrence = saveOccurrence(alarm, FIXED_NOW.plusHours(6), OccurrenceStatus.SCHEDULED);
             String accessToken = buildAccessToken(member);
             AlarmCheckinRequest request = buildCheckinRequest(
                 occurrence,
                 alarm.getLatitude(),
-                alarm.getLongitude(),
-                occurrence.getScheduledAt().minusHours(4)
+                alarm.getLongitude()
             );
 
             // when & then
@@ -429,6 +450,99 @@ class AlarmControllerIntegrationTest {
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest());
+        }
+    }
+
+    @Nested
+    @DisplayName("deactivateByPayment - 결제로 알람 끄기")
+    class DeactivateByPaymentTest {
+
+        @Test
+        @DisplayName("성공: 결제 요청이 성공하면 200 OK와 동기화 정보를 반환한다")
+        void success() throws Exception {
+            // given
+            MemberEntity member = memberRepository.save(MemberFixture.MEMBER_8.toEntity());
+            memberDeviceRepository.save(MemberDeviceFixture.ANDROID.toEntity(member));
+            AlarmEntity alarm = alarmRepository.save(AlarmFixture.ALARM_08.toEntity(member));
+            AlarmOccurrenceEntity occurrence = alarmOccurrenceRepository.save(
+                AlarmOccurrenceFixture.ALARM_OCCURRENCE_02.toEntity(alarm, FIXED_NOW.plusHours(1), OccurrenceStatus.SCHEDULED)
+            );
+            AlarmPaymentRequest request = new AlarmPaymentRequest(
+                occurrence.getId(),
+                MemberDeviceFixture.ANDROID.getDeviceId(),
+                "integration-payment-success-001"
+            );
+            String accessToken = buildAccessToken(member);
+            given(paymentVerificationPort.supportedPlatform()).willReturn(MemberDeviceFixture.ANDROID.getPlatform());
+            given(paymentVerificationPort.verify(request.paymentId())).willReturn(true);
+
+            // when
+            mockMvc.perform(post(BASE + "/{alarmId}/payment", alarm.getId())
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.alarmId").value(alarm.getId()))
+                .andExpect(jsonPath("$.result.alarmRevision").value(2));
+
+            // then
+            AlarmOccurrenceEntity savedOccurrence = alarmOccurrenceRepository.findById(occurrence.getId()).orElseThrow();
+            assertThat(savedOccurrence.getStatus()).isEqualTo(OccurrenceStatus.PAYMENT);
+            assertThat(paymentRepository.existsByPaymentId(request.paymentId())).isTrue();
+            assertThat(alarmDeactivationLogRepository.findAll()).hasSize(1);
+        }
+
+        @Test
+        @DisplayName("실패: 이미 처리된 결제 ID이면 409와 에러 코드를 반환한다")
+        void fail_duplicatePayment() throws Exception {
+            // given
+            MemberEntity member = memberRepository.save(MemberFixture.MEMBER_9.toEntity());
+            memberDeviceRepository.save(MemberDeviceFixture.ANDROID.toEntity(member));
+            AlarmEntity alarm = alarmRepository.save(AlarmFixture.ALARM_09.toEntity(member));
+            AlarmOccurrenceEntity occurrence = alarmOccurrenceRepository.save(
+                AlarmOccurrenceFixture.ALARM_OCCURRENCE_02.toEntity(alarm, FIXED_NOW.plusHours(1), OccurrenceStatus.SCHEDULED)
+            );
+            paymentRepository.save(PaymentFixture.STOP_ALARM_SUCCESS.toEntity(member, alarm));
+            AlarmPaymentRequest request = new AlarmPaymentRequest(
+                occurrence.getId(),
+                MemberDeviceFixture.ANDROID.getDeviceId(),
+                PaymentFixture.STOP_ALARM_SUCCESS.getPaymentId()
+            );
+            String accessToken = buildAccessToken(member);
+
+            // when & then
+            mockMvc.perform(post(BASE + "/{alarmId}/payment", alarm.getId())
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("PAYMENT_901"));
+        }
+
+        @Test
+        @DisplayName("실패: 결제 가능 시간 전이면 400과 에러 코드를 반환한다")
+        void fail_notYetAvailable() throws Exception {
+            // given
+            MemberEntity member = memberRepository.save(MemberFixture.MEMBER_10.toEntity());
+            memberDeviceRepository.save(MemberDeviceFixture.ANDROID.toEntity(member));
+            AlarmEntity alarm = alarmRepository.save(AlarmFixture.ALARM_10.toEntity(member));
+            AlarmOccurrenceEntity occurrence = alarmOccurrenceRepository.save(
+                AlarmOccurrenceFixture.ALARM_OCCURRENCE_02.toEntity(alarm, FIXED_NOW.plusHours(6), OccurrenceStatus.SCHEDULED)
+            );
+            AlarmPaymentRequest request = new AlarmPaymentRequest(
+                occurrence.getId(),
+                MemberDeviceFixture.ANDROID.getDeviceId(),
+                "integration-payment-not-yet-available"
+            );
+            String accessToken = buildAccessToken(member);
+
+            // when & then
+            mockMvc.perform(post(BASE + "/{alarmId}/payment", alarm.getId())
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("PAYMENT_001"));
         }
     }
 

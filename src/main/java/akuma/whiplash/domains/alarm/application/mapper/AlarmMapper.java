@@ -2,6 +2,7 @@ package akuma.whiplash.domains.alarm.application.mapper;
 
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmRegisterRequest;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmCheckinResponse;
+import akuma.whiplash.domains.alarm.application.dto.response.AlarmPaymentResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmSyncItemDto;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmSyncResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.CreateAlarmOccurrenceResponse;
@@ -9,6 +10,7 @@ import akuma.whiplash.domains.alarm.application.dto.response.CreateAlarmResponse
 import akuma.whiplash.domains.alarm.application.dto.response.NextOccurrenceResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmPreviewDto;
 import akuma.whiplash.domains.alarm.domain.constant.DeactivateType;
+import akuma.whiplash.domains.alarm.domain.constant.DeactivationResult;
 import akuma.whiplash.domains.alarm.domain.constant.AlarmStatus;
 import akuma.whiplash.domains.alarm.domain.constant.OccurrenceStatus;
 import akuma.whiplash.domains.alarm.domain.constant.SoundType;
@@ -149,7 +151,7 @@ public class AlarmMapper {
             .requestDeviceId(deviceId)
             .requestedAt(requestedAt)
             .processedAt(processedAt)
-            .result("SUCCESS")
+            .result(DeactivationResult.SUCCESS)
             .failReason("")
             .build();
     }
@@ -165,6 +167,47 @@ public class AlarmMapper {
                 .occurrenceId(nextOccurrence.getId())
                 .scheduledAt(nextOccurrence.getScheduledAt())
                 .build())
+            .build();
+    }
+
+    public static AlarmPaymentResponse mapToAlarmPaymentResponse(
+        AlarmEntity alarm,
+        LocalDateTime deactivatedAt,
+        AlarmOccurrenceEntity nextOccurrence
+    ) {
+        return AlarmPaymentResponse.builder()
+            .alarmId(alarm.getId())
+            .deactivatedAt(deactivatedAt)
+            .alarmRevision(alarm.getRevision())
+            .nextOccurrence(nextOccurrence == null ? null : AlarmPaymentResponse.NextOccurrenceInfo.builder()
+                .occurrenceId(nextOccurrence.getId())
+                .scheduledAt(nextOccurrence.getScheduledAt())
+                .build())
+            .build();
+    }
+
+    public static AlarmDeactivationLogEntity mapToPaymentDeactivationLogEntity(
+        AlarmOccurrenceEntity occurrence,
+        MemberEntity member,
+        String paymentId,
+        String deviceId,
+        LocalDateTime requestedAt,
+        LocalDateTime processedAt,
+        DeactivationResult result,
+        String failReason
+    ) {
+        return AlarmDeactivationLogEntity.builder()
+            .alarmOccurrence(occurrence)
+            .member(member)
+            .paymentId(paymentId)
+            .deactivateType(DeactivateType.PAYMENT)
+            .requestLatitude(null)
+            .requestLongitude(null)
+            .requestDeviceId(deviceId)
+            .requestedAt(requestedAt)
+            .processedAt(processedAt)
+            .result(result)
+            .failReason(failReason)
             .build();
     }
 

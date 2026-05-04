@@ -85,6 +85,12 @@ public class AlarmOccurrenceEntity extends BaseTimeEntity {
         this.alarmRinging = false;
     }
 
+    public void deactivateByPayment(LocalDateTime now) {
+        this.status = OccurrenceStatus.PAYMENT;
+        this.deactivatedAt = now;
+        this.alarmRinging = false;
+    }
+
     public int ring() {
         this.status = OccurrenceStatus.RINGING;
         this.alarmRinging = true;

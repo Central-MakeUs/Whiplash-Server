@@ -4,6 +4,7 @@ import akuma.whiplash.domains.alarm.domain.constant.OccurrenceStatus;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmEntity;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmOccurrenceEntity;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import lombok.Getter;
 
@@ -68,6 +69,33 @@ public enum AlarmOccurrenceFixture {
             .status(status)
             .alarmRinging(false)
             .ringingCount(0)
+            .reminderSent(false)
+            .build();
+    }
+
+    public AlarmOccurrenceEntity toMockEntity(AlarmEntity alarm, Long occurrenceId, LocalDateTime scheduledAt, OccurrenceStatus status) {
+        return AlarmOccurrenceEntity.builder()
+            .id(occurrenceId)
+            .alarm(alarm)
+            .occurrenceDate(scheduledAt.toLocalDate())
+            .occurrenceTime(scheduledAt.toLocalTime())
+            .scheduledAt(scheduledAt)
+            .status(status)
+            .alarmRinging(status == OccurrenceStatus.RINGING)
+            .ringingCount(status == OccurrenceStatus.RINGING ? 1 : 0)
+            .reminderSent(false)
+            .build();
+    }
+
+    public AlarmOccurrenceEntity toEntity(AlarmEntity alarm, LocalDateTime scheduledAt, OccurrenceStatus status) {
+        return AlarmOccurrenceEntity.builder()
+            .alarm(alarm)
+            .occurrenceDate(scheduledAt.toLocalDate())
+            .occurrenceTime(scheduledAt.toLocalTime())
+            .scheduledAt(scheduledAt)
+            .status(status)
+            .alarmRinging(status == OccurrenceStatus.RINGING)
+            .ringingCount(status == OccurrenceStatus.RINGING ? 1 : 0)
             .reminderSent(false)
             .build();
     }
