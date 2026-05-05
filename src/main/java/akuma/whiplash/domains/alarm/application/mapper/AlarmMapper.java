@@ -2,6 +2,7 @@ package akuma.whiplash.domains.alarm.application.mapper;
 
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmRegisterRequest;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmCheckinResponse;
+import akuma.whiplash.domains.alarm.application.dto.response.AlarmDeleteByAdResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmDeleteByPaymentResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmPaymentResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmSyncItemDto;
@@ -202,6 +203,13 @@ public class AlarmMapper {
             .build();
     }
 
+    public static AlarmDeleteByAdResponse mapToAlarmDeleteByAdResponse(AlarmEntity alarm) {
+        return AlarmDeleteByAdResponse.builder()
+            .alarmId(alarm.getId())
+            .alarmRevision(alarm.getRevision())
+            .build();
+    }
+
     public static AlarmDeactivationLogEntity mapToPaymentDeactivationLogEntity(
         AlarmOccurrenceEntity occurrence,
         MemberEntity member,
@@ -241,6 +249,24 @@ public class AlarmMapper {
             .deleteType(DeleteType.PAYMENT)
             .reason(reason)
             .paymentId(paymentId)
+            .requestedAt(requestedAt)
+            .deletedAt(deletedAt)
+            .build();
+    }
+
+    public static AlarmDeleteLogEntity mapToAdDeleteLogEntity(
+        AlarmEntity alarm,
+        MemberEntity member,
+        String adProofToken,
+        LocalDateTime requestedAt,
+        LocalDateTime deletedAt
+    ) {
+        return AlarmDeleteLogEntity.builder()
+            .alarm(alarm)
+            .member(member)
+            .deleteType(DeleteType.AD)
+            .reason("")
+            .adProofToken(adProofToken)
             .requestedAt(requestedAt)
             .deletedAt(deletedAt)
             .build();

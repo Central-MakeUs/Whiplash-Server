@@ -7,10 +7,12 @@ import static akuma.whiplash.domains.member.exception.MemberErrorCode.MEMBER_NOT
 import static akuma.whiplash.domains.payment.exception.PaymentErrorCode.*;
 
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmCheckinRequest;
+import akuma.whiplash.domains.alarm.application.dto.request.AlarmDeleteByAdRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmDeleteByPaymentRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmPaymentRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmRegisterRequest;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmCheckinResponse;
+import akuma.whiplash.domains.alarm.application.dto.response.AlarmDeleteByAdResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmDeleteByPaymentResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmPaymentResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmSyncResponse;
@@ -59,7 +61,7 @@ public class AlarmController {
         authErrorCodes = {PERMISSION_DENIED}
     )
     @Operation(summary = "결제로 알람 삭제", description = "알람 당일 인앱 결제를 통해 알람을 삭제합니다.")
-    @DeleteMapping("/{alarmId}")
+    @PostMapping("/{alarmId}/delete/payment")
     public ApplicationResponse<AlarmDeleteByPaymentResponse> removeAlarmByPayment(
         @AuthenticationPrincipal MemberContext memberContext,
         @PathVariable Long alarmId,
@@ -67,6 +69,22 @@ public class AlarmController {
     ) {
         return ApplicationResponse.onSuccess(
             alarmUseCase.removeAlarmByPayment(memberContext.memberId(), alarmId, request)
+        );
+    }
+
+    @CustomErrorCodes(
+        alarmErrorCodes = {ALARM_NOT_FOUND, ALARM_DELETE_REQUIRES_PAYMENT},
+        authErrorCodes = {PERMISSION_DENIED}
+    )
+    @Operation(summary = "광고 시청으로 알람 삭제", description = "광고 시청 증빙 토큰을 제출하여 알람을 삭제합니다.")
+    @PostMapping("/{alarmId}/delete/ad")
+    public ApplicationResponse<AlarmDeleteByAdResponse> removeAlarmByAd(
+        @AuthenticationPrincipal MemberContext memberContext,
+        @PathVariable Long alarmId,
+        @RequestBody @Valid AlarmDeleteByAdRequest request
+    ) {
+        return ApplicationResponse.onSuccess(
+            alarmUseCase.removeAlarmByAd(memberContext.memberId(), alarmId, request)
         );
     }
 
@@ -95,7 +113,7 @@ public class AlarmController {
         authErrorCodes = {PERMISSION_DENIED}
     )
     @Operation(summary = "알람 도착 인증", description = "알람 도착 인증을 합니다. 도착 위치 반경 50m 내에 들어와야 도착 인증이 가능합니다.")
-    @PostMapping("/{alarmId}/checkin")
+    @PostMapping("/{alarmId}/off/checkin")
     public ApplicationResponse<AlarmCheckinResponse> checkin(
         @PathVariable Long alarmId,
         @RequestBody @Valid AlarmCheckinRequest request,
@@ -119,7 +137,7 @@ public class AlarmController {
         authErrorCodes = {PERMISSION_DENIED}
     )
     @Operation(summary = "결제로 알람 끄기", description = "인앱 결제를 통해 알람 회차를 비활성화합니다.")
-    @PostMapping("/{alarmId}/payment")
+    @PostMapping("/{alarmId}/off/payment")
     public ApplicationResponse<AlarmPaymentResponse> deactivateByPayment(
         @AuthenticationPrincipal MemberContext memberContext,
         @PathVariable Long alarmId,

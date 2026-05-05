@@ -13,7 +13,7 @@ public enum AlarmErrorCode implements BaseErrorCode {
     ALREADY_OCCURRED_EXISTS(HttpStatus.BAD_REQUEST, "ALARM_002", "알람 발생 내역이 이미 생성돼 있습니다."),
     ALREADY_DEACTIVATED(HttpStatus.BAD_REQUEST, "ALARM_003", "이미 오늘은 비활성화된 알람입니다."),
     REPEAT_DAYS_NOT_CONFIG(HttpStatus.BAD_REQUEST, "ALARM_005", "반복 요일이 설정되지 않았습니다."),
-    ALARM_DELETE_NOT_AVAILABLE(HttpStatus.BAD_REQUEST, "ALARM_007", "지금은 알람을 삭제할 수 없습니다."),
+    ALARM_DELETE_REQUIRES_PAYMENT(HttpStatus.BAD_REQUEST, "ALARM_007", "결제 삭제가 필요한 알람입니다."),
     INVALID_WEEKDAY(HttpStatus.BAD_REQUEST, "ALARM_008", "유효하지 않은 요일 정보입니다."),
     CHECKIN_OUT_OF_RANGE(HttpStatus.BAD_REQUEST, "ALARM_009", "지정된 위치 반경 내에 있지 않아 출석할 수 없습니다."),
     NEXT_WEEK_ALARM_DEACTIVATION_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "ALARM_010", "다음 주에 울릴 알람은 끌 수 없습니다."),

@@ -97,4 +97,9 @@ public class AlarmEntity extends BaseTimeEntity {
         this.status = AlarmStatus.DELETED;
         this.deletedAt = now;
     }
+
+    public void softDeleteWithRevision(LocalDateTime now) {
+        softDelete(now);
+        incrementRevision();
+    }
 }

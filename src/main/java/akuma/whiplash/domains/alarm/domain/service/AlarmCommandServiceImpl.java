@@ -4,10 +4,12 @@ import static akuma.whiplash.domains.alarm.exception.AlarmErrorCode.*;
 
 import akuma.whiplash.domains.alarm.application.event.AlarmCheckinCompletedEvent;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmCheckinRequest;
+import akuma.whiplash.domains.alarm.application.dto.request.AlarmDeleteByAdRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmDeleteByPaymentRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmPaymentRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmRegisterRequest;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmCheckinResponse;
+import akuma.whiplash.domains.alarm.application.dto.response.AlarmDeleteByAdResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmDeleteByPaymentResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmPaymentResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.CreateAlarmOccurrenceResponse;
@@ -127,6 +129,40 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
         alarmOccurrenceRepository.save(alarmOccurrenceEntity);
 
         return AlarmMapper.mapToCreateAlarmOccurrenceResponse(alarmOccurrenceEntity.getId());
+    }
+
+    @Override
+    public AlarmDeleteByAdResponse removeAlarmByAd(Long memberId, Long alarmId, AlarmDeleteByAdRequest request) {
+        // 1. 알람을 조회하고 요청자가 알람 소유자인지 검증한다.
+        AlarmEntity alarm = findAlarmById(alarmId);
+        MemberEntity member = alarm.getMember();
+        validAlarmOwner(memberId, member.getId());
+
+        // 2. 오늘 회차가 아직 대기/울림 상태라면 결제 삭제 정책을 사용해야 한다.
+        alarmOccurrenceRepository.findByAlarmIdAndDate(alarmId, timeProvider.today())
+            .ifPresent(todayOccurrence -> {
+                OccurrenceStatus status = todayOccurrence.getStatus();
+                if (status == OccurrenceStatus.SCHEDULED || status == OccurrenceStatus.RINGING) {
+                    throw ApplicationException.from(ALARM_DELETE_REQUIRES_PAYMENT);
+                }
+            });
+
+        // 3. 오늘 회차가 없거나 이미 비활성화된 상태라면 알람을 소프트 삭제하고 revision을 증가시킨다.
+        LocalDateTime deletedAt = timeProvider.now();
+        alarm.softDeleteWithRevision(deletedAt);
+        ringingAlarmRedisRepository.remove(alarmId, memberId);
+
+        // 4. 광고 증빙 토큰을 포함한 삭제 이력을 저장한다.
+        alarmDeleteLogRepository.save(AlarmMapper.mapToAdDeleteLogEntity(
+            alarm,
+            member,
+            request.adProofToken(),
+            deletedAt,
+            deletedAt
+        ));
+
+        // 5. 클라이언트 동기화를 위해 변경된 revision을 응답한다.
+        return AlarmMapper.mapToAlarmDeleteByAdResponse(alarm);
     }
 
     @Override
