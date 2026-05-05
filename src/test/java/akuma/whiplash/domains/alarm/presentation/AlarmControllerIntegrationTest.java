@@ -1,5 +1,6 @@
 package akuma.whiplash.domains.alarm.presentation;
 
+import static akuma.whiplash.domains.alarm.exception.AlarmErrorCode.ALARM_DELETE_REQUIRES_PAYMENT;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.BDDMockito.given;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -15,11 +16,13 @@ import akuma.whiplash.common.fixture.MemberDeviceFixture;
 import akuma.whiplash.common.fixture.MemberFixture;
 import akuma.whiplash.common.fixture.PaymentFixture;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmCheckinRequest;
+import akuma.whiplash.domains.alarm.application.dto.request.AlarmDeleteByAdRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmDeleteByPaymentRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmPaymentRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmRegisterRequest;
 import akuma.whiplash.domains.alarm.application.mapper.AlarmMapper;
 import akuma.whiplash.domains.alarm.domain.constant.AlarmStatus;
+import akuma.whiplash.domains.alarm.domain.constant.DeleteType;
 import akuma.whiplash.domains.alarm.domain.constant.OccurrenceStatus;
 import akuma.whiplash.domains.alarm.domain.constant.SoundType;
 import akuma.whiplash.domains.alarm.domain.constant.Weekday;
@@ -321,7 +324,7 @@ class AlarmControllerIntegrationTest {
     }
 
     @Nested
-    @DisplayName("[POST] /api/v1/alarms/{alarmId}/checkin - 도착 인증")
+    @DisplayName("[POST] /api/v1/alarms/{alarmId}/off/checkin - 도착 인증")
     class CheckinTest {
 
         @Test
@@ -336,7 +339,7 @@ class AlarmControllerIntegrationTest {
             String accessToken = buildAccessToken(member);
 
             // when
-            mockMvc.perform(post(BASE + "/{alarmId}/checkin", alarm.getId())
+            mockMvc.perform(post(BASE + "/{alarmId}/off/checkin", alarm.getId())
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
@@ -358,7 +361,7 @@ class AlarmControllerIntegrationTest {
             AlarmCheckinRequest request = new AlarmCheckinRequest(999L, "device-uuid", 0.0, 0.0);
 
             // when & then
-            mockMvc.perform(post(BASE + "/{alarmId}/checkin", 999L)
+            mockMvc.perform(post(BASE + "/{alarmId}/off/checkin", 999L)
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
@@ -377,7 +380,7 @@ class AlarmControllerIntegrationTest {
             AlarmCheckinRequest request = buildCheckinRequest(occurrence, alarm.getLatitude(), alarm.getLongitude());
 
             // when & then
-            mockMvc.perform(post(BASE + "/{alarmId}/checkin", alarm.getId())
+            mockMvc.perform(post(BASE + "/{alarmId}/off/checkin", alarm.getId())
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
@@ -397,7 +400,7 @@ class AlarmControllerIntegrationTest {
             AlarmCheckinRequest request = buildCheckinRequest(occurrence, alarm.getLatitude(), alarm.getLongitude());
 
             // when & then
-            mockMvc.perform(post(BASE + "/{alarmId}/checkin", alarm.getId())
+            mockMvc.perform(post(BASE + "/{alarmId}/off/checkin", alarm.getId())
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
@@ -419,7 +422,7 @@ class AlarmControllerIntegrationTest {
             );
 
             // when & then
-            mockMvc.perform(post(BASE + "/{alarmId}/checkin", alarm.getId())
+            mockMvc.perform(post(BASE + "/{alarmId}/off/checkin", alarm.getId())
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
@@ -441,7 +444,7 @@ class AlarmControllerIntegrationTest {
             );
 
             // when & then
-            mockMvc.perform(post(BASE + "/{alarmId}/checkin", alarm.getId())
+            mockMvc.perform(post(BASE + "/{alarmId}/off/checkin", alarm.getId())
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
@@ -473,7 +476,7 @@ class AlarmControllerIntegrationTest {
             given(paymentVerificationPort.verify(request.paymentId())).willReturn(true);
 
             // when
-            mockMvc.perform(post(BASE + "/{alarmId}/payment", alarm.getId())
+            mockMvc.perform(post(BASE + "/{alarmId}/off/payment", alarm.getId())
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
@@ -507,7 +510,7 @@ class AlarmControllerIntegrationTest {
             String accessToken = buildAccessToken(member);
 
             // when & then
-            mockMvc.perform(post(BASE + "/{alarmId}/payment", alarm.getId())
+            mockMvc.perform(post(BASE + "/{alarmId}/off/payment", alarm.getId())
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
@@ -533,7 +536,7 @@ class AlarmControllerIntegrationTest {
             String accessToken = buildAccessToken(member);
 
             // when & then
-            mockMvc.perform(post(BASE + "/{alarmId}/payment", alarm.getId())
+            mockMvc.perform(post(BASE + "/{alarmId}/off/payment", alarm.getId())
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
@@ -543,7 +546,7 @@ class AlarmControllerIntegrationTest {
     }
 
     @Nested
-    @DisplayName("[DELETE] /api/v1/alarms/{alarmId} - 결제로 알람 삭제")
+    @DisplayName("[POST] /api/v1/alarms/{alarmId}/delete/payment - 결제로 알람 삭제")
     class RemoveAlarmByPaymentTest {
 
         @Test
@@ -563,7 +566,7 @@ class AlarmControllerIntegrationTest {
             given(paymentVerificationPort.verify(request.paymentId())).willReturn(true);
 
             // when
-            mockMvc.perform(delete(BASE + "/{alarmId}", alarm.getId())
+            mockMvc.perform(post(BASE + "/{alarmId}/delete/payment", alarm.getId())
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
@@ -587,7 +590,7 @@ class AlarmControllerIntegrationTest {
             String accessToken = jwtProvider.generateAccessToken(member.getId(), member.getRole(), "mock_device_id");
 
             // when & then
-            mockMvc.perform(delete(BASE + "/{alarmId}", 999L)
+            mockMvc.perform(post(BASE + "/{alarmId}/delete/payment", 999L)
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
@@ -605,7 +608,7 @@ class AlarmControllerIntegrationTest {
             String accessToken = jwtProvider.generateAccessToken(other.getId(), other.getRole(), "mock_device_id");
 
             // when & then
-            mockMvc.perform(delete(BASE + "/{alarmId}", alarm.getId())
+            mockMvc.perform(post(BASE + "/{alarmId}/delete/payment", alarm.getId())
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
@@ -622,7 +625,7 @@ class AlarmControllerIntegrationTest {
             String accessToken = jwtProvider.generateAccessToken(member.getId(), member.getRole(), "mock_device_id");
 
             // when & then
-            mockMvc.perform(delete(BASE + "/{alarmId}", alarm.getId())
+            mockMvc.perform(post(BASE + "/{alarmId}/delete/payment", alarm.getId())
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
@@ -639,7 +642,7 @@ class AlarmControllerIntegrationTest {
             String accessToken = jwtProvider.generateAccessToken(member.getId(), member.getRole(), "mock_device_id");
 
             // when & then
-            mockMvc.perform(delete(BASE + "/{alarmId}", alarm.getId())
+            mockMvc.perform(post(BASE + "/{alarmId}/delete/payment", alarm.getId())
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
@@ -658,7 +661,7 @@ class AlarmControllerIntegrationTest {
             String accessToken = jwtProvider.generateAccessToken(member.getId(), member.getRole(), "mock_device_id");
 
             // when & then
-            mockMvc.perform(delete(BASE + "/{alarmId}", alarm.getId())
+            mockMvc.perform(post(BASE + "/{alarmId}/delete/payment", alarm.getId())
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
@@ -684,7 +687,7 @@ class AlarmControllerIntegrationTest {
             given(paymentVerificationPort.verify(request.paymentId())).willReturn(false);
 
             // when & then
-            mockMvc.perform(delete(BASE + "/{alarmId}", alarm.getId())
+            mockMvc.perform(post(BASE + "/{alarmId}/delete/payment", alarm.getId())
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
@@ -693,6 +696,91 @@ class AlarmControllerIntegrationTest {
 
             assertThat(paymentRepository.existsByPaymentId(request.paymentId())).isTrue();
             assertThat(alarmDeleteLogRepository.findAll()).hasSize(1);
+        }
+    }
+
+    @Nested
+    @DisplayName("removeAlarmByAd - 광고 시청으로 알람 삭제")
+    class RemoveAlarmByAdTest {
+
+        @Test
+        @DisplayName("성공: 비활성화된 오늘 회차가 있으면 알람을 소프트 삭제한다")
+        void success_todayOccurrenceDeactivated() throws Exception {
+            // given
+            MemberEntity member = memberRepository.save(MemberFixture.MEMBER_8.toEntity());
+            AlarmEntity alarm = alarmRepository.save(AlarmFixture.ALARM_08.toEntity(member));
+            saveOccurrence(alarm, FIXED_NOW, OccurrenceStatus.CHECKIN);
+            AlarmDeleteByAdRequest request = new AlarmDeleteByAdRequest("device-uuid", "ad-proof-token-001");
+            String accessToken = buildAccessToken(member);
+
+            // when
+            mockMvc.perform(post(BASE + "/{alarmId}/delete/ad", alarm.getId())
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.alarmId").value(alarm.getId()))
+                .andExpect(jsonPath("$.result.alarmRevision").value(2));
+
+            // then
+            AlarmEntity deletedAlarm = alarmRepository.findById(alarm.getId()).orElseThrow();
+            assertThat(deletedAlarm.getStatus()).isEqualTo(AlarmStatus.DELETED);
+            assertThat(deletedAlarm.getDeletedAt()).isEqualTo(FIXED_NOW);
+            assertThat(deletedAlarm.getRevision()).isEqualTo(2);
+            assertThat(alarmDeleteLogRepository.findAll())
+                .anySatisfy(log -> {
+                    assertThat(log.getDeleteType()).isEqualTo(DeleteType.AD);
+                    assertThat(log.getAdProofToken()).isEqualTo(request.adProofToken());
+                });
+        }
+
+        @Test
+        @DisplayName("성공: 오늘 회차가 없으면 알람을 소프트 삭제한다")
+        void success() throws Exception {
+            // given
+            MemberEntity member = memberRepository.save(MemberFixture.MEMBER_9.toEntity());
+            AlarmEntity alarm = alarmRepository.save(AlarmFixture.ALARM_09.toEntity(member));
+            AlarmDeleteByAdRequest request = new AlarmDeleteByAdRequest("device-uuid", "ad-proof-token-002");
+            String accessToken = buildAccessToken(member);
+
+            // when
+            mockMvc.perform(post(BASE + "/{alarmId}/delete/ad", alarm.getId())
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.alarmId").value(alarm.getId()))
+                .andExpect(jsonPath("$.result.alarmRevision").value(2));
+
+            // then
+            AlarmEntity deletedAlarm = alarmRepository.findById(alarm.getId()).orElseThrow();
+            assertThat(deletedAlarm.getStatus()).isEqualTo(AlarmStatus.DELETED);
+            assertThat(deletedAlarm.getDeletedAt()).isEqualTo(FIXED_NOW);
+            assertThat(alarmDeleteLogRepository.findAll())
+                .anySatisfy(log -> {
+                    assertThat(log.getDeleteType()).isEqualTo(DeleteType.AD);
+                    assertThat(log.getAdProofToken()).isEqualTo(request.adProofToken());
+                });
+        }
+
+        @Test
+        @DisplayName("실패: 오늘 회차가 아직 비활성화되지 않았으면 400을 반환한다")
+        void fail_alarmDeleteNotAvailable() throws Exception {
+            // given
+            MemberEntity member = memberRepository.save(MemberFixture.MEMBER_10.toEntity());
+            AlarmEntity alarm = alarmRepository.save(AlarmFixture.ALARM_10.toEntity(member));
+            saveOccurrence(alarm, FIXED_NOW, OccurrenceStatus.RINGING);
+            AlarmDeleteByAdRequest request = new AlarmDeleteByAdRequest("device-uuid", "ad-proof-token");
+            String accessToken = buildAccessToken(member);
+
+            // when & then
+            mockMvc.perform(post(BASE + "/{alarmId}/delete/ad", alarm.getId())
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.isSuccess").value(false))
+                .andExpect(jsonPath("$.code").value(ALARM_DELETE_REQUIRES_PAYMENT.getCustomCode()));
         }
     }
 

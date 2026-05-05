@@ -17,14 +17,17 @@ import akuma.whiplash.common.fixture.MemberFixture;
 import akuma.whiplash.common.fixture.PaymentFixture;
 import akuma.whiplash.domains.alarm.application.event.AlarmCheckinCompletedEvent;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmCheckinRequest;
+import akuma.whiplash.domains.alarm.application.dto.request.AlarmDeleteByAdRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmDeleteByPaymentRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmPaymentRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmRegisterRequest;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmCheckinResponse;
+import akuma.whiplash.domains.alarm.application.dto.response.AlarmDeleteByAdResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmDeleteByPaymentResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmPaymentResponse;
 import akuma.whiplash.domains.alarm.application.service.AuditLogRecorder;
 import akuma.whiplash.domains.alarm.domain.constant.AlarmStatus;
+import akuma.whiplash.domains.alarm.domain.constant.DeleteType;
 import akuma.whiplash.domains.alarm.domain.constant.OccurrenceStatus;
 import akuma.whiplash.domains.alarm.domain.constant.Weekday;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmEntity;
@@ -650,6 +653,131 @@ class AlarmCommandServiceTest {
                 .contains("platform=ANDROID")
                 .contains("paymentId=" + request.paymentId())
                 .contains("reason=verification returned false");
+        }
+    }
+
+    @Nested
+    @DisplayName("removeAlarmByAd - 광고 시청으로 알람 삭제")
+    class RemoveAlarmByAdTest {
+
+        @Test
+        @DisplayName("성공: 오늘 회차가 비활성화되어 있으면 광고 시청으로 알람을 삭제한다")
+        void success_todayOccurrenceDeactivated() {
+            // given
+            MemberEntity member = MemberFixture.MEMBER_8.toMockEntity();
+            AlarmEntity alarm = AlarmFixture.ALARM_08.toMockEntity(member);
+            AlarmOccurrenceEntity occurrence = AlarmOccurrenceFixture.ALARM_OCCURRENCE_02
+                .toMockEntity(alarm, 1501L, FIXED_NOW, OccurrenceStatus.CHECKIN);
+            AlarmDeleteByAdRequest request = new AlarmDeleteByAdRequest("device-uuid", "ad-proof-token-001");
+
+            given(alarmRepository.findById(alarm.getId())).willReturn(Optional.of(alarm));
+            given(alarmOccurrenceRepository.findByAlarmIdAndDate(alarm.getId(), FIXED_NOW.toLocalDate()))
+                .willReturn(Optional.of(occurrence));
+
+            // when
+            AlarmDeleteByAdResponse response = alarmCommandService.removeAlarmByAd(member.getId(), alarm.getId(), request);
+
+            // then
+            assertThat(response.alarmId()).isEqualTo(alarm.getId());
+            assertThat(response.alarmRevision()).isEqualTo(2);
+            assertThat(alarm.getStatus()).isEqualTo(AlarmStatus.DELETED);
+            assertThat(alarm.getDeletedAt()).isEqualTo(FIXED_NOW);
+
+            ArgumentCaptor<AlarmDeleteLogEntity> logCaptor = ArgumentCaptor.forClass(AlarmDeleteLogEntity.class);
+            verify(alarmDeleteLogRepository).save(logCaptor.capture());
+            assertThat(logCaptor.getValue().getDeleteType()).isEqualTo(DeleteType.AD);
+            assertThat(logCaptor.getValue().getAdProofToken()).isEqualTo(request.adProofToken());
+            verify(ringingAlarmRedisRepository).remove(alarm.getId(), member.getId());
+        }
+
+        @Test
+        @DisplayName("성공: 오늘 회차가 없으면 광고 시청으로 알람을 삭제한다")
+        void success() {
+            // given
+            MemberEntity member = MemberFixture.MEMBER_8.toMockEntity();
+            AlarmEntity alarm = AlarmFixture.ALARM_08.toMockEntity(member);
+            AlarmDeleteByAdRequest request = new AlarmDeleteByAdRequest("device-uuid", "ad-proof-token-002");
+
+            given(alarmRepository.findById(alarm.getId())).willReturn(Optional.of(alarm));
+            given(alarmOccurrenceRepository.findByAlarmIdAndDate(alarm.getId(), FIXED_NOW.toLocalDate()))
+                .willReturn(Optional.empty());
+
+            // when
+            AlarmDeleteByAdResponse response = alarmCommandService.removeAlarmByAd(member.getId(), alarm.getId(), request);
+
+            // then
+            assertThat(response.alarmId()).isEqualTo(alarm.getId());
+            assertThat(response.alarmRevision()).isEqualTo(2);
+            assertThat(alarm.getStatus()).isEqualTo(AlarmStatus.DELETED);
+            assertThat(alarm.getDeletedAt()).isEqualTo(FIXED_NOW);
+            verify(alarmDeleteLogRepository).save(any(AlarmDeleteLogEntity.class));
+            verify(ringingAlarmRedisRepository).remove(alarm.getId(), member.getId());
+        }
+
+        @Test
+        @DisplayName("실패: 알람이 존재하지 않으면 예외를 던진다")
+        void fail_alarmNotFound() {
+            // given
+            given(alarmRepository.findById(1L)).willReturn(Optional.empty());
+            AlarmDeleteByAdRequest request = new AlarmDeleteByAdRequest("device-uuid", "ad-proof-token");
+
+            // when & then
+            assertThatThrownBy(() -> alarmCommandService.removeAlarmByAd(1L, 1L, request))
+                .isInstanceOf(ApplicationException.class);
+        }
+
+        @Test
+        @DisplayName("실패: 소유자가 아니면 예외를 던진다")
+        void fail_permissionDenied() {
+            // given
+            MemberEntity owner = MemberFixture.MEMBER_9.toMockEntity();
+            AlarmEntity alarm = AlarmFixture.ALARM_09.toMockEntity(owner);
+            AlarmDeleteByAdRequest request = new AlarmDeleteByAdRequest("device-uuid", "ad-proof-token");
+            given(alarmRepository.findById(alarm.getId())).willReturn(Optional.of(alarm));
+
+            // when & then
+            assertThatThrownBy(() -> alarmCommandService.removeAlarmByAd(MemberFixture.MEMBER_10.getId(), alarm.getId(), request))
+                .isInstanceOf(ApplicationException.class);
+        }
+
+        @Test
+        @DisplayName("실패: 오늘 회차가 SCHEDULED이면 결제 삭제를 사용해야 한다")
+        void fail_occurrenceScheduled() {
+            // given
+            MemberEntity member = MemberFixture.MEMBER_8.toMockEntity();
+            AlarmEntity alarm = AlarmFixture.ALARM_08.toMockEntity(member);
+            AlarmOccurrenceEntity occurrence = AlarmOccurrenceFixture.ALARM_OCCURRENCE_02
+                .toMockEntity(alarm, 1502L, FIXED_NOW, OccurrenceStatus.SCHEDULED);
+            AlarmDeleteByAdRequest request = new AlarmDeleteByAdRequest("device-uuid", "ad-proof-token");
+
+            given(alarmRepository.findById(alarm.getId())).willReturn(Optional.of(alarm));
+            given(alarmOccurrenceRepository.findByAlarmIdAndDate(alarm.getId(), FIXED_NOW.toLocalDate()))
+                .willReturn(Optional.of(occurrence));
+
+            // when & then
+            assertThatThrownBy(() -> alarmCommandService.removeAlarmByAd(member.getId(), alarm.getId(), request))
+                .isInstanceOf(ApplicationException.class)
+                .hasMessage("결제 삭제가 필요한 알람입니다.");
+        }
+
+        @Test
+        @DisplayName("실패: 오늘 회차가 RINGING이면 결제 삭제를 사용해야 한다")
+        void fail_occurrenceRinging() {
+            // given
+            MemberEntity member = MemberFixture.MEMBER_8.toMockEntity();
+            AlarmEntity alarm = AlarmFixture.ALARM_08.toMockEntity(member);
+            AlarmOccurrenceEntity occurrence = AlarmOccurrenceFixture.ALARM_OCCURRENCE_02
+                .toMockEntity(alarm, 1503L, FIXED_NOW, OccurrenceStatus.RINGING);
+            AlarmDeleteByAdRequest request = new AlarmDeleteByAdRequest("device-uuid", "ad-proof-token");
+
+            given(alarmRepository.findById(alarm.getId())).willReturn(Optional.of(alarm));
+            given(alarmOccurrenceRepository.findByAlarmIdAndDate(alarm.getId(), FIXED_NOW.toLocalDate()))
+                .willReturn(Optional.of(occurrence));
+
+            // when & then
+            assertThatThrownBy(() -> alarmCommandService.removeAlarmByAd(member.getId(), alarm.getId(), request))
+                .isInstanceOf(ApplicationException.class)
+                .hasMessage("결제 삭제가 필요한 알람입니다.");
         }
     }
 

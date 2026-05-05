@@ -285,7 +285,7 @@ class AlarmControllerTest {
     }
 
     @Nested
-    @DisplayName("[POST] /api/v1/alarms/{alarmId}/checkin - 도착 인증")
+    @DisplayName("[POST] /api/v1/alarms/{alarmId}/off/checkin - 도착 인증")
     class CheckinTest {
 
         @Test
@@ -296,7 +296,7 @@ class AlarmControllerTest {
             AlarmCheckinRequest request = buildCheckinRequest();
 
             // when & then
-            mockMvc.perform(post(BASE + "/{alarmId}/checkin", 1L)
+            mockMvc.perform(post(BASE + "/{alarmId}/off/checkin", 1L)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk());
@@ -316,7 +316,7 @@ class AlarmControllerTest {
             AlarmCheckinRequest request = buildCheckinRequest();
 
             // when & then
-            mockMvc.perform(post(BASE + "/{alarmId}/checkin", 1L)
+            mockMvc.perform(post(BASE + "/{alarmId}/off/checkin", 1L)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isNotFound());
@@ -333,7 +333,7 @@ class AlarmControllerTest {
             AlarmCheckinRequest request = buildCheckinRequest();
 
             // when & then
-            mockMvc.perform(post(BASE + "/{alarmId}/checkin", 1L)
+            mockMvc.perform(post(BASE + "/{alarmId}/off/checkin", 1L)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isForbidden());
@@ -350,7 +350,7 @@ class AlarmControllerTest {
             AlarmCheckinRequest request = buildCheckinRequest();
 
             // when & then
-            mockMvc.perform(post(BASE + "/{alarmId}/checkin", 1L)
+            mockMvc.perform(post(BASE + "/{alarmId}/off/checkin", 1L)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest());
@@ -367,7 +367,7 @@ class AlarmControllerTest {
             AlarmCheckinRequest request = buildCheckinRequest();
 
             // when & then
-            mockMvc.perform(post(BASE + "/{alarmId}/checkin", 1L)
+            mockMvc.perform(post(BASE + "/{alarmId}/off/checkin", 1L)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest());
@@ -384,7 +384,7 @@ class AlarmControllerTest {
             AlarmCheckinRequest request = buildCheckinRequest();
 
             // when & then
-            mockMvc.perform(post(BASE + "/{alarmId}/checkin", 1L)
+            mockMvc.perform(post(BASE + "/{alarmId}/off/checkin", 1L)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest());
@@ -392,7 +392,7 @@ class AlarmControllerTest {
     }
 
     @Nested
-    @DisplayName("[DELETE] /api/v1/alarms/{alarmId} - 결제로 알람 삭제")
+    @DisplayName("[POST] /api/v1/alarms/{alarmId}/delete/payment - 결제로 알람 삭제")
     class RemoveAlarmByPaymentTest {
 
         @Test
@@ -409,7 +409,7 @@ class AlarmControllerTest {
                 .thenReturn(response);
 
             // when & then
-            mockMvc.perform(delete(BASE + "/{alarmId}", 1L)
+            mockMvc.perform(post(BASE + "/{alarmId}/delete/payment", 1L)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
@@ -429,7 +429,7 @@ class AlarmControllerTest {
                 .thenThrow(ApplicationException.from(AlarmErrorCode.ALARM_NOT_FOUND));
 
             // when & then
-            mockMvc.perform(delete(BASE + "/{alarmId}", 1L)
+            mockMvc.perform(post(BASE + "/{alarmId}/delete/payment", 1L)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isNotFound());
@@ -445,7 +445,7 @@ class AlarmControllerTest {
                 .thenThrow(ApplicationException.from(AuthErrorCode.PERMISSION_DENIED));
 
             // when & then
-            mockMvc.perform(delete(BASE + "/{alarmId}", 1L)
+            mockMvc.perform(post(BASE + "/{alarmId}/delete/payment", 1L)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isForbidden());
@@ -459,7 +459,7 @@ class AlarmControllerTest {
             setSecurityContext(buildContext(MEMBER_8));
 
             // when & then
-            mockMvc.perform(delete(BASE + "/{alarmId}", 1L)
+            mockMvc.perform(post(BASE + "/{alarmId}/delete/payment", 1L)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest());
@@ -475,7 +475,7 @@ class AlarmControllerTest {
                 .thenThrow(ApplicationException.from(PaymentErrorCode.PAYMENT_VERIFICATION_FAILED));
 
             // when & then
-            mockMvc.perform(delete(BASE + "/{alarmId}", 1L)
+            mockMvc.perform(post(BASE + "/{alarmId}/delete/payment", 1L)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest());
