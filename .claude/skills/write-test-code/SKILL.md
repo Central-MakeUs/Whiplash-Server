@@ -54,6 +54,26 @@ AlarmOccurrenceEntity occurrence =
 `local` 프로파일 → `MockFcmService(@Primary)` 자동 등록, FCM 실제 호출 없음
 `INVALID_` prefix 토큰 → 실패 처리
 
+## 에러 응답 검증 규칙
+
+- 컨트롤러/통합 테스트에서 에러 응답은 `status`, `isSuccess`, `code` 중심으로 검증한다.
+- 에러 메시지(`message`)는 사용자 노출 문구라 변경 가능성이 높으므로 String literal로 직접 검증하지 않는다.
+- 메시지 검증이 꼭 필요하면 직접 문자열 대신 ErrorCode enum의 `getMessage()`를 사용한다.
+- 에러 코드도 직접 문자열보다 ErrorCode enum의 `getCustomCode()`를 우선 사용한다.
+
+```java
+// ✅ 권장
+.andExpect(status().isBadRequest())
+.andExpect(jsonPath("$.isSuccess").value(false))
+.andExpect(jsonPath("$.code").value(ALARM_DELETE_REQUIRES_PAYMENT.getCustomCode()));
+
+// ⚠️ 메시지까지 계약으로 보장해야 하는 경우에만 사용
+.andExpect(jsonPath("$.message").value(ALARM_DELETE_REQUIRES_PAYMENT.getMessage()));
+
+// ❌ 지양: 문구 변경만으로 테스트가 깨짐
+.andExpect(jsonPath("$.message").value("결제 삭제가 필요한 알람입니다."));
+```
+
 ## 체크리스트
 - [ ] 어노테이션 목적에 맞는가?
 - [ ] `@Nested` inner class가 메서드마다 있는가?
@@ -62,3 +82,4 @@ AlarmOccurrenceEntity occurrence =
 - [ ] `// given` / `// when` / `// then` 있는가?
 - [ ] 서비스→`toMockEntity()`, Persistence→`toEntity()` 구분했는가?
 - [ ] 테스트 내부 생성 헬퍼 대신 Fixture 메서드를 사용했는가?
+- [ ] 에러 응답 검증에서 메시지 String literal 대신 ErrorCode enum 또는 code 중심 검증을 사용했는가?

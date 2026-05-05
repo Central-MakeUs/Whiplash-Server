@@ -52,6 +52,12 @@ tools: Read, Grep, Glob
 - [ ] Fixture만으로 표현이 어려운 케이스는 테스트 안에서 빌더를 만들지 말고 `AlarmOccurrenceFixture.toEntity(...)` 같은 오버로드를 Fixture에 추가했는가?
 - [ ] 테스트 본문에서는 `AlarmFixture.ALARM_01.toEntity(...)`, `AlarmOccurrenceFixture.ALARM_OCCURRENCE_01.toEntity(...)`처럼 Fixture 호출 형태를 우선 사용했는가?
 
+### 에러 응답 검증
+- [ ] 컨트롤러/통합 테스트에서 에러 응답은 `status`, `isSuccess`, `code` 중심으로 검증했는가?
+- [ ] 에러 코드 검증 시 직접 문자열보다 ErrorCode enum의 `getCustomCode()`를 사용했는가?
+- [ ] 에러 메시지(`message`)를 String literal로 직접 검증하고 있지 않은가?
+- [ ] 메시지까지 API 계약으로 보장해야 하는 경우에만 ErrorCode enum의 `getMessage()`로 검증했는가?
+
 ---
 
 ## 위반 예시 → 수정 예시
@@ -75,4 +81,19 @@ class AlarmOffTest {
     @DisplayName("실패: 주간 OFF 한도를 초과하면 예외를 던진다")
     void fail_weeklyLimitExceeded() { ... }
 }
+```
+
+```java
+// ❌ 위반: 사용자 노출 문구를 String literal로 직접 검증
+.andExpect(status().isBadRequest())
+.andExpect(jsonPath("$.code").value("ALARM_007"))
+.andExpect(jsonPath("$.message").value("결제 삭제가 필요한 알람입니다."));
+
+// ✅ 수정: 에러 코드는 enum 기반으로 검증하고, 메시지는 기본적으로 검증하지 않음
+.andExpect(status().isBadRequest())
+.andExpect(jsonPath("$.isSuccess").value(false))
+.andExpect(jsonPath("$.code").value(ALARM_DELETE_REQUIRES_PAYMENT.getCustomCode()));
+
+// ✅ 메시지가 계약인 경우에만 enum 기반으로 검증
+.andExpect(jsonPath("$.message").value(ALARM_DELETE_REQUIRES_PAYMENT.getMessage()));
 ```
