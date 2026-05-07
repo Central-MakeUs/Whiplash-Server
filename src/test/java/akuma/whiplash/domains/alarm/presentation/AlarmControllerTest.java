@@ -413,7 +413,8 @@ class AlarmControllerTest {
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.result.alarmId").value(1L));
+                .andExpect(jsonPath("$.result.alarmId").value(1L))
+                .andExpect(jsonPath("$.result.deletedAt").value("2026-05-02T14:30:00"));
 
             verify(alarmUseCase, times(1))
                 .removeAlarmByPayment(eq(MEMBER_5.getId()), eq(1L), any(AlarmDeleteByPaymentRequest.class));

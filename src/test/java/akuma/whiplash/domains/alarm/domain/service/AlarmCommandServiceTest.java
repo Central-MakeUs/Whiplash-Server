@@ -384,7 +384,7 @@ class AlarmCommandServiceTest {
             assertThat(response.alarmId()).isEqualTo(alarm.getId());
             assertThat(response.deactivatedAt()).isEqualTo(FIXED_NOW);
             assertThat(response.nextOccurrence().occurrenceId()).isEqualTo(nextOccurrence.getId());
-            verify(paymentRepository).save(any(PaymentEntity.class));
+            verify(paymentRepository).saveAndFlush(any(PaymentEntity.class));
             verify(alarmDeactivationLogRepository).save(any(AlarmDeactivationLogEntity.class));
             verify(ringingAlarmRedisRepository).remove(alarm.getId(), member.getId());
             verify(paymentVerificationPort).consume(request.paymentId());
@@ -518,7 +518,7 @@ class AlarmCommandServiceTest {
             assertThat(response.deletedAt()).isEqualTo(FIXED_NOW);
             assertThat(alarm.getStatus()).isEqualTo(AlarmStatus.DELETED);
             assertThat(alarm.getDeletedAt()).isEqualTo(FIXED_NOW);
-            verify(paymentRepository).save(any(PaymentEntity.class));
+            verify(paymentRepository).saveAndFlush(any(PaymentEntity.class));
             verify(alarmDeleteLogRepository).save(any(AlarmDeleteLogEntity.class));
             verify(ringingAlarmRedisRepository).remove(alarm.getId(), member.getId());
             verify(paymentVerificationPort).consume(request.paymentId());

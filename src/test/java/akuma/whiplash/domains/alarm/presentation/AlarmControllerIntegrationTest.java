@@ -30,6 +30,7 @@ import akuma.whiplash.domains.alarm.persistence.entity.AlarmEntity;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmOccurrenceEntity;
 import akuma.whiplash.domains.alarm.persistence.repository.AlarmDeactivationLogRepository;
 import akuma.whiplash.domains.alarm.persistence.repository.AlarmDeleteLogRepository;
+import akuma.whiplash.domains.alarm.persistence.repository.AlarmRingingLogRepository;
 import akuma.whiplash.domains.alarm.persistence.repository.AlarmOccurrenceRepository;
 import akuma.whiplash.domains.alarm.persistence.repository.AlarmRepository;
 import akuma.whiplash.domains.member.persistence.entity.MemberEntity;
@@ -45,6 +46,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -70,6 +72,7 @@ class AlarmControllerIntegrationTest {
     @Autowired private MemberDeviceRepository memberDeviceRepository;
     @Autowired private AlarmRepository alarmRepository;
     @Autowired private AlarmOccurrenceRepository alarmOccurrenceRepository;
+    @Autowired private AlarmRingingLogRepository alarmRingingLogRepository;
     @Autowired private AlarmDeactivationLogRepository alarmDeactivationLogRepository;
     @Autowired private AlarmDeleteLogRepository alarmDeleteLogRepository;
     @Autowired private PaymentRepository paymentRepository;
@@ -78,6 +81,18 @@ class AlarmControllerIntegrationTest {
 
     private static final String BASE = "/api/v1/alarms";
     private static final LocalDateTime FIXED_NOW = LocalDateTime.of(2026, 5, 4, 11, 0);
+
+    @AfterEach
+    void cleanupCommittedData() {
+        alarmDeleteLogRepository.deleteAll();
+        alarmDeactivationLogRepository.deleteAll();
+        paymentRepository.deleteAll();
+        alarmRingingLogRepository.deleteAll();
+        alarmOccurrenceRepository.deleteAll();
+        memberDeviceRepository.deleteAll();
+        alarmRepository.deleteAll();
+        memberRepository.deleteAll();
+    }
 
     @BeforeEach
     void setUpTimeProvider() {
