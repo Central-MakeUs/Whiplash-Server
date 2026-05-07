@@ -5,7 +5,7 @@ description: 이 저장소에서 ErrorCode enum을 추가/수정하거나, 예�
 
 # Handle Exception
 
-루트 [AGENTS.md](/Users/user/dev/cmc/nuntteo/code/Whiplash-Server/AGENTS.md) 규칙을 전제로 사용한다.
+루트 [AGENTS.md](../../../AGENTS.md) 규칙을 전제로 사용한다.
 
 ## ErrorCode 포맷
 
@@ -47,11 +47,11 @@ alarmRepository.findById(id)
 
 ## 주요 파일 위치
 
-- Alarm: [AlarmErrorCode.java](/Users/user/dev/cmc/nuntteo/code/Whiplash-Server/src/main/java/akuma/whiplash/domains/alarm/exception/AlarmErrorCode.java)
-- Auth: [AuthErrorCode.java](/Users/user/dev/cmc/nuntteo/code/Whiplash-Server/src/main/java/akuma/whiplash/domains/auth/exception/AuthErrorCode.java)
-- Member: [MemberErrorCode.java](/Users/user/dev/cmc/nuntteo/code/Whiplash-Server/src/main/java/akuma/whiplash/domains/member/exception/MemberErrorCode.java)
-- Common: [CommonErrorCode.java](/Users/user/dev/cmc/nuntteo/code/Whiplash-Server/src/main/java/akuma/whiplash/global/response/code/CommonErrorCode.java)
-- Swagger annotation: [CustomErrorCodes.java](/Users/user/dev/cmc/nuntteo/code/Whiplash-Server/src/main/java/akuma/whiplash/global/annotation/swagger/CustomErrorCodes.java)
+- Alarm: [AlarmErrorCode.java](../../../src/main/java/akuma/whiplash/domains/alarm/exception/AlarmErrorCode.java)
+- Auth: [AuthErrorCode.java](../../../src/main/java/akuma/whiplash/domains/auth/exception/AuthErrorCode.java)
+- Member: [MemberErrorCode.java](../../../src/main/java/akuma/whiplash/domains/member/exception/MemberErrorCode.java)
+- Common: [CommonErrorCode.java](../../../src/main/java/akuma/whiplash/global/response/code/CommonErrorCode.java)
+- Swagger annotation: [CustomErrorCodes.java](../../../src/main/java/akuma/whiplash/global/annotation/swagger/CustomErrorCodes.java)
 
 ## 체크리스트
 

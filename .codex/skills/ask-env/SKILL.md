@@ -5,7 +5,7 @@ description: 이 저장소에서 프로젝트 실행 방법, Spring profile 선�
 
 # Ask Env
 
-루트 [AGENTS.md](/Users/user/dev/cmc/nuntteo/code/Whiplash-Server/AGENTS.md) 규칙을 전제로 사용한다.
+루트 [AGENTS.md](../../../AGENTS.md) 규칙을 전제로 사용한다.
 
 ## 자주 쓰는 커맨드
 
@@ -34,7 +34,7 @@ docker-compose up -d
 | MySQL 8 | 메인 관계형 DB |
 | Redis 7.2 | 토큰 캐시 및 알람 관련 임시 상태 저장 |
 | Firebase FCM | 푸시 알림 |
-| Google Sheets | 알람 삭제 로그 연동 |
+| AuditLogRecorder | 알람 삭제 실패 감사 로그 저장(AlarmDeleteLogEntity) |
 | Naver API | 장소 검색 / 역지오코딩 |
 | Sentry | 에러 추적 |
 
@@ -46,9 +46,9 @@ docker-compose up -d
 
 ## 관련 코드 위치
 
-- Redis integration: [src/main/java/akuma/whiplash/infrastructure/redis](/Users/user/dev/cmc/nuntteo/code/Whiplash-Server/src/main/java/akuma/whiplash/infrastructure/redis)
-- Firebase integration: [src/main/java/akuma/whiplash/infrastructure/firebase](/Users/user/dev/cmc/nuntteo/code/Whiplash-Server/src/main/java/akuma/whiplash/infrastructure/firebase)
-- Place integration: [src/main/java/akuma/whiplash/domains/place](/Users/user/dev/cmc/nuntteo/code/Whiplash-Server/src/main/java/akuma/whiplash/domains/place)
+- Redis integration: [src/main/java/akuma/whiplash/infrastructure/redis](../../../src/main/java/akuma/whiplash/infrastructure/redis)
+- Firebase integration: [src/main/java/akuma/whiplash/infrastructure/firebase](../../../src/main/java/akuma/whiplash/infrastructure/firebase)
+- Place integration: [src/main/java/akuma/whiplash/domains/place](../../../src/main/java/akuma/whiplash/domains/place)
 
 ## 응답 가이드
 

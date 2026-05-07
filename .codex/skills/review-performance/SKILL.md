@@ -5,7 +5,7 @@ description: 이 저장소에서 성능, 메모리, N+1, 트랜잭션 범위, Re
 
 # Review Performance
 
-루트 [AGENTS.md](/Users/user/dev/cmc/nuntteo/code/Whiplash-Server/AGENTS.md) 규칙을 전제로 사용한다.
+루트 [AGENTS.md](../../../AGENTS.md) 규칙을 전제로 사용한다.
 
 Java 17, Spring Boot 3.5, JPA, Redis 기준으로 리뷰한다.
 

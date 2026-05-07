@@ -5,7 +5,7 @@ description: 이 저장소에서 아키텍처, 레이어 의존, 메서드 네�
 
 # Review Architecture
 
-루트 [AGENTS.md](/Users/user/dev/cmc/nuntteo/code/Whiplash-Server/AGENTS.md) 규칙을 전제로 사용한다.
+루트 [AGENTS.md](../../../AGENTS.md) 규칙을 전제로 사용한다.
 
 ## 리뷰 목적
 

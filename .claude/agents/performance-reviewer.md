@@ -38,7 +38,7 @@ Java 17 + Spring Boot 3.5 + JPA + Redis 환경 기준으로 리뷰합니다.
 - 불필요한 `Optional` 중첩이 있는가?
 
 **Whiplash 특이사항**
-- `AlarmCommandServiceImpl.logDeleteReason()`: Google Sheets 클라이언트를 매 호출마다 생성 → 캐싱 고려
+- 알람 삭제 실패 감사 로그는 `AuditLogRecorder`가 DB에 저장한다. 실패 로그 저장이 트랜잭션 범위를 불필요하게 늘리지 않는지 확인
 - `NicknameGenerator`: `new Random()` 을 매 호출마다 생성 → static 필드로 이동 권장
 
 ---
@@ -55,13 +55,13 @@ Java 17 + Spring Boot 3.5 + JPA + Redis 환경 기준으로 리뷰합니다.
 ## 4. 트랜잭션 범위
 
 **확인 항목**
-- 트랜잭션 안에서 외부 API(FCM, Google Sheets, Naver)를 호출하는가?
+- 트랜잭션 안에서 외부 API(FCM, 결제 consume, Naver)를 호출하는가?
   → 외부 호출은 트랜잭션 밖으로 분리 권장
 - 긴 트랜잭션 안에서 불필요한 조회가 포함되는가?
 - `@Transactional(readOnly = true)` 여야 하는데 쓰기 트랜잭션으로 열리는가?
 
 **특이사항**
-- `AlarmCommandServiceImpl.removeAlarm()`: Google Sheets 호출이 트랜잭션 내부에 있음 → 외부 호출 실패 시 DB 롤백 연동 여부 확인
+- 결제 `consume()` 같은 비가역 외부 호출은 DB 커밋 이후 실행되는지 확인
 
 ---
 

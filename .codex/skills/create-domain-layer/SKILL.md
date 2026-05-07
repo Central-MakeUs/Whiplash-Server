@@ -5,7 +5,7 @@ description: 이 저장소에서 새 도메인을 만들거나, 기존 도메인
 
 # Create Domain Layer
 
-루트 [AGENTS.md](/Users/user/dev/cmc/nuntteo/code/Whiplash-Server/AGENTS.md) 규칙을 전제로 사용한다.
+루트 [AGENTS.md](../../../AGENTS.md) 규칙을 전제로 사용한다.
 
 ## 권장 패키지 구조
 
@@ -87,12 +87,12 @@ Optional<MemberDeviceEntity> findByMember_IdAndDeviceId(Long memberId, String de
 
 ## 저장소 내 참고 파일
 
-- Entity example: [AlarmEntity.java](/Users/user/dev/cmc/nuntteo/code/Whiplash-Server/src/main/java/akuma/whiplash/domains/alarm/persistence/entity/AlarmEntity.java)
-- Command service example: [AlarmCommandServiceImpl.java](/Users/user/dev/cmc/nuntteo/code/Whiplash-Server/src/main/java/akuma/whiplash/domains/alarm/domain/service/AlarmCommandServiceImpl.java)
-- Query service example: [AlarmQueryServiceImpl.java](/Users/user/dev/cmc/nuntteo/code/Whiplash-Server/src/main/java/akuma/whiplash/domains/alarm/domain/service/AlarmQueryServiceImpl.java)
-- Use case example: [AlarmUseCase.java](/Users/user/dev/cmc/nuntteo/code/Whiplash-Server/src/main/java/akuma/whiplash/domains/alarm/application/usecase/AlarmUseCase.java)
-- Controller example: [AlarmController.java](/Users/user/dev/cmc/nuntteo/code/Whiplash-Server/src/main/java/akuma/whiplash/domains/alarm/presentation/AlarmController.java)
-- ErrorCode example: [AlarmErrorCode.java](/Users/user/dev/cmc/nuntteo/code/Whiplash-Server/src/main/java/akuma/whiplash/domains/alarm/exception/AlarmErrorCode.java)
+- Entity example: [AlarmEntity.java](../../../src/main/java/akuma/whiplash/domains/alarm/persistence/entity/AlarmEntity.java)
+- Command service example: [AlarmCommandServiceImpl.java](../../../src/main/java/akuma/whiplash/domains/alarm/domain/service/AlarmCommandServiceImpl.java)
+- Query service example: [AlarmQueryServiceImpl.java](../../../src/main/java/akuma/whiplash/domains/alarm/domain/service/AlarmQueryServiceImpl.java)
+- Use case example: [AlarmUseCase.java](../../../src/main/java/akuma/whiplash/domains/alarm/application/usecase/AlarmUseCase.java)
+- Controller example: [AlarmController.java](../../../src/main/java/akuma/whiplash/domains/alarm/presentation/AlarmController.java)
+- ErrorCode example: [AlarmErrorCode.java](../../../src/main/java/akuma/whiplash/domains/alarm/exception/AlarmErrorCode.java)
 
 ## 마무리 전 체크
 

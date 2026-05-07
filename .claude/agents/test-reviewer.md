@@ -53,6 +53,7 @@ tools: Read, Grep, Glob
 - [ ] 테스트 본문에서는 `AlarmFixture.ALARM_01.toEntity(...)`, `AlarmOccurrenceFixture.ALARM_OCCURRENCE_01.toEntity(...)`처럼 Fixture 호출 형태를 우선 사용했는가?
 
 ### 에러 응답 검증
+
 - [ ] 컨트롤러/통합 테스트에서 에러 응답은 `status`, `isSuccess`, `code` 중심으로 검증했는가?
 - [ ] 에러 코드 검증 시 직접 문자열보다 ErrorCode enum의 `getCustomCode()`를 사용했는가?
 - [ ] 에러 메시지(`message`)를 String literal로 직접 검증하고 있지 않은가?

@@ -5,7 +5,7 @@ description: 이 저장소에서 controller, service, repository, Redis, integra
 
 # Write Test Code
 
-루트 [AGENTS.md](/Users/user/dev/cmc/nuntteo/code/Whiplash-Server/AGENTS.md) 규칙을 전제로 사용한다.
+루트 [AGENTS.md](../../../AGENTS.md) 규칙을 전제로 사용한다.
 
 ## 테스트 어노테이션 선택
 
@@ -65,11 +65,11 @@ description: 이 저장소에서 controller, service, repository, Redis, integra
 
 사용 가능한 fixture:
 
-- [MemberFixture.java](/Users/user/dev/cmc/nuntteo/code/Whiplash-Server/src/test/java/akuma/whiplash/common/fixture/MemberFixture.java)
-- [MemberDeviceFixture.java](/Users/user/dev/cmc/nuntteo/code/Whiplash-Server/src/test/java/akuma/whiplash/common/fixture/MemberDeviceFixture.java)
-- [AlarmFixture.java](/Users/user/dev/cmc/nuntteo/code/Whiplash-Server/src/test/java/akuma/whiplash/common/fixture/AlarmFixture.java)
-- [AlarmOccurrenceFixture.java](/Users/user/dev/cmc/nuntteo/code/Whiplash-Server/src/test/java/akuma/whiplash/common/fixture/AlarmOccurrenceFixture.java)
-- [PaymentFixture.java](/Users/user/dev/cmc/nuntteo/code/Whiplash-Server/src/test/java/akuma/whiplash/common/fixture/PaymentFixture.java)
+- [MemberFixture.java](../../../src/test/java/akuma/whiplash/common/fixture/MemberFixture.java)
+- [MemberDeviceFixture.java](../../../src/test/java/akuma/whiplash/common/fixture/MemberDeviceFixture.java)
+- [AlarmFixture.java](../../../src/test/java/akuma/whiplash/common/fixture/AlarmFixture.java)
+- [AlarmOccurrenceFixture.java](../../../src/test/java/akuma/whiplash/common/fixture/AlarmOccurrenceFixture.java)
+- [PaymentFixture.java](../../../src/test/java/akuma/whiplash/common/fixture/PaymentFixture.java)
 
 ## FCM 관련 메모
 
@@ -78,9 +78,9 @@ description: 이 저장소에서 controller, service, repository, Redis, integra
 
 ## 저장소 내 참고 테스트
 
-- Controller test: [AlarmControllerTest.java](/Users/user/dev/cmc/nuntteo/code/Whiplash-Server/src/test/java/akuma/whiplash/domains/alarm/presentation/AlarmControllerTest.java)
-- Integration test: [AlarmControllerIntegrationTest.java](/Users/user/dev/cmc/nuntteo/code/Whiplash-Server/src/test/java/akuma/whiplash/domains/alarm/presentation/AlarmControllerIntegrationTest.java)
-- Repository test: [AlarmRepositoryTest.java](/Users/user/dev/cmc/nuntteo/code/Whiplash-Server/src/test/java/akuma/whiplash/domains/alarm/persistence/repository/AlarmRepositoryTest.java)
+- Controller test: [AlarmControllerTest.java](../../../src/test/java/akuma/whiplash/domains/alarm/presentation/AlarmControllerTest.java)
+- Integration test: [AlarmControllerIntegrationTest.java](../../../src/test/java/akuma/whiplash/domains/alarm/presentation/AlarmControllerIntegrationTest.java)
+- Repository test: [AlarmRepositoryTest.java](../../../src/test/java/akuma/whiplash/domains/alarm/persistence/repository/AlarmRepositoryTest.java)
 
 ## 마무리 전 체크
 

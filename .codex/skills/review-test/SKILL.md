@@ -5,7 +5,7 @@ description: 이 저장소에서 작성된 테스트 코드가 프로젝트 컨�
 
 # Review Test
 
-루트 [AGENTS.md](/Users/user/dev/cmc/nuntteo/code/Whiplash-Server/AGENTS.md)와 `write-test-code` 규칙을 전제로 사용한다.
+루트 [AGENTS.md](../../../AGENTS.md)와 `write-test-code` 규칙을 전제로 사용한다.
 
 ## 리뷰 목적
 

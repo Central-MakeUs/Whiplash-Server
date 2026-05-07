@@ -5,7 +5,7 @@ description: 이 저장소에서 변경 내용을 바탕으로 프로젝트 커�
 
 # Commit Helper
 
-루트 [AGENTS.md](/Users/user/dev/cmc/nuntteo/code/Whiplash-Server/AGENTS.md) 규칙을 전제로 사용한다.
+루트 [AGENTS.md](../../../AGENTS.md) 규칙을 전제로 사용한다.
 
 ## 목적
 
