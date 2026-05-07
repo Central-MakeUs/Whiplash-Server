@@ -35,7 +35,7 @@ public class AuditLogRecorder {
         LocalDateTime processedAt,
         String failReason
     ) {
-        paymentRepository.save(PaymentMapper.mapToPaymentEntity(
+        paymentRepository.saveAndFlush(PaymentMapper.mapToPaymentEntity(
             member,
             alarm,
             paymentId,
@@ -63,7 +63,7 @@ public class AuditLogRecorder {
         LocalDateTime processedAt,
         String failReason
     ) {
-        paymentRepository.save(PaymentMapper.mapToPaymentEntity(
+        paymentRepository.saveAndFlush(PaymentMapper.mapToPaymentEntity(
             member,
             alarm,
             paymentId,
@@ -71,12 +71,11 @@ public class AuditLogRecorder {
             PaymentStatus.FAILED
         ));
 
-        alarmDeleteLogRepository.save(AlarmMapper.mapToPaymentDeleteLogEntity(
+        alarmDeleteLogRepository.save(AlarmMapper.mapToPaymentDeleteFailureLogEntity(
             alarm,
             member,
             paymentId,
             failReason,
-            processedAt,
             processedAt
         ));
     }

@@ -254,6 +254,24 @@ public class AlarmMapper {
             .build();
     }
 
+    public static AlarmDeleteLogEntity mapToPaymentDeleteFailureLogEntity(
+        AlarmEntity alarm,
+        MemberEntity member,
+        String paymentId,
+        String reason,
+        LocalDateTime requestedAt
+    ) {
+        return AlarmDeleteLogEntity.builder()
+            .alarm(alarm)
+            .member(member)
+            .deleteType(DeleteType.PAYMENT_FAILED)
+            .reason(truncateReason(reason))
+            .paymentId(paymentId)
+            .requestedAt(requestedAt)
+            .deletedAt(null)
+            .build();
+    }
+
     public static AlarmDeleteLogEntity mapToAdDeleteLogEntity(
         AlarmEntity alarm,
         MemberEntity member,
@@ -346,5 +364,11 @@ public class AlarmMapper {
             .map(Weekday::from)
             .filter(Objects::nonNull)
             .toList();
+    }
+
+    private static String truncateReason(String reason) {
+        if (reason == null) return "";
+        int maxLength = 2000;
+        return reason.length() <= maxLength ? reason : reason.substring(0, maxLength);
     }
 }

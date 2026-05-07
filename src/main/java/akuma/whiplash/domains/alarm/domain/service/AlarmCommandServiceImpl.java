@@ -56,7 +56,10 @@ import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.annotation.Transactional;
 
 @Slf4j
@@ -217,24 +220,22 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
 
         // 6. 검증 실패도 감사 추적을 위해 실패 결제와 삭제 실패 로그를 저장한 뒤 400으로 응답한다.
         if (!validPayment) {
-            auditLogRecorder.recordPaymentDeleteFailure(
-                member,
-                alarm,
-                request.paymentId(),
-                processedAt,
-                verificationFailReason
-            );
+            try {
+                auditLogRecorder.recordPaymentDeleteFailure(
+                    member,
+                    alarm,
+                    request.paymentId(),
+                    processedAt,
+                    verificationFailReason
+                );
+            } catch (DataIntegrityViolationException e) {
+                throw ApplicationException.from(PaymentErrorCode.DUPLICATE_PAYMENT);
+            }
             throw ApplicationException.from(PaymentErrorCode.PAYMENT_VERIFICATION_FAILED);
         }
 
         // 7. 검증 성공 시 결제를 성공으로 기록하고 알람을 소프트 삭제한다.
-        paymentRepository.save(PaymentMapper.mapToPaymentEntity(
-            member,
-            alarm,
-            request.paymentId(),
-            PaymentType.DELETE_ALARM,
-            PaymentStatus.SUCCESS
-        ));
+        savePaymentOrThrowDuplicate(member, alarm, request.paymentId(), PaymentType.DELETE_ALARM);
         alarm.softDelete(processedAt);
         ringingAlarmRedisRepository.remove(alarmId, memberId);
 
@@ -247,12 +248,8 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
             processedAt
         ));
 
-        // 8. consume은 외부 플랫폼 후처리이므로 실패해도 알람 삭제 트랜잭션은 유지한다.
-        try {
-            paymentClient.consume(request.paymentId());
-        } catch (Exception e) {
-            log.warn("Failed to consume payment. paymentId={}", request.paymentId(), e);
-        }
+        // 8. consume은 외부 플랫폼 후처리이므로 DB 커밋이 성공한 뒤 실행한다.
+        consumePaymentAfterCommit(paymentClient, request.paymentId());
 
         return AlarmMapper.mapToAlarmDeleteByPaymentResponse(alarm, processedAt);
     }
@@ -378,26 +375,24 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
 
         // 7. 검증 실패도 감사 추적을 위해 실패 결제와 상세 실패 로그를 저장한 뒤 400으로 응답한다.
         if (!validPayment) {
-            auditLogRecorder.recordPaymentDeactivationFailure(
-                member,
-                alarm,
-                occurrence,
-                request.paymentId(),
-                request.deviceId(),
-                processedAt,
-                verificationFailReason
-            );
+            try {
+                auditLogRecorder.recordPaymentDeactivationFailure(
+                    member,
+                    alarm,
+                    occurrence,
+                    request.paymentId(),
+                    request.deviceId(),
+                    processedAt,
+                    verificationFailReason
+                );
+            } catch (DataIntegrityViolationException e) {
+                throw ApplicationException.from(PaymentErrorCode.DUPLICATE_PAYMENT);
+            }
             throw ApplicationException.from(PaymentErrorCode.PAYMENT_VERIFICATION_FAILED);
         }
 
         // 8. 검증 성공 시 결제를 성공으로 기록하고 알람 회차를 PAYMENT 상태로 비활성화한다.
-        paymentRepository.save(PaymentMapper.mapToPaymentEntity(
-            member,
-            alarm,
-            request.paymentId(),
-            PaymentType.STOP_ALARM,
-            PaymentStatus.SUCCESS
-        ));
+        savePaymentOrThrowDuplicate(member, alarm, request.paymentId(), PaymentType.STOP_ALARM);
         occurrence.deactivateByPayment(processedAt);
         alarm.incrementRevision();
         ringingAlarmRedisRepository.remove(alarmId, memberId);
@@ -414,12 +409,8 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
             ""
         ));
 
-        // 10. consume은 외부 플랫폼 후처리이므로 실패해도 알람 비활성화 트랜잭션은 유지한다.
-        try {
-            paymentClient.consume(request.paymentId());
-        } catch (Exception e) {
-            log.warn("Failed to consume payment. paymentId={}", request.paymentId(), e);
-        }
+        // 10. consume은 외부 플랫폼 후처리이므로 DB 커밋이 성공한 뒤 실행한다.
+        consumePaymentAfterCommit(paymentClient, request.paymentId());
 
         // 11. 변경된 revision과 다음 예약 회차를 함께 내려 클라이언트가 로컬 알람을 재동기화하게 한다.
         AlarmOccurrenceEntity nextOccurrence = alarmOccurrenceRepository
@@ -538,6 +529,47 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
             + ", alarmId=" + alarmId
             + ", occurrenceId=" + occurrenceId
             + ", reason=" + reason;
+    }
+
+    private void savePaymentOrThrowDuplicate(
+        MemberEntity member,
+        AlarmEntity alarm,
+        String paymentId,
+        PaymentType paymentType
+    ) {
+        try {
+            paymentRepository.saveAndFlush(PaymentMapper.mapToPaymentEntity(
+                member,
+                alarm,
+                paymentId,
+                paymentType,
+                PaymentStatus.SUCCESS
+            ));
+        } catch (DataIntegrityViolationException e) {
+            throw ApplicationException.from(PaymentErrorCode.DUPLICATE_PAYMENT);
+        }
+    }
+
+    private void consumePaymentAfterCommit(PaymentVerificationPort paymentClient, String paymentId) {
+        Runnable consume = () -> {
+            try {
+                paymentClient.consume(paymentId);
+            } catch (Exception e) {
+                log.warn("Failed to consume payment. paymentId={}", paymentId, e);
+            }
+        };
+
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            consume.run();
+            return;
+        }
+
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                consume.run();
+            }
+        });
     }
 
     private static void validAlarmOwner(Long reqMemberId, Long alarmMemberId) {

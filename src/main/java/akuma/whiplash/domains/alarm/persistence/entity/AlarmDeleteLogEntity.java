@@ -45,7 +45,7 @@ public class AlarmDeleteLogEntity extends BaseTimeEntity {
     @Column(name = "delete_type", length = 20, nullable = false)
     private DeleteType deleteType;
 
-    @Column(name = "reason", length = 300, nullable = false)
+    @Column(name = "reason", length = 2000, nullable = false)
     private String reason;
 
     @Column(name = "payment_id", length = 100)
@@ -57,6 +57,6 @@ public class AlarmDeleteLogEntity extends BaseTimeEntity {
     @Column(name = "requested_at")
     private LocalDateTime requestedAt;
 
-    @Column(name = "deleted_at", nullable = false)
+    @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
 }
