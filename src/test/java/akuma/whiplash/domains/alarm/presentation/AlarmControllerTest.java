@@ -21,12 +21,14 @@ import akuma.whiplash.domains.alarm.application.dto.request.AlarmCheckinRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmDeleteByAdRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmDeleteByPaymentRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmRegisterRequest;
+import akuma.whiplash.domains.alarm.application.dto.response.AlarmDeleteMethodResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmPreviewDto;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmSyncItemDto;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmSyncResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.CreateAlarmResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.GetAlarmsResponse;
 import akuma.whiplash.domains.alarm.application.usecase.AlarmUseCase;
+import akuma.whiplash.domains.alarm.domain.constant.AlarmDeleteMethod;
 import akuma.whiplash.domains.alarm.domain.constant.Weekday;
 import akuma.whiplash.domains.alarm.exception.AlarmErrorCode;
 import akuma.whiplash.domains.auth.application.dto.etc.MemberContext;
@@ -36,6 +38,7 @@ import akuma.whiplash.domains.payment.exception.PaymentErrorCode;
 import akuma.whiplash.global.config.security.SecurityConfig;
 import akuma.whiplash.global.config.security.jwt.JwtAuthenticationFilter;
 import akuma.whiplash.global.exception.ApplicationException;
+import akuma.whiplash.global.response.code.CommonErrorCode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -560,6 +563,114 @@ class AlarmControllerTest {
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isNotFound());
+        }
+    }
+
+    @Nested
+    @DisplayName("getAlarmDeleteMethod - 알람 삭제 방법 조회")
+    class GetAlarmDeleteMethodTest {
+
+        @Nested
+        @DisplayName("광고 삭제 방법인 경우")
+        class AdMethodTest {
+
+            @Test
+            @DisplayName("성공: 광고 삭제 방법을 반환한다")
+            void success() throws Exception {
+                // given
+                setSecurityContext(buildContext(MEMBER_5));
+                when(alarmUseCase.getAlarmDeleteMethod(MEMBER_5.getId(), 1L))
+                    .thenReturn(AlarmDeleteMethodResponse.builder()
+                        .deleteMethod(AlarmDeleteMethod.AD.name())
+                        .build());
+
+                // when
+                var result = mockMvc.perform(get(BASE + "/{alarmId}/delete-method", 1L));
+
+                // then
+                result
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.result.deleteMethod").value(AlarmDeleteMethod.AD.name()))
+                    .andExpect(jsonPath("$.result.alarmId").doesNotExist());
+                verify(alarmUseCase, times(1)).getAlarmDeleteMethod(MEMBER_5.getId(), 1L);
+            }
+        }
+
+        @Nested
+        @DisplayName("결제 삭제 방법인 경우")
+        class PaymentMethodTest {
+
+            @Test
+            @DisplayName("성공: 결제 삭제 방법을 반환한다")
+            void success() throws Exception {
+                // given
+                setSecurityContext(buildContext(MEMBER_5));
+                when(alarmUseCase.getAlarmDeleteMethod(MEMBER_5.getId(), 1L))
+                    .thenReturn(AlarmDeleteMethodResponse.builder()
+                        .deleteMethod(AlarmDeleteMethod.PAYMENT.name())
+                        .build());
+
+                // when
+                var result = mockMvc.perform(get(BASE + "/{alarmId}/delete-method", 1L));
+
+                // then
+                result
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.result.deleteMethod").value(AlarmDeleteMethod.PAYMENT.name()));
+                verify(alarmUseCase, times(1)).getAlarmDeleteMethod(MEMBER_5.getId(), 1L);
+            }
+        }
+
+        @Test
+        @DisplayName("실패: 알람이 존재하지 않으면 404를 반환한다")
+        void fail_alarmNotFound() throws Exception {
+            // given
+            setSecurityContext(buildContext(MEMBER_6));
+            doThrow(ApplicationException.from(AlarmErrorCode.ALARM_NOT_FOUND))
+                .when(alarmUseCase).getAlarmDeleteMethod(anyLong(), anyLong());
+
+            // when
+            var result = mockMvc.perform(get(BASE + "/{alarmId}/delete-method", 1L));
+
+            // then
+            result
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.isSuccess").value(false))
+                .andExpect(jsonPath("$.code").value(AlarmErrorCode.ALARM_NOT_FOUND.getCustomCode()));
+        }
+
+        @Test
+        @DisplayName("실패: 소유자가 아니면 403을 반환한다")
+        void fail_permissionDenied() throws Exception {
+            // given
+            setSecurityContext(buildContext(MEMBER_7));
+            doThrow(ApplicationException.from(AuthErrorCode.PERMISSION_DENIED))
+                .when(alarmUseCase).getAlarmDeleteMethod(anyLong(), anyLong());
+
+            // when
+            var result = mockMvc.perform(get(BASE + "/{alarmId}/delete-method", 1L));
+
+            // then
+            result
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.isSuccess").value(false))
+                .andExpect(jsonPath("$.code").value(AuthErrorCode.PERMISSION_DENIED.getCustomCode()));
+        }
+
+        @Test
+        @DisplayName("실패: 알람 ID가 양수가 아니면 400을 반환한다")
+        void fail_alarmIdNotPositive() throws Exception {
+            // given
+            setSecurityContext(buildContext(MEMBER_7));
+
+            // when
+            var result = mockMvc.perform(get(BASE + "/{alarmId}/delete-method", 0L));
+
+            // then
+            result
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.isSuccess").value(false))
+                .andExpect(jsonPath("$.code").value(CommonErrorCode.METHOD_ARGUMENT_NOT_VALID.getCustomCode()));
         }
     }
 

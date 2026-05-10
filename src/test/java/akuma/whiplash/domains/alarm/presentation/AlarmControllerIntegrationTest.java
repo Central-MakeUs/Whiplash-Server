@@ -21,11 +21,8 @@ import akuma.whiplash.domains.alarm.application.dto.request.AlarmDeleteByPayment
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmPaymentRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmRegisterRequest;
 import akuma.whiplash.domains.alarm.application.mapper.AlarmMapper;
-import akuma.whiplash.domains.alarm.domain.constant.AlarmStatus;
-import akuma.whiplash.domains.alarm.domain.constant.DeleteType;
-import akuma.whiplash.domains.alarm.domain.constant.OccurrenceStatus;
-import akuma.whiplash.domains.alarm.domain.constant.SoundType;
-import akuma.whiplash.domains.alarm.domain.constant.Weekday;
+import akuma.whiplash.domains.alarm.domain.constant.*;
+import akuma.whiplash.domains.alarm.exception.AlarmErrorCode;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmEntity;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmOccurrenceEntity;
 import akuma.whiplash.domains.alarm.persistence.repository.AlarmDeactivationLogRepository;
@@ -33,6 +30,7 @@ import akuma.whiplash.domains.alarm.persistence.repository.AlarmDeleteLogReposit
 import akuma.whiplash.domains.alarm.persistence.repository.AlarmRingingLogRepository;
 import akuma.whiplash.domains.alarm.persistence.repository.AlarmOccurrenceRepository;
 import akuma.whiplash.domains.alarm.persistence.repository.AlarmRepository;
+import akuma.whiplash.domains.auth.exception.AuthErrorCode;
 import akuma.whiplash.domains.member.persistence.entity.MemberEntity;
 import akuma.whiplash.domains.member.persistence.repository.MemberDeviceRepository;
 import akuma.whiplash.domains.member.persistence.repository.MemberRepository;
@@ -711,6 +709,97 @@ class AlarmControllerIntegrationTest {
 
             assertThat(paymentRepository.existsByPaymentId(request.paymentId())).isTrue();
             assertThat(alarmDeleteLogRepository.findAll()).hasSize(1);
+        }
+    }
+
+    @Nested
+    @DisplayName("getAlarmDeleteMethod - 알람 삭제 방법 조회")
+    class GetAlarmDeleteMethodTest {
+
+        @Nested
+        @DisplayName("오늘 회차가 없는 경우")
+        class NoOccurrenceTodayTest {
+
+            @Test
+            @DisplayName("성공: 광고 삭제 방법을 반환한다")
+            void success() throws Exception {
+                // given
+                MemberEntity member = memberRepository.save(MemberFixture.MEMBER_11.toEntity());
+                AlarmEntity alarm = alarmRepository.save(AlarmFixture.ALARM_11.toEntity(member));
+                String accessToken = buildAccessToken(member);
+
+                // when
+                var result = mockMvc.perform(get(BASE + "/{alarmId}/delete-method", alarm.getId())
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken));
+
+                // then
+                result
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.result.deleteMethod").value(AlarmDeleteMethod.AD.name()))
+                    .andExpect(jsonPath("$.result.alarmId").doesNotExist());
+            }
+        }
+
+        @Nested
+        @DisplayName("오늘 회차가 예정 상태인 경우")
+        class ScheduledTest {
+
+            @Test
+            @DisplayName("성공: 결제 삭제 방법을 반환한다")
+            void success() throws Exception {
+                // given
+                MemberEntity member = memberRepository.save(MemberFixture.MEMBER_12.toEntity());
+                AlarmEntity alarm = alarmRepository.save(AlarmFixture.ALARM_12.toEntity(member));
+                saveOccurrence(alarm, FIXED_NOW, OccurrenceStatus.SCHEDULED);
+                String accessToken = buildAccessToken(member);
+
+                // when
+                var result = mockMvc.perform(get(BASE + "/{alarmId}/delete-method", alarm.getId())
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken));
+
+                // then
+                result
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.result.deleteMethod").value(AlarmDeleteMethod.PAYMENT.name()));
+            }
+        }
+
+        @Test
+        @DisplayName("실패: 알람이 존재하지 않으면 404를 반환한다")
+        void fail_alarmNotFound() throws Exception {
+            // given
+            MemberEntity member = memberRepository.save(MemberFixture.MEMBER_13.toEntity());
+            String accessToken = buildAccessToken(member);
+
+            // when
+            var result = mockMvc.perform(get(BASE + "/{alarmId}/delete-method", 999L)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken));
+
+            // then
+            result
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.isSuccess").value(false))
+                .andExpect(jsonPath("$.code").value(AlarmErrorCode.ALARM_NOT_FOUND.getCustomCode()));
+        }
+
+        @Test
+        @DisplayName("실패: 소유자가 아니면 403을 반환한다")
+        void fail_permissionDenied() throws Exception {
+            // given
+            MemberEntity owner = memberRepository.save(MemberFixture.MEMBER_14.toEntity());
+            MemberEntity other = memberRepository.save(MemberFixture.MEMBER_15.toEntity());
+            AlarmEntity alarm = alarmRepository.save(AlarmFixture.ALARM_14.toEntity(owner));
+            String accessToken = buildAccessToken(other);
+
+            // when
+            var result = mockMvc.perform(get(BASE + "/{alarmId}/delete-method", alarm.getId())
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken));
+
+            // then
+            result
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.isSuccess").value(false))
+                .andExpect(jsonPath("$.code").value(AuthErrorCode.PERMISSION_DENIED.getCustomCode()));
         }
     }
 
