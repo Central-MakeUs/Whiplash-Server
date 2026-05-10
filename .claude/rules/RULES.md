@@ -65,6 +65,9 @@ ErrorCode enum: `NAME(HttpStatus.STATUS, "Domain_{에러코드맨뒤숫자1개}0
 - 테스트 엔티티 생성은 테스트 클래스 내부 `buildXxx()` 헬퍼보다 Fixture 메서드 사용을 우선한다.
 - Fixture로 표현이 안 되는 케이스는 테스트에서 직접 빌더를 추가하지 말고 `src/test/java/akuma/whiplash/common/fixture/` 아래 Fixture에 `toEntity(...)` / `toMockEntity(...)` 오버로드를 추가한다.
 - 권장 형태: `AlarmFixture.ALARM_01.toEntity(member)`, `AlarmOccurrenceFixture.ALARM_OCCURRENCE_01.toEntity(alarm)`
+- 컨트롤러/통합 테스트의 에러 응답은 `status`, `isSuccess`, `code` 중심으로 검증한다.
+- 에러 코드 검증은 직접 문자열보다 ErrorCode enum의 `getCustomCode()` 사용을 우선한다.
+- 에러 메시지(`message`)는 사용자 노출 문구라 변경 가능성이 높으므로 String literal로 직접 검증하지 않는다. 메시지까지 계약인 경우에만 ErrorCode enum의 `getMessage()`로 검증한다.
 
 ## Swagger
 모든 매핑 메서드에 `@CustomErrorCodes` 명시 필수

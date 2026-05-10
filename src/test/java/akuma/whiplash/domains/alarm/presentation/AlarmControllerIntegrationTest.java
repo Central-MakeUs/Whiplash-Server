@@ -1,5 +1,6 @@
 package akuma.whiplash.domains.alarm.presentation;
 
+import static akuma.whiplash.domains.alarm.exception.AlarmErrorCode.ALARM_DELETE_REQUIRES_PAYMENT;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.BDDMockito.given;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -15,16 +16,21 @@ import akuma.whiplash.common.fixture.MemberDeviceFixture;
 import akuma.whiplash.common.fixture.MemberFixture;
 import akuma.whiplash.common.fixture.PaymentFixture;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmCheckinRequest;
+import akuma.whiplash.domains.alarm.application.dto.request.AlarmDeleteByAdRequest;
+import akuma.whiplash.domains.alarm.application.dto.request.AlarmDeleteByPaymentRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmPaymentRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmRegisterRequest;
-import akuma.whiplash.domains.alarm.application.dto.request.AlarmRemoveRequest;
 import akuma.whiplash.domains.alarm.application.mapper.AlarmMapper;
+import akuma.whiplash.domains.alarm.domain.constant.AlarmStatus;
+import akuma.whiplash.domains.alarm.domain.constant.DeleteType;
 import akuma.whiplash.domains.alarm.domain.constant.OccurrenceStatus;
 import akuma.whiplash.domains.alarm.domain.constant.SoundType;
 import akuma.whiplash.domains.alarm.domain.constant.Weekday;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmEntity;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmOccurrenceEntity;
 import akuma.whiplash.domains.alarm.persistence.repository.AlarmDeactivationLogRepository;
+import akuma.whiplash.domains.alarm.persistence.repository.AlarmDeleteLogRepository;
+import akuma.whiplash.domains.alarm.persistence.repository.AlarmRingingLogRepository;
 import akuma.whiplash.domains.alarm.persistence.repository.AlarmOccurrenceRepository;
 import akuma.whiplash.domains.alarm.persistence.repository.AlarmRepository;
 import akuma.whiplash.domains.member.persistence.entity.MemberEntity;
@@ -40,6 +46,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -48,6 +55,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
@@ -63,13 +72,27 @@ class AlarmControllerIntegrationTest {
     @Autowired private MemberDeviceRepository memberDeviceRepository;
     @Autowired private AlarmRepository alarmRepository;
     @Autowired private AlarmOccurrenceRepository alarmOccurrenceRepository;
+    @Autowired private AlarmRingingLogRepository alarmRingingLogRepository;
     @Autowired private AlarmDeactivationLogRepository alarmDeactivationLogRepository;
+    @Autowired private AlarmDeleteLogRepository alarmDeleteLogRepository;
     @Autowired private PaymentRepository paymentRepository;
     @MockitoBean private PaymentVerificationPort paymentVerificationPort;
     @MockitoBean private TimeProvider timeProvider;
 
     private static final String BASE = "/api/v1/alarms";
     private static final LocalDateTime FIXED_NOW = LocalDateTime.of(2026, 5, 4, 11, 0);
+
+    @AfterEach
+    void cleanupCommittedData() {
+        alarmDeleteLogRepository.deleteAll();
+        alarmDeactivationLogRepository.deleteAll();
+        paymentRepository.deleteAll();
+        alarmRingingLogRepository.deleteAll();
+        alarmOccurrenceRepository.deleteAll();
+        memberDeviceRepository.deleteAll();
+        alarmRepository.deleteAll();
+        memberRepository.deleteAll();
+    }
 
     @BeforeEach
     void setUpTimeProvider() {
@@ -223,23 +246,14 @@ class AlarmControllerIntegrationTest {
     class RingAlarmTest {
 
         @Test
+        @DisplayName("성공: 알람 울림 요청이 성공하면 200을 반환한다")
         void success() throws Exception {
             // given
             MemberEntity member = memberRepository.save(MemberFixture.MEMBER_1.toEntity());
             var alarm = alarmRepository.save(AlarmFixture.ALARM_01.toEntity(member));
 
             var now = FIXED_NOW;
-            var occurrence = AlarmOccurrenceEntity.builder()
-                .alarm(alarm)
-                .occurrenceDate(now.toLocalDate())
-                .occurrenceTime(now.toLocalTime().minusMinutes(1)) // ← now보다 과거
-                .scheduledAt(now.minusMinutes(1))
-                .status(OccurrenceStatus.SCHEDULED)
-                .alarmRinging(false)
-                .ringingCount(0)
-                .reminderSent(false)
-                .build();
-            alarmOccurrenceRepository.save(occurrence);
+            saveOccurrence(alarm, now.minusMinutes(1), OccurrenceStatus.SCHEDULED);
 
             String accessToken = jwtProvider.generateAccessToken(member.getId(), member.getRole(), "mock_device_id");
 
@@ -325,7 +339,7 @@ class AlarmControllerIntegrationTest {
     }
 
     @Nested
-    @DisplayName("[POST] /api/v1/alarms/{alarmId}/checkin - 도착 인증")
+    @DisplayName("[POST] /api/v1/alarms/{alarmId}/off/checkin - 도착 인증")
     class CheckinTest {
 
         @Test
@@ -340,7 +354,7 @@ class AlarmControllerIntegrationTest {
             String accessToken = buildAccessToken(member);
 
             // when
-            mockMvc.perform(post(BASE + "/{alarmId}/checkin", alarm.getId())
+            mockMvc.perform(post(BASE + "/{alarmId}/off/checkin", alarm.getId())
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
@@ -362,7 +376,7 @@ class AlarmControllerIntegrationTest {
             AlarmCheckinRequest request = new AlarmCheckinRequest(999L, "device-uuid", 0.0, 0.0);
 
             // when & then
-            mockMvc.perform(post(BASE + "/{alarmId}/checkin", 999L)
+            mockMvc.perform(post(BASE + "/{alarmId}/off/checkin", 999L)
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
@@ -381,7 +395,7 @@ class AlarmControllerIntegrationTest {
             AlarmCheckinRequest request = buildCheckinRequest(occurrence, alarm.getLatitude(), alarm.getLongitude());
 
             // when & then
-            mockMvc.perform(post(BASE + "/{alarmId}/checkin", alarm.getId())
+            mockMvc.perform(post(BASE + "/{alarmId}/off/checkin", alarm.getId())
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
@@ -401,7 +415,7 @@ class AlarmControllerIntegrationTest {
             AlarmCheckinRequest request = buildCheckinRequest(occurrence, alarm.getLatitude(), alarm.getLongitude());
 
             // when & then
-            mockMvc.perform(post(BASE + "/{alarmId}/checkin", alarm.getId())
+            mockMvc.perform(post(BASE + "/{alarmId}/off/checkin", alarm.getId())
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
@@ -423,7 +437,7 @@ class AlarmControllerIntegrationTest {
             );
 
             // when & then
-            mockMvc.perform(post(BASE + "/{alarmId}/checkin", alarm.getId())
+            mockMvc.perform(post(BASE + "/{alarmId}/off/checkin", alarm.getId())
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
@@ -445,7 +459,7 @@ class AlarmControllerIntegrationTest {
             );
 
             // when & then
-            mockMvc.perform(post(BASE + "/{alarmId}/checkin", alarm.getId())
+            mockMvc.perform(post(BASE + "/{alarmId}/off/checkin", alarm.getId())
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
@@ -477,7 +491,7 @@ class AlarmControllerIntegrationTest {
             given(paymentVerificationPort.verify(request.paymentId())).willReturn(true);
 
             // when
-            mockMvc.perform(post(BASE + "/{alarmId}/payment", alarm.getId())
+            mockMvc.perform(post(BASE + "/{alarmId}/off/payment", alarm.getId())
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
@@ -511,7 +525,7 @@ class AlarmControllerIntegrationTest {
             String accessToken = buildAccessToken(member);
 
             // when & then
-            mockMvc.perform(post(BASE + "/{alarmId}/payment", alarm.getId())
+            mockMvc.perform(post(BASE + "/{alarmId}/off/payment", alarm.getId())
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
@@ -537,7 +551,7 @@ class AlarmControllerIntegrationTest {
             String accessToken = buildAccessToken(member);
 
             // when & then
-            mockMvc.perform(post(BASE + "/{alarmId}/payment", alarm.getId())
+            mockMvc.perform(post(BASE + "/{alarmId}/off/payment", alarm.getId())
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
@@ -547,27 +561,39 @@ class AlarmControllerIntegrationTest {
     }
 
     @Nested
-    @DisplayName("[DELETE] /api/v1/alarms/{alarmId} - 알람 삭제")
-    class RemoveAlarmTest {
+    @DisplayName("[POST] /api/v1/alarms/{alarmId}/delete/payment - 결제로 알람 삭제")
+    class RemoveAlarmByPaymentTest {
 
         @Test
-        @DisplayName("성공: 알람 삭제 요청이 성공하면 알람이 제거된다")
+        @DisplayName("성공: 결제 삭제 요청이 성공하면 알람이 소프트 삭제된다")
         void success() throws Exception {
             // given
             MemberEntity member = memberRepository.save(MemberFixture.MEMBER_3.toEntity());
             AlarmEntity alarm = alarmRepository.save(AlarmFixture.ALARM_03.toEntity(member));
-            AlarmRemoveRequest request = new AlarmRemoveRequest("필요 없어졌어요");
+            saveOccurrence(alarm, FIXED_NOW, OccurrenceStatus.SCHEDULED);
+            memberDeviceRepository.save(MemberDeviceFixture.ANDROID.toEntity(member));
+            AlarmDeleteByPaymentRequest request = new AlarmDeleteByPaymentRequest(
+                MemberDeviceFixture.ANDROID.getDeviceId(),
+                PaymentFixture.DELETE_ALARM_SUCCESS.getPaymentId()
+            );
             String accessToken = jwtProvider.generateAccessToken(member.getId(), member.getRole(), "mock_device_id");
+            given(paymentVerificationPort.supportedPlatform()).willReturn(MemberDeviceFixture.ANDROID.getPlatform());
+            given(paymentVerificationPort.verify(request.paymentId())).willReturn(true);
 
             // when
-            mockMvc.perform(delete(BASE + "/{alarmId}", alarm.getId())
+            mockMvc.perform(post(BASE + "/{alarmId}/delete/payment", alarm.getId())
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isOk());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result").doesNotExist());
 
             // then
-            assertThat(alarmRepository.findById(alarm.getId())).isEmpty();
+            AlarmEntity deletedAlarm = alarmRepository.findById(alarm.getId()).orElseThrow();
+            assertThat(deletedAlarm.getStatus()).isEqualTo(AlarmStatus.DELETED);
+            assertThat(deletedAlarm.getDeletedAt()).isEqualTo(FIXED_NOW);
+            assertThat(paymentRepository.existsByPaymentId(request.paymentId())).isTrue();
+            assertThat(alarmDeleteLogRepository.findAll()).hasSize(1);
         }
 
         @Test
@@ -575,11 +601,11 @@ class AlarmControllerIntegrationTest {
         void fail_alarmNotFound() throws Exception {
             // given
             MemberEntity member = memberRepository.save(MemberFixture.MEMBER_4.toEntity());
-            AlarmRemoveRequest request = new AlarmRemoveRequest("사유");
+            AlarmDeleteByPaymentRequest request = new AlarmDeleteByPaymentRequest("device-uuid", "payment-id");
             String accessToken = jwtProvider.generateAccessToken(member.getId(), member.getRole(), "mock_device_id");
 
             // when & then
-            mockMvc.perform(delete(BASE + "/{alarmId}", 999L)
+            mockMvc.perform(post(BASE + "/{alarmId}/delete/payment", 999L)
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
@@ -593,11 +619,11 @@ class AlarmControllerIntegrationTest {
             MemberEntity owner = memberRepository.save(MemberFixture.MEMBER_5.toEntity());
             AlarmEntity alarm = alarmRepository.save(AlarmFixture.ALARM_05.toEntity(owner));
             MemberEntity other = memberRepository.save(MemberFixture.MEMBER_6.toEntity());
-            AlarmRemoveRequest request = new AlarmRemoveRequest("사유");
+            AlarmDeleteByPaymentRequest request = new AlarmDeleteByPaymentRequest("device-uuid", "payment-id");
             String accessToken = jwtProvider.generateAccessToken(other.getId(), other.getRole(), "mock_device_id");
 
             // when & then
-            mockMvc.perform(delete(BASE + "/{alarmId}", alarm.getId())
+            mockMvc.perform(post(BASE + "/{alarmId}/delete/payment", alarm.getId())
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
@@ -605,20 +631,169 @@ class AlarmControllerIntegrationTest {
         }
 
         @Test
-        @DisplayName("실패: 삭제 사유가 비어 있으면 400을 반환한다")
-        void fail_reasonBlank() throws Exception {
+        @DisplayName("실패: 결제 ID가 비어 있으면 400을 반환한다")
+        void fail_paymentIdBlank() throws Exception {
             // given
             MemberEntity member = memberRepository.save(MemberFixture.MEMBER_7.toEntity());
             AlarmEntity alarm = alarmRepository.save(AlarmFixture.ALARM_07.toEntity(member));
-            AlarmRemoveRequest request = new AlarmRemoveRequest("");
+            AlarmDeleteByPaymentRequest request = new AlarmDeleteByPaymentRequest("device-uuid", "");
             String accessToken = jwtProvider.generateAccessToken(member.getId(), member.getRole(), "mock_device_id");
 
             // when & then
-            mockMvc.perform(delete(BASE + "/{alarmId}", alarm.getId())
+            mockMvc.perform(post(BASE + "/{alarmId}/delete/payment", alarm.getId())
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest());
+        }
+
+        @Test
+        @DisplayName("실패: 오늘 회차가 없으면 400을 반환한다")
+        void fail_todayIsNotAlarmDay() throws Exception {
+            // given
+            MemberEntity member = memberRepository.save(MemberFixture.MEMBER_7.toEntity());
+            AlarmEntity alarm = alarmRepository.save(AlarmFixture.ALARM_07.toEntity(member));
+            AlarmDeleteByPaymentRequest request = new AlarmDeleteByPaymentRequest("device-uuid", "payment-id");
+            String accessToken = jwtProvider.generateAccessToken(member.getId(), member.getRole(), "mock_device_id");
+
+            // when & then
+            mockMvc.perform(post(BASE + "/{alarmId}/delete/payment", alarm.getId())
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("ALARM_001"));
+        }
+
+        @Test
+        @DisplayName("실패: 이미 비활성화된 회차이면 400을 반환한다")
+        void fail_alreadyDeactivated() throws Exception {
+            // given
+            MemberEntity member = memberRepository.save(MemberFixture.MEMBER_7.toEntity());
+            AlarmEntity alarm = alarmRepository.save(AlarmFixture.ALARM_07.toEntity(member));
+            saveOccurrence(alarm, FIXED_NOW, OccurrenceStatus.PAYMENT);
+            AlarmDeleteByPaymentRequest request = new AlarmDeleteByPaymentRequest("device-uuid", "payment-id");
+            String accessToken = jwtProvider.generateAccessToken(member.getId(), member.getRole(), "mock_device_id");
+
+            // when & then
+            mockMvc.perform(post(BASE + "/{alarmId}/delete/payment", alarm.getId())
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("ALARM_003"));
+        }
+
+        @Test
+        @DisplayName("실패: 결제 검증에 실패하면 실패 기록을 남기고 400을 반환한다")
+        @Transactional(propagation = Propagation.NOT_SUPPORTED)
+        void fail_paymentVerificationFailed() throws Exception {
+            // given
+            MemberEntity member = memberRepository.save(MemberFixture.MEMBER_20.toEntity());
+            AlarmEntity alarm = alarmRepository.save(AlarmFixture.ALARM_07.toEntity(member));
+            saveOccurrence(alarm, FIXED_NOW, OccurrenceStatus.SCHEDULED);
+            memberDeviceRepository.save(MemberDeviceFixture.ANDROID.toEntity(member));
+            AlarmDeleteByPaymentRequest request = new AlarmDeleteByPaymentRequest(
+                MemberDeviceFixture.ANDROID.getDeviceId(),
+                PaymentFixture.DELETE_ALARM_FAILED.getPaymentId()
+            );
+            String accessToken = jwtProvider.generateAccessToken(member.getId(), member.getRole(), "mock_device_id");
+            given(paymentVerificationPort.supportedPlatform()).willReturn(MemberDeviceFixture.ANDROID.getPlatform());
+            given(paymentVerificationPort.verify(request.paymentId())).willReturn(false);
+
+            // when & then
+            mockMvc.perform(post(BASE + "/{alarmId}/delete/payment", alarm.getId())
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("PAYMENT_002"));
+
+            assertThat(paymentRepository.existsByPaymentId(request.paymentId())).isTrue();
+            assertThat(alarmDeleteLogRepository.findAll()).hasSize(1);
+        }
+    }
+
+    @Nested
+    @DisplayName("removeAlarmByAd - 광고 시청으로 알람 삭제")
+    class RemoveAlarmByAdTest {
+
+        @Test
+        @DisplayName("성공: 비활성화된 오늘 회차가 있으면 알람을 소프트 삭제한다")
+        void success_todayOccurrenceDeactivated() throws Exception {
+            // given
+            MemberEntity member = memberRepository.save(MemberFixture.MEMBER_8.toEntity());
+            AlarmEntity alarm = alarmRepository.save(AlarmFixture.ALARM_08.toEntity(member));
+            saveOccurrence(alarm, FIXED_NOW, OccurrenceStatus.CHECKIN);
+            AlarmDeleteByAdRequest request = new AlarmDeleteByAdRequest("device-uuid", "ad-proof-token-001");
+            String accessToken = buildAccessToken(member);
+
+            // when
+            mockMvc.perform(post(BASE + "/{alarmId}/delete/ad", alarm.getId())
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result").doesNotExist());
+
+            // then
+            AlarmEntity deletedAlarm = alarmRepository.findById(alarm.getId()).orElseThrow();
+            assertThat(deletedAlarm.getStatus()).isEqualTo(AlarmStatus.DELETED);
+            assertThat(deletedAlarm.getDeletedAt()).isEqualTo(FIXED_NOW);
+            assertThat(deletedAlarm.getRevision()).isEqualTo(2);
+            assertThat(alarmDeleteLogRepository.findAll())
+                .anySatisfy(log -> {
+                    assertThat(log.getDeleteType()).isEqualTo(DeleteType.AD);
+                    assertThat(log.getAdProofToken()).isEqualTo(request.adProofToken());
+                });
+        }
+
+        @Test
+        @DisplayName("성공: 오늘 회차가 없으면 알람을 소프트 삭제한다")
+        void success() throws Exception {
+            // given
+            MemberEntity member = memberRepository.save(MemberFixture.MEMBER_9.toEntity());
+            AlarmEntity alarm = alarmRepository.save(AlarmFixture.ALARM_09.toEntity(member));
+            AlarmDeleteByAdRequest request = new AlarmDeleteByAdRequest("device-uuid", "ad-proof-token-002");
+            String accessToken = buildAccessToken(member);
+
+            // when
+            mockMvc.perform(post(BASE + "/{alarmId}/delete/ad", alarm.getId())
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result").doesNotExist());
+
+            // then
+            AlarmEntity deletedAlarm = alarmRepository.findById(alarm.getId()).orElseThrow();
+            assertThat(deletedAlarm.getStatus()).isEqualTo(AlarmStatus.DELETED);
+            assertThat(deletedAlarm.getDeletedAt()).isEqualTo(FIXED_NOW);
+            assertThat(alarmDeleteLogRepository.findAll())
+                .anySatisfy(log -> {
+                    assertThat(log.getDeleteType()).isEqualTo(DeleteType.AD);
+                    assertThat(log.getAdProofToken()).isEqualTo(request.adProofToken());
+                });
+        }
+
+        @Test
+        @DisplayName("실패: 오늘 회차가 아직 비활성화되지 않았으면 400을 반환한다")
+        void fail_alarmDeleteNotAvailable() throws Exception {
+            // given
+            MemberEntity member = memberRepository.save(MemberFixture.MEMBER_10.toEntity());
+            AlarmEntity alarm = alarmRepository.save(AlarmFixture.ALARM_10.toEntity(member));
+            saveOccurrence(alarm, FIXED_NOW, OccurrenceStatus.RINGING);
+            AlarmDeleteByAdRequest request = new AlarmDeleteByAdRequest("device-uuid", "ad-proof-token");
+            String accessToken = buildAccessToken(member);
+
+            // when & then
+            mockMvc.perform(post(BASE + "/{alarmId}/delete/ad", alarm.getId())
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.isSuccess").value(false))
+                .andExpect(jsonPath("$.code").value(ALARM_DELETE_REQUIRES_PAYMENT.getCustomCode()));
         }
     }
 

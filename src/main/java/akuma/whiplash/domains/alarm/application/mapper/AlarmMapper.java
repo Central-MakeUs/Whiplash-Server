@@ -12,10 +12,12 @@ import akuma.whiplash.domains.alarm.application.dto.response.AlarmPreviewDto;
 import akuma.whiplash.domains.alarm.domain.constant.DeactivateType;
 import akuma.whiplash.domains.alarm.domain.constant.DeactivationResult;
 import akuma.whiplash.domains.alarm.domain.constant.AlarmStatus;
+import akuma.whiplash.domains.alarm.domain.constant.DeleteType;
 import akuma.whiplash.domains.alarm.domain.constant.OccurrenceStatus;
 import akuma.whiplash.domains.alarm.domain.constant.SoundType;
 import akuma.whiplash.domains.alarm.domain.constant.Weekday;
 import akuma.whiplash.domains.alarm.exception.AlarmErrorCode;
+import akuma.whiplash.domains.alarm.persistence.entity.AlarmDeleteLogEntity;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmEntity;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmDeactivationLogEntity;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmOccurrenceEntity;
@@ -33,6 +35,10 @@ import java.util.Map;
 import java.util.Objects;
 
 public class AlarmMapper {
+
+    private AlarmMapper() {
+        throw new IllegalArgumentException();
+    }
 
     public static AlarmEntity mapToAlarmEntity(AlarmRegisterRequest request, MemberEntity memberEntity) {
         return AlarmEntity.builder()
@@ -74,8 +80,7 @@ public class AlarmMapper {
             .build();
     }
 
-    public static AlarmOccurrenceEntity mapToTodayFirstAlarmOccurrenceEntity(AlarmEntity alarmEntity) {
-        LocalDate today = LocalDate.now();
+    public static AlarmOccurrenceEntity mapToTodayFirstAlarmOccurrenceEntity(AlarmEntity alarmEntity, LocalDate today) {
         DayOfWeek todayDayOfWeek = today.getDayOfWeek();
 
         boolean isTodayAlarmDay = alarmEntity.getRepeatDays().stream()
@@ -211,6 +216,61 @@ public class AlarmMapper {
             .build();
     }
 
+    public static AlarmDeleteLogEntity mapToPaymentDeleteLogEntity(
+        AlarmEntity alarm,
+        MemberEntity member,
+        String paymentId,
+        String reason,
+        LocalDateTime requestedAt,
+        LocalDateTime deletedAt
+    ) {
+        return AlarmDeleteLogEntity.builder()
+            .alarm(alarm)
+            .member(member)
+            .deleteType(DeleteType.PAYMENT)
+            .reason(reason)
+            .paymentId(paymentId)
+            .requestedAt(requestedAt)
+            .deletedAt(deletedAt)
+            .build();
+    }
+
+    public static AlarmDeleteLogEntity mapToPaymentDeleteFailureLogEntity(
+        AlarmEntity alarm,
+        MemberEntity member,
+        String paymentId,
+        String reason,
+        LocalDateTime requestedAt
+    ) {
+        return AlarmDeleteLogEntity.builder()
+            .alarm(alarm)
+            .member(member)
+            .deleteType(DeleteType.PAYMENT_FAILED)
+            .reason(truncateReason(reason))
+            .paymentId(paymentId)
+            .requestedAt(requestedAt)
+            .deletedAt(null)
+            .build();
+    }
+
+    public static AlarmDeleteLogEntity mapToAdDeleteLogEntity(
+        AlarmEntity alarm,
+        MemberEntity member,
+        String adProofToken,
+        LocalDateTime requestedAt,
+        LocalDateTime deletedAt
+    ) {
+        return AlarmDeleteLogEntity.builder()
+            .alarm(alarm)
+            .member(member)
+            .deleteType(DeleteType.AD)
+            .reason("")
+            .adProofToken(adProofToken)
+            .requestedAt(requestedAt)
+            .deletedAt(deletedAt)
+            .build();
+    }
+
     public static AlarmPreviewDto mapToAlarmPreviewDto(
         AlarmEntity alarm,
         LocalDateTime now,
@@ -285,5 +345,11 @@ public class AlarmMapper {
             .map(Weekday::from)
             .filter(Objects::nonNull)
             .toList();
+    }
+
+    private static String truncateReason(String reason) {
+        if (reason == null) return "";
+        int maxLength = 2000;
+        return reason.length() <= maxLength ? reason : reason.substring(0, maxLength);
     }
 }

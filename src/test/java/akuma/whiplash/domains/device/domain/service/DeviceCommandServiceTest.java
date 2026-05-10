@@ -105,9 +105,9 @@ class DeviceCommandServiceTest {
 
             // when & then
             assertThatThrownBy(() -> deviceCommandService.modifyFcmToken(memberId, request))
-                .isInstanceOf(ApplicationException.class)
-                .extracting("code")
-                .isEqualTo(DEVICE_NOT_FOUND);
+                .isInstanceOfSatisfying(ApplicationException.class, e ->
+                    assertThat(e.getCode()).isEqualTo(DEVICE_NOT_FOUND)
+                );
 
             verify(redisService, never()).upsertFcmToken(any(), any(), any());
         }

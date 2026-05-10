@@ -171,9 +171,9 @@ class AuthCommandServiceTest {
 
             // when & then
             assertThatThrownBy(() -> authCommandService.login(request))
-                .isInstanceOf(ApplicationException.class)
-                .extracting("code")
-                .isEqualTo(MemberErrorCode.MEMBER_DELETED);
+                .isInstanceOfSatisfying(ApplicationException.class, e ->
+                    assertThat(e.getCode()).isEqualTo(MemberErrorCode.MEMBER_DELETED)
+                );
         }
 
         @Test
@@ -185,9 +185,9 @@ class AuthCommandServiceTest {
 
             // when & then
             assertThatThrownBy(() -> authCommandService.login(request))
-                .isInstanceOf(ApplicationException.class)
-                .extracting("code")
-                .isEqualTo(AuthErrorCode.UNSUPPORTED_SOCIAL_TYPE);
+                .isInstanceOfSatisfying(ApplicationException.class, e ->
+                    assertThat(e.getCode()).isEqualTo(AuthErrorCode.UNSUPPORTED_SOCIAL_TYPE)
+                );
         }
     }
 
@@ -221,7 +221,9 @@ class AuthCommandServiceTest {
 
             // when & then
             assertThatThrownBy(() -> authCommandService.logout(ctx))
-                .isInstanceOf(ApplicationException.class);
+                .isInstanceOfSatisfying(ApplicationException.class, e ->
+                    assertThat(e.getCode()).isEqualTo(AuthErrorCode.INVALID_TOKEN)
+                );
         }
     }
 

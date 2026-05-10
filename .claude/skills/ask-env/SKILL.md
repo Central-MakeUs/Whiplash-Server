@@ -33,7 +33,7 @@ docker-compose up -d
 | MySQL 8.0 | 메인 DB | `mysql.yml` |
 | Redis 7.2 | 토큰 캐시, `alarm:ringing` Sorted Set | `redis.yml` |
 | FCM | 푸시 알림 | `whiplash-firebase-key.json` |
-| Google Sheets | 알람 삭제 로깅 | `oauth.yml` |
+| AuditLogRecorder | 알람 삭제 실패 감사 로그 저장 | DB `payment`, `alarm_delete_log` |
 | Naver API | 장소 검색/역지오코딩 | `naver.yml` |
 | Sentry | 에러 트래킹 | `sentry.yml` |
 

@@ -4,7 +4,6 @@ import static akuma.whiplash.common.fixture.MemberFixture.*;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
@@ -19,8 +18,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import akuma.whiplash.common.fixture.AlarmFixture;
 import akuma.whiplash.common.fixture.MemberFixture;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmCheckinRequest;
+import akuma.whiplash.domains.alarm.application.dto.request.AlarmDeleteByAdRequest;
+import akuma.whiplash.domains.alarm.application.dto.request.AlarmDeleteByPaymentRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmRegisterRequest;
-import akuma.whiplash.domains.alarm.application.dto.request.AlarmRemoveRequest;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmPreviewDto;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmSyncItemDto;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmSyncResponse;
@@ -32,6 +32,7 @@ import akuma.whiplash.domains.alarm.exception.AlarmErrorCode;
 import akuma.whiplash.domains.auth.application.dto.etc.MemberContext;
 import akuma.whiplash.domains.auth.exception.AuthErrorCode;
 import akuma.whiplash.domains.member.exception.MemberErrorCode;
+import akuma.whiplash.domains.payment.exception.PaymentErrorCode;
 import akuma.whiplash.global.config.security.SecurityConfig;
 import akuma.whiplash.global.config.security.jwt.JwtAuthenticationFilter;
 import akuma.whiplash.global.exception.ApplicationException;
@@ -284,7 +285,7 @@ class AlarmControllerTest {
     }
 
     @Nested
-    @DisplayName("[POST] /api/v1/alarms/{alarmId}/checkin - 도착 인증")
+    @DisplayName("[POST] /api/v1/alarms/{alarmId}/off/checkin - 도착 인증")
     class CheckinTest {
 
         @Test
@@ -295,7 +296,7 @@ class AlarmControllerTest {
             AlarmCheckinRequest request = buildCheckinRequest();
 
             // when & then
-            mockMvc.perform(post(BASE + "/{alarmId}/checkin", 1L)
+            mockMvc.perform(post(BASE + "/{alarmId}/off/checkin", 1L)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk());
@@ -315,7 +316,7 @@ class AlarmControllerTest {
             AlarmCheckinRequest request = buildCheckinRequest();
 
             // when & then
-            mockMvc.perform(post(BASE + "/{alarmId}/checkin", 1L)
+            mockMvc.perform(post(BASE + "/{alarmId}/off/checkin", 1L)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isNotFound());
@@ -332,7 +333,7 @@ class AlarmControllerTest {
             AlarmCheckinRequest request = buildCheckinRequest();
 
             // when & then
-            mockMvc.perform(post(BASE + "/{alarmId}/checkin", 1L)
+            mockMvc.perform(post(BASE + "/{alarmId}/off/checkin", 1L)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isForbidden());
@@ -349,7 +350,7 @@ class AlarmControllerTest {
             AlarmCheckinRequest request = buildCheckinRequest();
 
             // when & then
-            mockMvc.perform(post(BASE + "/{alarmId}/checkin", 1L)
+            mockMvc.perform(post(BASE + "/{alarmId}/off/checkin", 1L)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest());
@@ -366,7 +367,7 @@ class AlarmControllerTest {
             AlarmCheckinRequest request = buildCheckinRequest();
 
             // when & then
-            mockMvc.perform(post(BASE + "/{alarmId}/checkin", 1L)
+            mockMvc.perform(post(BASE + "/{alarmId}/off/checkin", 1L)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest());
@@ -383,7 +384,7 @@ class AlarmControllerTest {
             AlarmCheckinRequest request = buildCheckinRequest();
 
             // when & then
-            mockMvc.perform(post(BASE + "/{alarmId}/checkin", 1L)
+            mockMvc.perform(post(BASE + "/{alarmId}/off/checkin", 1L)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest());
@@ -391,37 +392,38 @@ class AlarmControllerTest {
     }
 
     @Nested
-    @DisplayName("[DELETE] /api/v1/alarms/{alarmId} - 알람 삭제")
-    class RemoveAlarmTest {
+    @DisplayName("[POST] /api/v1/alarms/{alarmId}/delete/payment - 결제로 알람 삭제")
+    class RemoveAlarmByPaymentTest {
 
         @Test
-        @DisplayName("성공: 알람 삭제 요청이 성공하면 200을 반환한다")
+        @DisplayName("성공: 결제 삭제 요청이 성공하면 200을 반환한다")
         void success() throws Exception {
             // given
-            AlarmRemoveRequest request = new AlarmRemoveRequest("사유");
+            AlarmDeleteByPaymentRequest request = new AlarmDeleteByPaymentRequest("device-uuid", "payment-id");
             setSecurityContext(buildContext(MEMBER_5));
 
             // when & then
-            mockMvc.perform(delete(BASE + "/{alarmId}", 1L)
+            mockMvc.perform(post(BASE + "/{alarmId}/delete/payment", 1L)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isOk());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result").doesNotExist());
 
             verify(alarmUseCase, times(1))
-                .removeAlarm(eq(MEMBER_5.getId()), eq(1L), anyString());
+                .removeAlarmByPayment(eq(MEMBER_5.getId()), eq(1L), any(AlarmDeleteByPaymentRequest.class));
         }
 
         @Test
         @DisplayName("실패: 알람이 존재하지 않으면 404를 반환한다")
         void fail_alarmNotFound() throws Exception {
             // given
-            AlarmRemoveRequest request = new AlarmRemoveRequest("사유");
+            AlarmDeleteByPaymentRequest request = new AlarmDeleteByPaymentRequest("device-uuid", "payment-id");
             setSecurityContext(buildContext(MEMBER_6));
-            org.mockito.Mockito.doThrow(ApplicationException.from(akuma.whiplash.domains.alarm.exception.AlarmErrorCode.ALARM_NOT_FOUND))
-                .when(alarmUseCase).removeAlarm(anyLong(), anyLong(), anyString());
+            doThrow(ApplicationException.from(AlarmErrorCode.ALARM_NOT_FOUND))
+                .when(alarmUseCase).removeAlarmByPayment(anyLong(), anyLong(), any(AlarmDeleteByPaymentRequest.class));
 
             // when & then
-            mockMvc.perform(delete(BASE + "/{alarmId}", 1L)
+            mockMvc.perform(post(BASE + "/{alarmId}/delete/payment", 1L)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isNotFound());
@@ -431,30 +433,133 @@ class AlarmControllerTest {
         @DisplayName("실패: 소유자가 아니면 403을 반환한다")
         void fail_permissionDenied() throws Exception {
             // given
-            AlarmRemoveRequest request = new AlarmRemoveRequest("사유");
+            AlarmDeleteByPaymentRequest request = new AlarmDeleteByPaymentRequest("device-uuid", "payment-id");
             setSecurityContext(buildContext(MEMBER_7));
-            org.mockito.Mockito.doThrow(ApplicationException.from(AuthErrorCode.PERMISSION_DENIED))
-                .when(alarmUseCase).removeAlarm(anyLong(), anyLong(), anyString());
+            doThrow(ApplicationException.from(AuthErrorCode.PERMISSION_DENIED))
+                .when(alarmUseCase).removeAlarmByPayment(anyLong(), anyLong(), any(AlarmDeleteByPaymentRequest.class));
 
             // when & then
-            mockMvc.perform(delete(BASE + "/{alarmId}", 1L)
+            mockMvc.perform(post(BASE + "/{alarmId}/delete/payment", 1L)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isForbidden());
         }
 
         @Test
-        @DisplayName("실패: 삭제 사유가 비어 있으면 400을 반환한다")
-        void fail_reasonBlank() throws Exception {
+        @DisplayName("실패: 결제 ID가 비어 있으면 400을 반환한다")
+        void fail_paymentIdBlank() throws Exception {
             // given
-            AlarmRemoveRequest request = new AlarmRemoveRequest("");
+            AlarmDeleteByPaymentRequest request = new AlarmDeleteByPaymentRequest("device-uuid", "");
             setSecurityContext(buildContext(MEMBER_8));
 
             // when & then
-            mockMvc.perform(delete(BASE + "/{alarmId}", 1L)
+            mockMvc.perform(post(BASE + "/{alarmId}/delete/payment", 1L)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest());
+        }
+
+        @Test
+        @DisplayName("실패: 결제 검증에 실패하면 400을 반환한다")
+        void fail_paymentVerificationFailed() throws Exception {
+            // given
+            AlarmDeleteByPaymentRequest request = new AlarmDeleteByPaymentRequest("device-uuid", "payment-id");
+            setSecurityContext(buildContext(MEMBER_8));
+            doThrow(ApplicationException.from(PaymentErrorCode.PAYMENT_VERIFICATION_FAILED))
+                .when(alarmUseCase).removeAlarmByPayment(anyLong(), anyLong(), any(AlarmDeleteByPaymentRequest.class));
+
+            // when & then
+            mockMvc.perform(post(BASE + "/{alarmId}/delete/payment", 1L)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest());
+        }
+    }
+
+    @Nested
+    @DisplayName("[POST] /api/v1/alarms/{alarmId}/delete/ad - 광고 시청으로 알람 삭제")
+    class RemoveAlarmByAdTest {
+
+        @Test
+        @DisplayName("성공: 광고 삭제 요청이 성공하면 200을 반환한다")
+        void success() throws Exception {
+            // given
+            AlarmDeleteByAdRequest request = new AlarmDeleteByAdRequest("device-uuid", "ad-proof-token");
+            setSecurityContext(buildContext(MEMBER_5));
+
+            // when & then
+            mockMvc.perform(post(BASE + "/{alarmId}/delete/ad", 1L)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result").doesNotExist());
+
+            verify(alarmUseCase, times(1))
+                .removeAlarmByAd(eq(MEMBER_5.getId()), eq(1L), any(AlarmDeleteByAdRequest.class));
+        }
+
+        @Test
+        @DisplayName("실패: 광고 증빙 토큰이 비어 있으면 400을 반환한다")
+        void fail_adProofTokenBlank() throws Exception {
+            // given
+            AlarmDeleteByAdRequest request = new AlarmDeleteByAdRequest("device-uuid", "");
+            setSecurityContext(buildContext(MEMBER_8));
+
+            // when & then
+            mockMvc.perform(post(BASE + "/{alarmId}/delete/ad", 1L)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest());
+        }
+
+        @Test
+        @DisplayName("실패: 결제 삭제가 필요한 알람이면 400과 에러 코드를 반환한다")
+        void fail_alarmDeleteRequiresPayment() throws Exception {
+            // given
+            AlarmDeleteByAdRequest request = new AlarmDeleteByAdRequest("device-uuid", "ad-proof-token");
+            setSecurityContext(buildContext(MEMBER_8));
+            doThrow(ApplicationException.from(AlarmErrorCode.ALARM_DELETE_REQUIRES_PAYMENT))
+                .when(alarmUseCase).removeAlarmByAd(anyLong(), anyLong(), any(AlarmDeleteByAdRequest.class));
+
+            // when & then
+            mockMvc.perform(post(BASE + "/{alarmId}/delete/ad", 1L)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.isSuccess").value(false))
+                .andExpect(jsonPath("$.code").value(AlarmErrorCode.ALARM_DELETE_REQUIRES_PAYMENT.getCustomCode()));
+        }
+
+        @Test
+        @DisplayName("실패: 소유자가 아니면 403을 반환한다")
+        void fail_permissionDenied() throws Exception {
+            // given
+            AlarmDeleteByAdRequest request = new AlarmDeleteByAdRequest("device-uuid", "ad-proof-token");
+            setSecurityContext(buildContext(MEMBER_7));
+            doThrow(ApplicationException.from(AuthErrorCode.PERMISSION_DENIED))
+                .when(alarmUseCase).removeAlarmByAd(anyLong(), anyLong(), any(AlarmDeleteByAdRequest.class));
+
+            // when & then
+            mockMvc.perform(post(BASE + "/{alarmId}/delete/ad", 1L)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isForbidden());
+        }
+
+        @Test
+        @DisplayName("실패: 알람이 존재하지 않으면 404를 반환한다")
+        void fail_alarmNotFound() throws Exception {
+            // given
+            AlarmDeleteByAdRequest request = new AlarmDeleteByAdRequest("device-uuid", "ad-proof-token");
+            setSecurityContext(buildContext(MEMBER_6));
+            doThrow(ApplicationException.from(AlarmErrorCode.ALARM_NOT_FOUND))
+                .when(alarmUseCase).removeAlarmByAd(anyLong(), anyLong(), any(AlarmDeleteByAdRequest.class));
+
+            // when & then
+            mockMvc.perform(post(BASE + "/{alarmId}/delete/ad", 1L)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isNotFound());
         }
     }
 
