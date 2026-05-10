@@ -18,6 +18,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import akuma.whiplash.common.fixture.AlarmFixture;
 import akuma.whiplash.common.fixture.MemberFixture;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmCheckinRequest;
+import akuma.whiplash.domains.alarm.application.dto.request.AlarmDeleteByAdRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmDeleteByPaymentRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmRegisterRequest;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmPreviewDto;
@@ -472,6 +473,93 @@ class AlarmControllerTest {
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest());
+        }
+    }
+
+    @Nested
+    @DisplayName("[POST] /api/v1/alarms/{alarmId}/delete/ad - 광고 시청으로 알람 삭제")
+    class RemoveAlarmByAdTest {
+
+        @Test
+        @DisplayName("성공: 광고 삭제 요청이 성공하면 200을 반환한다")
+        void success() throws Exception {
+            // given
+            AlarmDeleteByAdRequest request = new AlarmDeleteByAdRequest("device-uuid", "ad-proof-token");
+            setSecurityContext(buildContext(MEMBER_5));
+
+            // when & then
+            mockMvc.perform(post(BASE + "/{alarmId}/delete/ad", 1L)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result").doesNotExist());
+
+            verify(alarmUseCase, times(1))
+                .removeAlarmByAd(eq(MEMBER_5.getId()), eq(1L), any(AlarmDeleteByAdRequest.class));
+        }
+
+        @Test
+        @DisplayName("실패: 광고 증빙 토큰이 비어 있으면 400을 반환한다")
+        void fail_adProofTokenBlank() throws Exception {
+            // given
+            AlarmDeleteByAdRequest request = new AlarmDeleteByAdRequest("device-uuid", "");
+            setSecurityContext(buildContext(MEMBER_8));
+
+            // when & then
+            mockMvc.perform(post(BASE + "/{alarmId}/delete/ad", 1L)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest());
+        }
+
+        @Test
+        @DisplayName("실패: 결제 삭제가 필요한 알람이면 400과 에러 코드를 반환한다")
+        void fail_alarmDeleteRequiresPayment() throws Exception {
+            // given
+            AlarmDeleteByAdRequest request = new AlarmDeleteByAdRequest("device-uuid", "ad-proof-token");
+            setSecurityContext(buildContext(MEMBER_8));
+            doThrow(ApplicationException.from(AlarmErrorCode.ALARM_DELETE_REQUIRES_PAYMENT))
+                .when(alarmUseCase).removeAlarmByAd(anyLong(), anyLong(), any(AlarmDeleteByAdRequest.class));
+
+            // when & then
+            mockMvc.perform(post(BASE + "/{alarmId}/delete/ad", 1L)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.isSuccess").value(false))
+                .andExpect(jsonPath("$.code").value(AlarmErrorCode.ALARM_DELETE_REQUIRES_PAYMENT.getCustomCode()));
+        }
+
+        @Test
+        @DisplayName("실패: 소유자가 아니면 403을 반환한다")
+        void fail_permissionDenied() throws Exception {
+            // given
+            AlarmDeleteByAdRequest request = new AlarmDeleteByAdRequest("device-uuid", "ad-proof-token");
+            setSecurityContext(buildContext(MEMBER_7));
+            doThrow(ApplicationException.from(AuthErrorCode.PERMISSION_DENIED))
+                .when(alarmUseCase).removeAlarmByAd(anyLong(), anyLong(), any(AlarmDeleteByAdRequest.class));
+
+            // when & then
+            mockMvc.perform(post(BASE + "/{alarmId}/delete/ad", 1L)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isForbidden());
+        }
+
+        @Test
+        @DisplayName("실패: 알람이 존재하지 않으면 404를 반환한다")
+        void fail_alarmNotFound() throws Exception {
+            // given
+            AlarmDeleteByAdRequest request = new AlarmDeleteByAdRequest("device-uuid", "ad-proof-token");
+            setSecurityContext(buildContext(MEMBER_6));
+            doThrow(ApplicationException.from(AlarmErrorCode.ALARM_NOT_FOUND))
+                .when(alarmUseCase).removeAlarmByAd(anyLong(), anyLong(), any(AlarmDeleteByAdRequest.class));
+
+            // when & then
+            mockMvc.perform(post(BASE + "/{alarmId}/delete/ad", 1L)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isNotFound());
         }
     }
 

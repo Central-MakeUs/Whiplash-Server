@@ -72,9 +72,9 @@ class MemberCommandServiceTest {
 
             // when & then
             assertThatThrownBy(() -> memberCommandService.softDeleteMember(999L, "device"))
-                .isInstanceOf(ApplicationException.class)
-                .satisfies(e -> assertThat(((ApplicationException) e).getCode())
-                    .isEqualTo(MemberErrorCode.MEMBER_NOT_FOUND));
+                .isInstanceOfSatisfying(ApplicationException.class, e ->
+                    assertThat(e.getCode()).isEqualTo(MemberErrorCode.MEMBER_NOT_FOUND)
+                );
         }
     }
 }

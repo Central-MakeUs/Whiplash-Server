@@ -58,6 +58,7 @@ tools: Read, Grep, Glob
 - [ ] 에러 코드 검증 시 직접 문자열보다 ErrorCode enum의 `getCustomCode()`를 사용했는가?
 - [ ] 에러 메시지(`message`)를 String literal로 직접 검증하고 있지 않은가?
 - [ ] 메시지까지 API 계약으로 보장해야 하는 경우에만 ErrorCode enum의 `getMessage()`로 검증했는가?
+- [ ] 서비스 단위 테스트에서 `ApplicationException`을 검증할 때 `hasMessage(...)` 대신 `getCode()`로 ErrorCode enum을 검증했는가?
 
 ---
 
@@ -97,4 +98,17 @@ class AlarmOffTest {
 
 // ✅ 메시지가 계약인 경우에만 enum 기반으로 검증
 .andExpect(jsonPath("$.message").value(ALARM_DELETE_REQUIRES_PAYMENT.getMessage()));
+```
+
+```java
+// ❌ 위반: 서비스 예외 메시지 문구를 직접 검증
+assertThatThrownBy(() -> alarmCommandService.removeAlarmByAd(memberId, alarmId, request))
+    .isInstanceOf(ApplicationException.class)
+    .hasMessage("결제 삭제가 필요한 알람입니다.");
+
+// ✅ 수정: 서비스 예외는 ErrorCode enum을 검증
+assertThatThrownBy(() -> alarmCommandService.removeAlarmByAd(memberId, alarmId, request))
+    .isInstanceOfSatisfying(ApplicationException.class, e ->
+        assertThat(e.getCode()).isEqualTo(ALARM_DELETE_REQUIRES_PAYMENT)
+    );
 ```

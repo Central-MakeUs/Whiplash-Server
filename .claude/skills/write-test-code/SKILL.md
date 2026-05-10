@@ -60,12 +60,19 @@ AlarmOccurrenceEntity occurrence =
 - 에러 메시지(`message`)는 사용자 노출 문구라 변경 가능성이 높으므로 String literal로 직접 검증하지 않는다.
 - 메시지 검증이 꼭 필요하면 직접 문자열 대신 ErrorCode enum의 `getMessage()`를 사용한다.
 - 에러 코드도 직접 문자열보다 ErrorCode enum의 `getCustomCode()`를 우선 사용한다.
+- 서비스 단위 테스트에서 `ApplicationException`을 검증할 때는 `hasMessage(...)`보다 `getCode()`로 ErrorCode enum을 비교한다.
 
 ```java
 // ✅ 권장
 .andExpect(status().isBadRequest())
 .andExpect(jsonPath("$.isSuccess").value(false))
 .andExpect(jsonPath("$.code").value(ALARM_DELETE_REQUIRES_PAYMENT.getCustomCode()));
+
+// ✅ 서비스 단위 테스트 권장
+assertThatThrownBy(() -> alarmCommandService.removeAlarmByAd(memberId, alarmId, request))
+    .isInstanceOfSatisfying(ApplicationException.class, e ->
+        assertThat(e.getCode()).isEqualTo(ALARM_DELETE_REQUIRES_PAYMENT)
+    );
 
 // ⚠️ 메시지까지 계약으로 보장해야 하는 경우에만 사용
 .andExpect(jsonPath("$.message").value(ALARM_DELETE_REQUIRES_PAYMENT.getMessage()));
@@ -83,3 +90,4 @@ AlarmOccurrenceEntity occurrence =
 - [ ] 서비스→`toMockEntity()`, Persistence→`toEntity()` 구분했는가?
 - [ ] 테스트 내부 생성 헬퍼 대신 Fixture 메서드를 사용했는가?
 - [ ] 에러 응답 검증에서 메시지 String literal 대신 ErrorCode enum 또는 code 중심 검증을 사용했는가?
+- [ ] 서비스 예외 검증에서 `hasMessage(...)` 대신 `ApplicationException#getCode()`를 검증했는가?

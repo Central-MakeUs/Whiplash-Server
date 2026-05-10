@@ -15,6 +15,7 @@ description: 이 저장소에서 작성된 테스트 코드가 프로젝트 컨�
 - BDD 주석 존재 여부 점검
 - 테스트 슬라이스 어노테이션 선택 점검
 - fixture 사용 방식 점검
+- 에러 응답 및 서비스 예외 검증 방식 점검
 
 ## 1. 구조
 
@@ -67,6 +68,16 @@ description: 이 저장소에서 작성된 테스트 코드가 프로젝트 컨�
 - 서비스 테스트에서 `toMockEntity()`를 쓰는가
 - persistence / integration 테스트에서 `toEntity()`를 쓰는가
 - 이미 있는 fixture 대신 직접 builder를 남발하지 않는가
+
+## 7. 에러 검증
+
+중점 확인:
+
+- 컨트롤러/통합 테스트에서 에러 응답은 `status`, `isSuccess`, `code` 중심으로 검증하는가
+- 에러 코드 검증 시 직접 문자열보다 ErrorCode enum의 `getCustomCode()`를 사용하는가
+- 에러 메시지(`message`)를 String literal로 직접 검증하지 않는가
+- 메시지까지 API 계약인 경우에만 ErrorCode enum의 `getMessage()`를 사용하는가
+- 서비스 단위 테스트에서 `ApplicationException`은 `hasMessage(...)`보다 `getCode()`로 ErrorCode enum을 검증하는가
 
 ## 출력 방식
 

@@ -1,5 +1,9 @@
 package akuma.whiplash.domains.alarm.domain.service;
 
+import static akuma.whiplash.domains.alarm.exception.AlarmErrorCode.*;
+import static akuma.whiplash.domains.auth.exception.AuthErrorCode.PERMISSION_DENIED;
+import static akuma.whiplash.domains.member.exception.MemberErrorCode.MEMBER_NOT_FOUND;
+import static akuma.whiplash.domains.payment.exception.PaymentErrorCode.*;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -159,7 +163,9 @@ class AlarmCommandServiceTest {
 
             // when & then
             assertThatThrownBy(() -> alarmCommandService.createAlarm(request, MemberFixture.MEMBER_6.getId()))
-                .isInstanceOf(ApplicationException.class);
+                .isInstanceOfSatisfying(ApplicationException.class, e ->
+                    assertThat(e.getCode()).isEqualTo(MEMBER_NOT_FOUND)
+                );
         }
 
         @Test
@@ -184,7 +190,9 @@ class AlarmCommandServiceTest {
 
             // when & then
             assertThatThrownBy(() -> alarmCommandService.createAlarm(request, member.getId()))
-                .isInstanceOf(ApplicationException.class);
+                .isInstanceOfSatisfying(ApplicationException.class, e ->
+                    assertThat(e.getCode()).isEqualTo(DUPLICATE_ALARM_PURPOSE)
+                );
         }
     }
 
@@ -246,7 +254,9 @@ class AlarmCommandServiceTest {
                 1L,
                 new AlarmCheckinRequest(1L, "device-uuid", 0.0, 0.0)
             ))
-                .isInstanceOf(ApplicationException.class);
+                .isInstanceOfSatisfying(ApplicationException.class, e ->
+                    assertThat(e.getCode()).isEqualTo(ALARM_NOT_FOUND)
+                );
         }
 
         @Test
@@ -263,7 +273,9 @@ class AlarmCommandServiceTest {
 
             // when & then
             assertThatThrownBy(() -> alarmCommandService.checkinAlarm(999L, alarm.getId(), request))
-                .isInstanceOf(ApplicationException.class);
+                .isInstanceOfSatisfying(ApplicationException.class, e ->
+                    assertThat(e.getCode()).isEqualTo(PERMISSION_DENIED)
+                );
         }
 
         @Test
@@ -279,7 +291,9 @@ class AlarmCommandServiceTest {
 
             // when & then
             assertThatThrownBy(() -> alarmCommandService.checkinAlarm(member.getId(), alarm.getId(), request))
-                .isInstanceOf(ApplicationException.class);
+                .isInstanceOfSatisfying(ApplicationException.class, e ->
+                    assertThat(e.getCode()).isEqualTo(ALARM_OCCURRENCE_NOT_FOUND)
+                );
         }
 
         @Test
@@ -298,7 +312,9 @@ class AlarmCommandServiceTest {
 
             // when & then
             assertThatThrownBy(() -> alarmCommandService.checkinAlarm(member.getId(), alarm.getId(), request))
-                .isInstanceOf(ApplicationException.class);
+                .isInstanceOfSatisfying(ApplicationException.class, e ->
+                    assertThat(e.getCode()).isEqualTo(ALREADY_DEACTIVATED)
+                );
         }
 
         @Test
@@ -320,7 +336,9 @@ class AlarmCommandServiceTest {
 
             // when & then
             assertThatThrownBy(() -> alarmCommandService.checkinAlarm(member.getId(), alarm.getId(), request))
-                .isInstanceOf(ApplicationException.class);
+                .isInstanceOfSatisfying(ApplicationException.class, e ->
+                    assertThat(e.getCode()).isEqualTo(CHECKIN_NOT_YET_AVAILABLE)
+                );
         }
 
         @Test
@@ -338,7 +356,9 @@ class AlarmCommandServiceTest {
 
             // when & then
             assertThatThrownBy(() -> alarmCommandService.checkinAlarm(member.getId(), alarm.getId(), request))
-                .isInstanceOf(ApplicationException.class);
+                .isInstanceOfSatisfying(ApplicationException.class, e ->
+                    assertThat(e.getCode()).isEqualTo(CHECKIN_OUT_OF_RANGE)
+                );
         }
     }
 
@@ -409,8 +429,9 @@ class AlarmCommandServiceTest {
 
             // when & then
             assertThatThrownBy(() -> alarmCommandService.deactivateByPayment(member.getId(), alarm.getId(), request))
-                .isInstanceOf(ApplicationException.class)
-                .hasMessage("이미 처리된 결제입니다.");
+                .isInstanceOfSatisfying(ApplicationException.class, e ->
+                    assertThat(e.getCode()).isEqualTo(DUPLICATE_PAYMENT)
+                );
         }
 
         @Test
@@ -438,8 +459,9 @@ class AlarmCommandServiceTest {
 
             // when & then
             assertThatThrownBy(() -> alarmCommandService.deactivateByPayment(member.getId(), alarm.getId(), request))
-                .isInstanceOf(ApplicationException.class)
-                .hasMessage("결제 검증에 실패했습니다.");
+                .isInstanceOfSatisfying(ApplicationException.class, e ->
+                    assertThat(e.getCode()).isEqualTo(PAYMENT_VERIFICATION_FAILED)
+                );
 
             ArgumentCaptor<String> failReasonCaptor = ArgumentCaptor.forClass(String.class);
             verify(auditLogRecorder).recordPaymentDeactivationFailure(
@@ -477,8 +499,9 @@ class AlarmCommandServiceTest {
 
             // when & then
             assertThatThrownBy(() -> alarmCommandService.deactivateByPayment(member.getId(), alarm.getId(), request))
-                .isInstanceOf(ApplicationException.class)
-                .hasMessage("아직 결제로 알람을 끌 수 있는 시간이 아닙니다.");
+                .isInstanceOfSatisfying(ApplicationException.class, e ->
+                    assertThat(e.getCode()).isEqualTo(PAYMENT_NOT_YET_AVAILABLE)
+                );
         }
     }
 
@@ -531,7 +554,9 @@ class AlarmCommandServiceTest {
 
             // when & then
             assertThatThrownBy(() -> alarmCommandService.removeAlarmByPayment(1L, 1L, request))
-                .isInstanceOf(ApplicationException.class);
+                .isInstanceOfSatisfying(ApplicationException.class, e ->
+                    assertThat(e.getCode()).isEqualTo(ALARM_NOT_FOUND)
+                );
         }
 
         @Test
@@ -545,7 +570,9 @@ class AlarmCommandServiceTest {
 
             // when & then
             assertThatThrownBy(() -> alarmCommandService.removeAlarmByPayment(MemberFixture.MEMBER_10.getId(), alarm.getId(), request))
-                .isInstanceOf(ApplicationException.class);
+                .isInstanceOfSatisfying(ApplicationException.class, e ->
+                    assertThat(e.getCode()).isEqualTo(PERMISSION_DENIED)
+                );
         }
 
         @Test
@@ -562,8 +589,9 @@ class AlarmCommandServiceTest {
 
             // when & then
             assertThatThrownBy(() -> alarmCommandService.removeAlarmByPayment(member.getId(), alarm.getId(), request))
-                .isInstanceOf(ApplicationException.class)
-                .hasMessage("오늘은 알람이 울리는 날이 아닙니다.");
+                .isInstanceOfSatisfying(ApplicationException.class, e ->
+                    assertThat(e.getCode()).isEqualTo(TODAY_IS_NOT_ALARM_DAY)
+                );
         }
 
         @Test
@@ -582,8 +610,9 @@ class AlarmCommandServiceTest {
 
             // when & then
             assertThatThrownBy(() -> alarmCommandService.removeAlarmByPayment(member.getId(), alarm.getId(), request))
-                .isInstanceOf(ApplicationException.class)
-                .hasMessage("이미 오늘은 비활성화된 알람입니다.");
+                .isInstanceOfSatisfying(ApplicationException.class, e ->
+                    assertThat(e.getCode()).isEqualTo(ALREADY_DEACTIVATED)
+                );
         }
 
         @Test
@@ -606,8 +635,9 @@ class AlarmCommandServiceTest {
 
             // when & then
             assertThatThrownBy(() -> alarmCommandService.removeAlarmByPayment(member.getId(), alarm.getId(), request))
-                .isInstanceOf(ApplicationException.class)
-                .hasMessage("이미 처리된 결제입니다.");
+                .isInstanceOfSatisfying(ApplicationException.class, e ->
+                    assertThat(e.getCode()).isEqualTo(DUPLICATE_PAYMENT)
+                );
         }
 
         @Test
@@ -637,8 +667,9 @@ class AlarmCommandServiceTest {
 
             // when & then
             assertThatThrownBy(() -> alarmCommandService.removeAlarmByPayment(member.getId(), alarm.getId(), request))
-                .isInstanceOf(ApplicationException.class)
-                .hasMessage("이미 처리된 결제입니다.");
+                .isInstanceOfSatisfying(ApplicationException.class, e ->
+                    assertThat(e.getCode()).isEqualTo(DUPLICATE_PAYMENT)
+                );
         }
 
         @Test
@@ -666,8 +697,9 @@ class AlarmCommandServiceTest {
 
             // when & then
             assertThatThrownBy(() -> alarmCommandService.removeAlarmByPayment(member.getId(), alarm.getId(), request))
-                .isInstanceOf(ApplicationException.class)
-                .hasMessage("결제 검증에 실패했습니다.");
+                .isInstanceOfSatisfying(ApplicationException.class, e ->
+                    assertThat(e.getCode()).isEqualTo(PAYMENT_VERIFICATION_FAILED)
+                );
 
             ArgumentCaptor<String> failReasonCaptor = ArgumentCaptor.forClass(String.class);
             verify(auditLogRecorder).recordPaymentDeleteFailure(
@@ -750,7 +782,9 @@ class AlarmCommandServiceTest {
 
             // when & then
             assertThatThrownBy(() -> alarmCommandService.removeAlarmByAd(1L, 1L, request))
-                .isInstanceOf(ApplicationException.class);
+                .isInstanceOfSatisfying(ApplicationException.class, e ->
+                    assertThat(e.getCode()).isEqualTo(ALARM_NOT_FOUND)
+                );
         }
 
         @Test
@@ -764,7 +798,9 @@ class AlarmCommandServiceTest {
 
             // when & then
             assertThatThrownBy(() -> alarmCommandService.removeAlarmByAd(MemberFixture.MEMBER_10.getId(), alarm.getId(), request))
-                .isInstanceOf(ApplicationException.class);
+                .isInstanceOfSatisfying(ApplicationException.class, e ->
+                    assertThat(e.getCode()).isEqualTo(PERMISSION_DENIED)
+                );
         }
 
         @Test
@@ -783,8 +819,9 @@ class AlarmCommandServiceTest {
 
             // when & then
             assertThatThrownBy(() -> alarmCommandService.removeAlarmByAd(member.getId(), alarm.getId(), request))
-                .isInstanceOf(ApplicationException.class)
-                .hasMessage("결제 삭제가 필요한 알람입니다.");
+                .isInstanceOfSatisfying(ApplicationException.class, e ->
+                    assertThat(e.getCode()).isEqualTo(ALARM_DELETE_REQUIRES_PAYMENT)
+                );
         }
 
         @Test
@@ -803,8 +840,9 @@ class AlarmCommandServiceTest {
 
             // when & then
             assertThatThrownBy(() -> alarmCommandService.removeAlarmByAd(member.getId(), alarm.getId(), request))
-                .isInstanceOf(ApplicationException.class)
-                .hasMessage("결제 삭제가 필요한 알람입니다.");
+                .isInstanceOfSatisfying(ApplicationException.class, e ->
+                    assertThat(e.getCode()).isEqualTo(ALARM_DELETE_REQUIRES_PAYMENT)
+                );
         }
     }
 
@@ -857,7 +895,9 @@ class AlarmCommandServiceTest {
 
             // when & then
             assertThatThrownBy(() -> alarmCommandService.ringAlarm(member.getId(), alarm.getId()))
-                .isInstanceOf(ApplicationException.class);
+                .isInstanceOfSatisfying(ApplicationException.class, e ->
+                    assertThat(e.getCode()).isEqualTo(NOT_ALARM_TIME)
+                );
         }
     }
 }
