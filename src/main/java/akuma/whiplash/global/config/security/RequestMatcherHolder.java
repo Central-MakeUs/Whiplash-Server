@@ -54,10 +54,10 @@ public class RequestMatcherHolder {
         new RequestInfo(DELETE, "/api/load-test/**", null),
 
         // alarm
-        new RequestInfo(GET, "/api/alarms/**",USER),
-        new RequestInfo(POST, "/api/alarms/**",USER),
-        new RequestInfo(PUT, "/api/alarms/**",USER),
-        new RequestInfo(DELETE, "/api/alarms/**",USER),
+        new RequestInfo(GET, "/api/v1/alarms/**",USER),
+        new RequestInfo(POST, "/api/v1/alarms/**",USER),
+        new RequestInfo(PUT, "/api/v1/alarms/**",USER),
+        new RequestInfo(DELETE, "/api/v1/alarms/**",USER),
 
         // member
         new RequestInfo(GET, "/api/v1/members/**", USER),

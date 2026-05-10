@@ -42,6 +42,17 @@ public interface AlarmOccurrenceRepository extends JpaRepository<AlarmOccurrence
     );
 
     @Query("""
+    SELECT ao.status
+    FROM AlarmOccurrenceEntity ao
+    WHERE ao.alarm.id = :alarmId
+      AND ao.occurrenceDate = :date
+    """)
+    Optional<OccurrenceStatus> findStatusByAlarmIdAndDate(
+        @Param("alarmId") Long alarmId,
+        @Param("date") LocalDate date
+    );
+
+    @Query("""
     SELECT ao
     FROM AlarmOccurrenceEntity ao
     WHERE ao.id = :occurrenceId

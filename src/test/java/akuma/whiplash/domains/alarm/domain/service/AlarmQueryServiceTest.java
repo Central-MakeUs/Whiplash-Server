@@ -11,20 +11,25 @@ import static org.mockito.Mockito.never;
 
 import akuma.whiplash.common.fixture.AlarmFixture;
 import akuma.whiplash.common.fixture.MemberFixture;
+import akuma.whiplash.domains.alarm.application.dto.response.AlarmDeleteMethodResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmSyncResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.GetAlarmsResponse;
+import akuma.whiplash.domains.alarm.domain.constant.AlarmDeleteMethod;
 import akuma.whiplash.domains.alarm.domain.constant.AlarmStatus;
 import akuma.whiplash.domains.alarm.domain.constant.OccurrenceStatus;
 import akuma.whiplash.domains.alarm.domain.constant.SoundType;
 import akuma.whiplash.domains.alarm.domain.constant.Weekday;
+import akuma.whiplash.domains.alarm.exception.AlarmErrorCode;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmEntity;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmOccurrenceEntity;
 import akuma.whiplash.domains.alarm.persistence.repository.AlarmOccurrenceRepository;
 import akuma.whiplash.domains.alarm.persistence.repository.AlarmRepository;
+import akuma.whiplash.domains.auth.exception.AuthErrorCode;
 import akuma.whiplash.domains.member.exception.MemberErrorCode;
 import akuma.whiplash.domains.member.persistence.entity.MemberEntity;
 import akuma.whiplash.domains.member.persistence.repository.MemberRepository;
 import akuma.whiplash.global.exception.ApplicationException;
+import akuma.whiplash.global.util.date.TimeProvider;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -45,6 +50,7 @@ class AlarmQueryServiceTest {
     @Mock private AlarmRepository alarmRepository;
     @Mock private AlarmOccurrenceRepository alarmOccurrenceRepository;
     @Mock private MemberRepository memberRepository;
+    @Mock private TimeProvider timeProvider;
 
     @InjectMocks private AlarmQueryServiceImpl alarmQueryService;
 
@@ -255,6 +261,162 @@ class AlarmQueryServiceTest {
             thrown
                 .isInstanceOf(ApplicationException.class)
                 .hasFieldOrPropertyWithValue("code", MemberErrorCode.MEMBER_NOT_FOUND);
+        }
+    }
+
+    @Nested
+    @DisplayName("getAlarmDeleteMethod - 알람 삭제 방법 조회")
+    class GetAlarmDeleteMethodTest {
+
+        private static final LocalDate TODAY = LocalDate.of(2026, 5, 4);
+
+        @Nested
+        @DisplayName("오늘 회차가 없는 경우")
+        class NoOccurrenceTodayTest {
+
+            @Test
+            @DisplayName("성공: 광고 시청으로 삭제할 수 있다")
+            void success() {
+                // given
+                MemberEntity member = MemberFixture.MEMBER_11.toMockEntity();
+                AlarmEntity alarm = AlarmFixture.ALARM_11.toMockEntity(member);
+                given(alarmRepository.findByIdWithMember(alarm.getId())).willReturn(Optional.of(alarm));
+                given(timeProvider.today()).willReturn(TODAY);
+                given(alarmOccurrenceRepository.findStatusByAlarmIdAndDate(alarm.getId(), TODAY))
+                    .willReturn(Optional.empty());
+
+                // when
+                AlarmDeleteMethodResponse result = alarmQueryService.getAlarmDeleteMethod(member.getId(), alarm.getId());
+
+                // then
+                assertThat(result.deleteMethod()).isEqualTo(AlarmDeleteMethod.AD.name());
+            }
+        }
+
+        @Nested
+        @DisplayName("오늘 회차가 도착 인증 완료 상태인 경우")
+        class CheckinCompletedTest {
+
+            @Test
+            @DisplayName("성공: 광고 시청으로 삭제할 수 있다")
+            void success() {
+                // given
+                MemberEntity member = MemberFixture.MEMBER_11.toMockEntity();
+                AlarmEntity alarm = AlarmFixture.ALARM_11.toMockEntity(member);
+                given(alarmRepository.findByIdWithMember(alarm.getId())).willReturn(Optional.of(alarm));
+                given(timeProvider.today()).willReturn(TODAY);
+                given(alarmOccurrenceRepository.findStatusByAlarmIdAndDate(alarm.getId(), TODAY))
+                    .willReturn(Optional.of(OccurrenceStatus.CHECKIN));
+
+                // when
+                AlarmDeleteMethodResponse result = alarmQueryService.getAlarmDeleteMethod(member.getId(), alarm.getId());
+
+                // then
+                assertThat(result.deleteMethod()).isEqualTo(AlarmDeleteMethod.AD.name());
+            }
+        }
+
+        @Nested
+        @DisplayName("오늘 회차가 결제 완료 상태인 경우")
+        class PaymentCompletedTest {
+
+            @Test
+            @DisplayName("성공: 광고 시청으로 삭제할 수 있다")
+            void success() {
+                // given
+                MemberEntity member = MemberFixture.MEMBER_11.toMockEntity();
+                AlarmEntity alarm = AlarmFixture.ALARM_11.toMockEntity(member);
+                given(alarmRepository.findByIdWithMember(alarm.getId())).willReturn(Optional.of(alarm));
+                given(timeProvider.today()).willReturn(TODAY);
+                given(alarmOccurrenceRepository.findStatusByAlarmIdAndDate(alarm.getId(), TODAY))
+                    .willReturn(Optional.of(OccurrenceStatus.PAYMENT));
+
+                // when
+                AlarmDeleteMethodResponse result = alarmQueryService.getAlarmDeleteMethod(member.getId(), alarm.getId());
+
+                // then
+                assertThat(result.deleteMethod()).isEqualTo(AlarmDeleteMethod.AD.name());
+            }
+        }
+
+        @Nested
+        @DisplayName("오늘 회차가 예정 상태인 경우")
+        class ScheduledTest {
+
+            @Test
+            @DisplayName("성공: 결제로 삭제할 수 있다")
+            void success() {
+                // given
+                MemberEntity member = MemberFixture.MEMBER_11.toMockEntity();
+                AlarmEntity alarm = AlarmFixture.ALARM_11.toMockEntity(member);
+                given(alarmRepository.findByIdWithMember(alarm.getId())).willReturn(Optional.of(alarm));
+                given(timeProvider.today()).willReturn(TODAY);
+                given(alarmOccurrenceRepository.findStatusByAlarmIdAndDate(alarm.getId(), TODAY))
+                    .willReturn(Optional.of(OccurrenceStatus.SCHEDULED));
+
+                // when
+                AlarmDeleteMethodResponse result = alarmQueryService.getAlarmDeleteMethod(member.getId(), alarm.getId());
+
+                // then
+                assertThat(result.deleteMethod()).isEqualTo(AlarmDeleteMethod.PAYMENT.name());
+            }
+        }
+
+        @Nested
+        @DisplayName("오늘 회차가 울림 상태인 경우")
+        class RingingTest {
+
+            @Test
+            @DisplayName("성공: 결제로 삭제할 수 있다")
+            void success() {
+                // given
+                MemberEntity member = MemberFixture.MEMBER_11.toMockEntity();
+                AlarmEntity alarm = AlarmFixture.ALARM_11.toMockEntity(member);
+                given(alarmRepository.findByIdWithMember(alarm.getId())).willReturn(Optional.of(alarm));
+                given(timeProvider.today()).willReturn(TODAY);
+                given(alarmOccurrenceRepository.findStatusByAlarmIdAndDate(alarm.getId(), TODAY))
+                    .willReturn(Optional.of(OccurrenceStatus.RINGING));
+
+                // when
+                AlarmDeleteMethodResponse result = alarmQueryService.getAlarmDeleteMethod(member.getId(), alarm.getId());
+
+                // then
+                assertThat(result.deleteMethod()).isEqualTo(AlarmDeleteMethod.PAYMENT.name());
+            }
+        }
+
+        @Test
+        @DisplayName("실패: 알람이 존재하지 않으면 예외를 던진다")
+        void fail_alarmNotFound() {
+            // given
+            long alarmId = 999L;
+            given(alarmRepository.findByIdWithMember(alarmId)).willReturn(Optional.empty());
+
+            // when
+            var thrown = assertThatThrownBy(() -> alarmQueryService.getAlarmDeleteMethod(1L, alarmId));
+
+            // then
+            thrown
+                .isInstanceOfSatisfying(ApplicationException.class, e ->
+                    assertThat(e.getCode()).isEqualTo(AlarmErrorCode.ALARM_NOT_FOUND));
+        }
+
+        @Test
+        @DisplayName("실패: 알람 소유자가 아니면 예외를 던진다")
+        void fail_permissionDenied() {
+            // given
+            MemberEntity owner = MemberFixture.MEMBER_11.toMockEntity();
+            MemberEntity other = MemberFixture.MEMBER_12.toMockEntity();
+            AlarmEntity alarm = AlarmFixture.ALARM_11.toMockEntity(owner);
+            given(alarmRepository.findByIdWithMember(alarm.getId())).willReturn(Optional.of(alarm));
+
+            // when
+            var thrown = assertThatThrownBy(() -> alarmQueryService.getAlarmDeleteMethod(other.getId(), alarm.getId()));
+
+            // then
+            thrown
+                .isInstanceOfSatisfying(ApplicationException.class, e ->
+                    assertThat(e.getCode()).isEqualTo(AuthErrorCode.PERMISSION_DENIED));
         }
     }
 }

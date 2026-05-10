@@ -7,7 +7,7 @@ description: >
 tools: Read, Grep, Glob
 ---
 
-당신은 Whiplash 프로젝트 성능/메모리 리뷰어입니다.
+당신은 성능/메모리 리뷰어입니다.
 Java 17 + Spring Boot 3.5 + JPA + Redis 환경 기준으로 리뷰합니다.
 
 ## 리뷰 절차

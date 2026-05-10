@@ -2,6 +2,7 @@ package akuma.whiplash.domains.alarm.application.mapper;
 
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmRegisterRequest;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmCheckinResponse;
+import akuma.whiplash.domains.alarm.application.dto.response.AlarmDeleteMethodResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmPaymentResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmSyncItemDto;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmSyncResponse;
@@ -9,6 +10,7 @@ import akuma.whiplash.domains.alarm.application.dto.response.CreateAlarmOccurren
 import akuma.whiplash.domains.alarm.application.dto.response.CreateAlarmResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.NextOccurrenceResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmPreviewDto;
+import akuma.whiplash.domains.alarm.domain.constant.AlarmDeleteMethod;
 import akuma.whiplash.domains.alarm.domain.constant.DeactivateType;
 import akuma.whiplash.domains.alarm.domain.constant.DeactivationResult;
 import akuma.whiplash.domains.alarm.domain.constant.AlarmStatus;
@@ -331,6 +333,12 @@ public class AlarmMapper {
         return AlarmSyncResponse.builder()
             .serverTime(serverTime)
             .alarms(alarms)
+            .build();
+    }
+
+    public static AlarmDeleteMethodResponse mapToAlarmDeleteMethodResponse(AlarmDeleteMethod deleteMethod) {
+        return AlarmDeleteMethodResponse.builder()
+            .deleteMethod(deleteMethod.name())
             .build();
     }
 
