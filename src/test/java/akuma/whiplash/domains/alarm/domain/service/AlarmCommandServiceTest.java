@@ -22,8 +22,6 @@ import akuma.whiplash.domains.alarm.application.dto.request.AlarmDeleteByPayment
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmPaymentRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmRegisterRequest;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmCheckinResponse;
-import akuma.whiplash.domains.alarm.application.dto.response.AlarmDeleteByAdResponse;
-import akuma.whiplash.domains.alarm.application.dto.response.AlarmDeleteByPaymentResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmPaymentResponse;
 import akuma.whiplash.domains.alarm.application.service.AuditLogRecorder;
 import akuma.whiplash.domains.alarm.domain.constant.AlarmStatus;
@@ -63,6 +61,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.dao.DataIntegrityViolationException;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("AlarmCommandService Unit Test")
@@ -511,13 +510,12 @@ class AlarmCommandServiceTest {
             given(paymentVerificationPort.verify(request.paymentId())).willReturn(true);
 
             // when
-            AlarmDeleteByPaymentResponse response = alarmCommandService.removeAlarmByPayment(member.getId(), alarm.getId(), request);
+            alarmCommandService.removeAlarmByPayment(member.getId(), alarm.getId(), request);
 
             // then
-            assertThat(response.alarmId()).isEqualTo(alarm.getId());
-            assertThat(response.deletedAt()).isEqualTo(FIXED_NOW);
             assertThat(alarm.getStatus()).isEqualTo(AlarmStatus.DELETED);
             assertThat(alarm.getDeletedAt()).isEqualTo(FIXED_NOW);
+            assertThat(alarm.getRevision()).isEqualTo(2);
             verify(paymentRepository).saveAndFlush(any(PaymentEntity.class));
             verify(alarmDeleteLogRepository).save(any(AlarmDeleteLogEntity.class));
             verify(ringingAlarmRedisRepository).remove(alarm.getId(), member.getId());
@@ -613,6 +611,37 @@ class AlarmCommandServiceTest {
         }
 
         @Test
+        @DisplayName("실패: 결제 저장 시점에 중복 결제가 감지되면 예외를 던진다")
+        void fail_duplicatePaymentOnSave() {
+            // given
+            MemberEntity member = MemberFixture.MEMBER_7.toMockEntity();
+            AlarmEntity alarm = AlarmFixture.ALARM_07.toMockEntity(member);
+            AlarmOccurrenceEntity occurrence = AlarmOccurrenceFixture.ALARM_OCCURRENCE_02
+                .toMockEntity(alarm, 1405L, FIXED_NOW, OccurrenceStatus.SCHEDULED);
+            MemberDeviceEntity device = MemberDeviceFixture.ANDROID.toEntity(member);
+            AlarmDeleteByPaymentRequest request = new AlarmDeleteByPaymentRequest(
+                device.getDeviceId(),
+                PaymentFixture.DELETE_ALARM_SUCCESS.getPaymentId()
+            );
+
+            given(alarmRepository.findById(alarm.getId())).willReturn(Optional.of(alarm));
+            given(alarmOccurrenceRepository.findByAlarmIdAndDate(alarm.getId(), FIXED_NOW.toLocalDate()))
+                .willReturn(Optional.of(occurrence));
+            given(paymentRepository.existsByPaymentId(request.paymentId())).willReturn(false);
+            given(memberDeviceRepository.findByMember_IdAndDeviceId(member.getId(), device.getDeviceId())).willReturn(Optional.of(device));
+            given(paymentVerificationPorts.stream()).willReturn(Stream.of(paymentVerificationPort));
+            given(paymentVerificationPort.supportedPlatform()).willReturn(device.getPlatform());
+            given(paymentVerificationPort.verify(request.paymentId())).willReturn(true);
+            given(paymentRepository.saveAndFlush(any(PaymentEntity.class)))
+                .willThrow(new DataIntegrityViolationException("duplicate payment"));
+
+            // when & then
+            assertThatThrownBy(() -> alarmCommandService.removeAlarmByPayment(member.getId(), alarm.getId(), request))
+                .isInstanceOf(ApplicationException.class)
+                .hasMessage("이미 처리된 결제입니다.");
+        }
+
+        @Test
         @DisplayName("실패: 플랫폼 결제 검증이 실패하면 FAILED 결제와 삭제 실패 로그를 저장한다")
         void fail_paymentVerificationFailed() {
             // given
@@ -675,13 +704,12 @@ class AlarmCommandServiceTest {
                 .willReturn(Optional.of(occurrence));
 
             // when
-            AlarmDeleteByAdResponse response = alarmCommandService.removeAlarmByAd(member.getId(), alarm.getId(), request);
+            alarmCommandService.removeAlarmByAd(member.getId(), alarm.getId(), request);
 
             // then
-            assertThat(response.alarmId()).isEqualTo(alarm.getId());
-            assertThat(response.alarmRevision()).isEqualTo(2);
             assertThat(alarm.getStatus()).isEqualTo(AlarmStatus.DELETED);
             assertThat(alarm.getDeletedAt()).isEqualTo(FIXED_NOW);
+            assertThat(alarm.getRevision()).isEqualTo(2);
 
             ArgumentCaptor<AlarmDeleteLogEntity> logCaptor = ArgumentCaptor.forClass(AlarmDeleteLogEntity.class);
             verify(alarmDeleteLogRepository).save(logCaptor.capture());
@@ -703,13 +731,12 @@ class AlarmCommandServiceTest {
                 .willReturn(Optional.empty());
 
             // when
-            AlarmDeleteByAdResponse response = alarmCommandService.removeAlarmByAd(member.getId(), alarm.getId(), request);
+            alarmCommandService.removeAlarmByAd(member.getId(), alarm.getId(), request);
 
             // then
-            assertThat(response.alarmId()).isEqualTo(alarm.getId());
-            assertThat(response.alarmRevision()).isEqualTo(2);
             assertThat(alarm.getStatus()).isEqualTo(AlarmStatus.DELETED);
             assertThat(alarm.getDeletedAt()).isEqualTo(FIXED_NOW);
+            assertThat(alarm.getRevision()).isEqualTo(2);
             verify(alarmDeleteLogRepository).save(any(AlarmDeleteLogEntity.class));
             verify(ringingAlarmRedisRepository).remove(alarm.getId(), member.getId());
         }

@@ -586,7 +586,7 @@ class AlarmControllerIntegrationTest {
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.result.alarmId").value(alarm.getId()));
+                .andExpect(jsonPath("$.result").doesNotExist());
 
             // then
             AlarmEntity deletedAlarm = alarmRepository.findById(alarm.getId()).orElseThrow();
@@ -734,8 +734,7 @@ class AlarmControllerIntegrationTest {
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.result.alarmId").value(alarm.getId()))
-                .andExpect(jsonPath("$.result.alarmRevision").value(2));
+                .andExpect(jsonPath("$.result").doesNotExist());
 
             // then
             AlarmEntity deletedAlarm = alarmRepository.findById(alarm.getId()).orElseThrow();
@@ -764,8 +763,7 @@ class AlarmControllerIntegrationTest {
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.result.alarmId").value(alarm.getId()))
-                .andExpect(jsonPath("$.result.alarmRevision").value(2));
+                .andExpect(jsonPath("$.result").doesNotExist());
 
             // then
             AlarmEntity deletedAlarm = alarmRepository.findById(alarm.getId()).orElseThrow();

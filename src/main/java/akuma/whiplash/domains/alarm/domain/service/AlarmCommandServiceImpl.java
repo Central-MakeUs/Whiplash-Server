@@ -9,8 +9,6 @@ import akuma.whiplash.domains.alarm.application.dto.request.AlarmDeleteByPayment
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmPaymentRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmRegisterRequest;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmCheckinResponse;
-import akuma.whiplash.domains.alarm.application.dto.response.AlarmDeleteByAdResponse;
-import akuma.whiplash.domains.alarm.application.dto.response.AlarmDeleteByPaymentResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmPaymentResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.CreateAlarmOccurrenceResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.CreateAlarmResponse;
@@ -135,7 +133,7 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
     }
 
     @Override
-    public AlarmDeleteByAdResponse removeAlarmByAd(Long memberId, Long alarmId, AlarmDeleteByAdRequest request) {
+    public void removeAlarmByAd(Long memberId, Long alarmId, AlarmDeleteByAdRequest request) {
         // 1. 알람을 조회하고 요청자가 알람 소유자인지 검증한다.
         AlarmEntity alarm = findAlarmById(alarmId);
         MemberEntity member = alarm.getMember();
@@ -164,12 +162,11 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
             deletedAt
         ));
 
-        // 5. 클라이언트 동기화를 위해 변경된 revision을 응답한다.
-        return AlarmMapper.mapToAlarmDeleteByAdResponse(alarm);
+        // 5. 삭제 성공 시 별도 본문 없이 응답한다.
     }
 
     @Override
-    public AlarmDeleteByPaymentResponse removeAlarmByPayment(Long memberId, Long alarmId, AlarmDeleteByPaymentRequest request) {
+    public void removeAlarmByPayment(Long memberId, Long alarmId, AlarmDeleteByPaymentRequest request) {
         // 1. 알람을 조회하고 요청자가 알람 소유자인지 검증한다.
         AlarmEntity alarm = findAlarmById(alarmId);
         MemberEntity member = alarm.getMember();
@@ -234,9 +231,9 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
             throw ApplicationException.from(PaymentErrorCode.PAYMENT_VERIFICATION_FAILED);
         }
 
-        // 7. 검증 성공 시 결제를 성공으로 기록하고 알람을 소프트 삭제한다.
+        // 7. 검증 성공 시 결제를 성공으로 기록하고 알람을 소프트 삭제하며 revision을 증가시킨다.
         savePaymentOrThrowDuplicate(member, alarm, request.paymentId(), PaymentType.DELETE_ALARM);
-        alarm.softDelete(processedAt);
+        alarm.softDeleteWithRevision(processedAt);
         ringingAlarmRedisRepository.remove(alarmId, memberId);
 
         alarmDeleteLogRepository.save(AlarmMapper.mapToPaymentDeleteLogEntity(
@@ -251,7 +248,7 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
         // 8. consume은 외부 플랫폼 후처리이므로 DB 커밋이 성공한 뒤 실행한다.
         consumePaymentAfterCommit(paymentClient, request.paymentId());
 
-        return AlarmMapper.mapToAlarmDeleteByPaymentResponse(alarm, processedAt);
+        // 삭제 성공 시 별도 본문 없이 응답한다.
     }
 
     @Override

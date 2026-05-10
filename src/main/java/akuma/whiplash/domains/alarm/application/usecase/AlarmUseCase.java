@@ -6,8 +6,6 @@ import akuma.whiplash.domains.alarm.application.dto.request.AlarmDeleteByPayment
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmPaymentRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmRegisterRequest;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmCheckinResponse;
-import akuma.whiplash.domains.alarm.application.dto.response.AlarmDeleteByAdResponse;
-import akuma.whiplash.domains.alarm.application.dto.response.AlarmDeleteByPaymentResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmPaymentResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmSyncResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.CreateAlarmOccurrenceResponse;
@@ -33,12 +31,12 @@ public class AlarmUseCase {
         return alarmCommandService.createAlarmOccurrence(memberId, alarmId);
     }
 
-    public AlarmDeleteByPaymentResponse removeAlarmByPayment(Long memberId, Long alarmId, AlarmDeleteByPaymentRequest request) {
-        return alarmCommandService.removeAlarmByPayment(memberId, alarmId, request);
+    public void removeAlarmByPayment(Long memberId, Long alarmId, AlarmDeleteByPaymentRequest request) {
+        alarmCommandService.removeAlarmByPayment(memberId, alarmId, request);
     }
 
-    public AlarmDeleteByAdResponse removeAlarmByAd(Long memberId, Long alarmId, AlarmDeleteByAdRequest request) {
-        return alarmCommandService.removeAlarmByAd(memberId, alarmId, request);
+    public void removeAlarmByAd(Long memberId, Long alarmId, AlarmDeleteByAdRequest request) {
+        alarmCommandService.removeAlarmByAd(memberId, alarmId, request);
     }
 
     public AlarmCheckinResponse checkinAlarm(Long memberId, Long alarmId, AlarmCheckinRequest request) {

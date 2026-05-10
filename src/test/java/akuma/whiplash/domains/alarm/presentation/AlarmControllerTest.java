@@ -20,7 +20,6 @@ import akuma.whiplash.common.fixture.MemberFixture;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmCheckinRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmDeleteByPaymentRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmRegisterRequest;
-import akuma.whiplash.domains.alarm.application.dto.response.AlarmDeleteByPaymentResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmPreviewDto;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmSyncItemDto;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmSyncResponse;
@@ -396,25 +395,18 @@ class AlarmControllerTest {
     class RemoveAlarmByPaymentTest {
 
         @Test
-        @DisplayName("성공: 결제 삭제 요청이 성공하면 200과 삭제 시각을 반환한다")
+        @DisplayName("성공: 결제 삭제 요청이 성공하면 200을 반환한다")
         void success() throws Exception {
             // given
             AlarmDeleteByPaymentRequest request = new AlarmDeleteByPaymentRequest("device-uuid", "payment-id");
-            AlarmDeleteByPaymentResponse response = AlarmDeleteByPaymentResponse.builder()
-                .alarmId(1L)
-                .deletedAt(LocalDateTime.of(2026, 5, 2, 14, 30))
-                .build();
             setSecurityContext(buildContext(MEMBER_5));
-            when(alarmUseCase.removeAlarmByPayment(eq(MEMBER_5.getId()), eq(1L), any(AlarmDeleteByPaymentRequest.class)))
-                .thenReturn(response);
 
             // when & then
             mockMvc.perform(post(BASE + "/{alarmId}/delete/payment", 1L)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.result.alarmId").value(1L))
-                .andExpect(jsonPath("$.result.deletedAt").value("2026-05-02T14:30:00"));
+                .andExpect(jsonPath("$.result").doesNotExist());
 
             verify(alarmUseCase, times(1))
                 .removeAlarmByPayment(eq(MEMBER_5.getId()), eq(1L), any(AlarmDeleteByPaymentRequest.class));
@@ -426,8 +418,8 @@ class AlarmControllerTest {
             // given
             AlarmDeleteByPaymentRequest request = new AlarmDeleteByPaymentRequest("device-uuid", "payment-id");
             setSecurityContext(buildContext(MEMBER_6));
-            when(alarmUseCase.removeAlarmByPayment(anyLong(), anyLong(), any(AlarmDeleteByPaymentRequest.class)))
-                .thenThrow(ApplicationException.from(AlarmErrorCode.ALARM_NOT_FOUND));
+            doThrow(ApplicationException.from(AlarmErrorCode.ALARM_NOT_FOUND))
+                .when(alarmUseCase).removeAlarmByPayment(anyLong(), anyLong(), any(AlarmDeleteByPaymentRequest.class));
 
             // when & then
             mockMvc.perform(post(BASE + "/{alarmId}/delete/payment", 1L)
@@ -442,8 +434,8 @@ class AlarmControllerTest {
             // given
             AlarmDeleteByPaymentRequest request = new AlarmDeleteByPaymentRequest("device-uuid", "payment-id");
             setSecurityContext(buildContext(MEMBER_7));
-            when(alarmUseCase.removeAlarmByPayment(anyLong(), anyLong(), any(AlarmDeleteByPaymentRequest.class)))
-                .thenThrow(ApplicationException.from(AuthErrorCode.PERMISSION_DENIED));
+            doThrow(ApplicationException.from(AuthErrorCode.PERMISSION_DENIED))
+                .when(alarmUseCase).removeAlarmByPayment(anyLong(), anyLong(), any(AlarmDeleteByPaymentRequest.class));
 
             // when & then
             mockMvc.perform(post(BASE + "/{alarmId}/delete/payment", 1L)
@@ -472,8 +464,8 @@ class AlarmControllerTest {
             // given
             AlarmDeleteByPaymentRequest request = new AlarmDeleteByPaymentRequest("device-uuid", "payment-id");
             setSecurityContext(buildContext(MEMBER_8));
-            when(alarmUseCase.removeAlarmByPayment(anyLong(), anyLong(), any(AlarmDeleteByPaymentRequest.class)))
-                .thenThrow(ApplicationException.from(PaymentErrorCode.PAYMENT_VERIFICATION_FAILED));
+            doThrow(ApplicationException.from(PaymentErrorCode.PAYMENT_VERIFICATION_FAILED))
+                .when(alarmUseCase).removeAlarmByPayment(anyLong(), anyLong(), any(AlarmDeleteByPaymentRequest.class));
 
             // when & then
             mockMvc.perform(post(BASE + "/{alarmId}/delete/payment", 1L)

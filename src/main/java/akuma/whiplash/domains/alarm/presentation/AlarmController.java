@@ -12,8 +12,6 @@ import akuma.whiplash.domains.alarm.application.dto.request.AlarmDeleteByPayment
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmPaymentRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmRegisterRequest;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmCheckinResponse;
-import akuma.whiplash.domains.alarm.application.dto.response.AlarmDeleteByAdResponse;
-import akuma.whiplash.domains.alarm.application.dto.response.AlarmDeleteByPaymentResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmPaymentResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmSyncResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.CreateAlarmResponse;
@@ -62,14 +60,13 @@ public class AlarmController {
     )
     @Operation(summary = "결제로 알람 삭제", description = "알람 당일 인앱 결제를 통해 알람을 삭제합니다.")
     @PostMapping("/{alarmId}/delete/payment")
-    public ApplicationResponse<AlarmDeleteByPaymentResponse> removeAlarmByPayment(
+    public ApplicationResponse<Void> removeAlarmByPayment(
         @AuthenticationPrincipal MemberContext memberContext,
         @PathVariable Long alarmId,
         @RequestBody @Valid AlarmDeleteByPaymentRequest request
     ) {
-        return ApplicationResponse.onSuccess(
-            alarmUseCase.removeAlarmByPayment(memberContext.memberId(), alarmId, request)
-        );
+        alarmUseCase.removeAlarmByPayment(memberContext.memberId(), alarmId, request);
+        return ApplicationResponse.onSuccess();
     }
 
     @CustomErrorCodes(
@@ -78,14 +75,13 @@ public class AlarmController {
     )
     @Operation(summary = "광고 시청으로 알람 삭제", description = "광고 시청 증빙 토큰을 제출하여 알람을 삭제합니다.")
     @PostMapping("/{alarmId}/delete/ad")
-    public ApplicationResponse<AlarmDeleteByAdResponse> removeAlarmByAd(
+    public ApplicationResponse<Void> removeAlarmByAd(
         @AuthenticationPrincipal MemberContext memberContext,
         @PathVariable Long alarmId,
         @RequestBody @Valid AlarmDeleteByAdRequest request
     ) {
-        return ApplicationResponse.onSuccess(
-            alarmUseCase.removeAlarmByAd(memberContext.memberId(), alarmId, request)
-        );
+        alarmUseCase.removeAlarmByAd(memberContext.memberId(), alarmId, request);
+        return ApplicationResponse.onSuccess();
     }
 
     @CustomErrorCodes(memberErrorCodes = {MEMBER_NOT_FOUND})

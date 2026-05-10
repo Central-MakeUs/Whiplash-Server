@@ -2,8 +2,6 @@ package akuma.whiplash.domains.alarm.application.mapper;
 
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmRegisterRequest;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmCheckinResponse;
-import akuma.whiplash.domains.alarm.application.dto.response.AlarmDeleteByAdResponse;
-import akuma.whiplash.domains.alarm.application.dto.response.AlarmDeleteByPaymentResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmPaymentResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmSyncItemDto;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmSyncResponse;
@@ -190,23 +188,6 @@ public class AlarmMapper {
                 .occurrenceId(nextOccurrence.getId())
                 .scheduledAt(nextOccurrence.getScheduledAt())
                 .build())
-            .build();
-    }
-
-    public static AlarmDeleteByPaymentResponse mapToAlarmDeleteByPaymentResponse(
-        AlarmEntity alarm,
-        LocalDateTime deletedAt
-    ) {
-        return AlarmDeleteByPaymentResponse.builder()
-            .alarmId(alarm.getId())
-            .deletedAt(deletedAt)
-            .build();
-    }
-
-    public static AlarmDeleteByAdResponse mapToAlarmDeleteByAdResponse(AlarmEntity alarm) {
-        return AlarmDeleteByAdResponse.builder()
-            .alarmId(alarm.getId())
-            .alarmRevision(alarm.getRevision())
             .build();
     }
 
