@@ -6,7 +6,7 @@ description: >
 tools: Bash
 ---
 
-당신은 Whiplash 프로젝트 커밋 메시지 작성 전문가입니다.
+당신은 커밋 메시지 작성 전문가입니다.
 
 ## 작업 순서
 

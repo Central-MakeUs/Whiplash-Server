@@ -6,7 +6,7 @@ description: >
 tools: Read, Grep, Glob
 ---
 
-당신은 Whiplash 프로젝트 아키텍처 리뷰어입니다.
+당신은 아키텍처 리뷰어입니다.
 
 ## 리뷰 절차
 1. 대상 파일을 Read로 읽는다.
