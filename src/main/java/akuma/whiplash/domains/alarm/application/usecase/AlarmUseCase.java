@@ -6,6 +6,7 @@ import akuma.whiplash.domains.alarm.application.dto.request.AlarmDeleteByPayment
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmPaymentRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmRegisterRequest;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmCheckinResponse;
+import akuma.whiplash.domains.alarm.application.dto.response.AlarmDeleteMethodResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmPaymentResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmSyncResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.CreateAlarmOccurrenceResponse;
@@ -57,5 +58,9 @@ public class AlarmUseCase {
 
     public AlarmSyncResponse getSyncAlarms(Long memberId) {
         return alarmQueryService.getSyncAlarms(memberId);
+    }
+
+    public AlarmDeleteMethodResponse getAlarmDeleteMethod(Long memberId, Long alarmId) {
+        return alarmQueryService.getAlarmDeleteMethod(memberId, alarmId);
     }
 }
