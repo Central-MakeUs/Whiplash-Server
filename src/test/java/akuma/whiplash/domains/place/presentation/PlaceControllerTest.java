@@ -1,8 +1,13 @@
 package akuma.whiplash.domains.place.presentation;
 
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.when;
+import static org.hamcrest.CoreMatchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import akuma.whiplash.domains.place.application.dto.response.PlaceInfoResponse;
@@ -39,10 +44,10 @@ class PlaceControllerTest {
     @Autowired private MockMvc mockMvc;
     @MockitoBean private PlaceUseCase placeUseCase;
 
-    private static final String BASE = "/api/places";
+    private static final String BASE = "/api/v1/places";
 
     @Nested
-    @DisplayName("[GET] /api/places/search - 장소 목록 검색")
+    @DisplayName("searchPlaces - 장소 목록 검색")
     class SearchPlacesTest {
 
         @Test
@@ -55,33 +60,113 @@ class PlaceControllerTest {
                     .address("서울시 강남구")
                     .latitude(37.0)
                     .longitude(127.0)
+                    .distanceMeters(120)
                     .build()
             );
-            when(placeUseCase.searchPlaces(anyString())).thenReturn(responses);
+            when(placeUseCase.searchPlaces(eq("카페"), eq(37.0), eq(127.0))).thenReturn(responses);
 
-            // when & then
-            mockMvc.perform(get(BASE + "/search").param("query", "카페"))
-                .andExpect(status().isOk());
+            // when
+            var resultActions = mockMvc.perform(get(BASE + "/search")
+                .param("query", "카페")
+                .param("latitude", "37.0")
+                .param("longitude", "127.0"));
+
+            // then
+            resultActions
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result[0].name").value("카페"))
+                .andExpect(jsonPath("$.result[0].address").value("서울시 강남구"))
+                .andExpect(jsonPath("$.result[0].distanceMeters").value(120));
+        }
+
+        @Test
+        @DisplayName("성공: 현재 좌표가 없으면 distanceMeters null을 반환한다")
+        void success_withoutCoordinates() throws Exception {
+            // given
+            List<PlaceInfoResponse> responses = List.of(
+                PlaceInfoResponse.builder()
+                    .name("카페")
+                    .address("서울시 강남구")
+                    .latitude(37.0)
+                    .longitude(127.0)
+                    .distanceMeters(null)
+                    .build()
+            );
+            when(placeUseCase.searchPlaces(eq("카페"), isNull(), isNull())).thenReturn(responses);
+
+            // when
+            var resultActions = mockMvc.perform(get(BASE + "/search").param("query", "카페"));
+
+            // then
+            resultActions
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result[0].distanceMeters").value(nullValue()));
         }
 
         @Test
         @DisplayName("실패: query 파라미터가 없으면 400과 에러 코드를 반환한다")
         void fail_queryMissing() throws Exception {
-            // when & then
-            mockMvc.perform(get(BASE + "/search"))
-                .andExpect(status().isBadRequest());
+            // when
+            var resultActions = mockMvc.perform(get(BASE + "/search"));
+
+            // then
+            resultActions
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.isSuccess").value(false))
+                .andExpect(jsonPath("$.code").value(CommonErrorCode.BAD_REQUEST.getCustomCode()));
+        }
+
+        @Test
+        @DisplayName("실패: query가 빈 문자열이면 400과 에러 코드를 반환한다")
+        void fail_queryBlank() throws Exception {
+            // given
+            when(placeUseCase.searchPlaces(eq(""), isNull(), isNull()))
+                .thenThrow(ApplicationException.from(CommonErrorCode.BAD_REQUEST));
+
+            // when
+            var resultActions = mockMvc.perform(get(BASE + "/search").param("query", ""));
+
+            // then
+            resultActions
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.isSuccess").value(false))
+                .andExpect(jsonPath("$.code").value(CommonErrorCode.BAD_REQUEST.getCustomCode()));
         }
 
         @Test
         @DisplayName("실패: 서비스에서 예외가 발생하면 400과 에러 코드를 반환한다")
         void fail_serviceThrows() throws Exception {
             // given
-            when(placeUseCase.searchPlaces(anyString()))
+            when(placeUseCase.searchPlaces(anyString(), nullable(Double.class), nullable(Double.class)))
                 .thenThrow(ApplicationException.from(CommonErrorCode.BAD_REQUEST));
 
-            // when & then
-            mockMvc.perform(get(BASE + "/search").param("query", "카페"))
-                .andExpect(status().isBadRequest());
+            // when
+            var resultActions = mockMvc.perform(get(BASE + "/search").param("query", "카페"));
+
+            // then
+            resultActions
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.isSuccess").value(false))
+                .andExpect(jsonPath("$.code").value(CommonErrorCode.BAD_REQUEST.getCustomCode()));
+        }
+
+        @Test
+        @DisplayName("실패: 현재 좌표가 하나만 전달되면 400과 에러 코드를 반환한다")
+        void fail_partialCoordinates() throws Exception {
+            // given
+            when(placeUseCase.searchPlaces(eq("카페"), eq(37.0), isNull()))
+                .thenThrow(ApplicationException.from(CommonErrorCode.BAD_REQUEST));
+
+            // when
+            var resultActions = mockMvc.perform(get(BASE + "/search")
+                .param("query", "카페")
+                .param("latitude", "37.0"));
+
+            // then
+            resultActions
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.isSuccess").value(false))
+                .andExpect(jsonPath("$.code").value(CommonErrorCode.BAD_REQUEST.getCustomCode()));
         }
     }
 }

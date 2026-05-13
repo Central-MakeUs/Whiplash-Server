@@ -6,7 +6,7 @@ import java.util.List;
 
 public interface PlaceQueryService {
 
-    List<PlaceInfoResponse> searchPlaces(String query);
+    List<PlaceInfoResponse> searchPlaces(String query, Double latitude, Double longitude);
     PlaceDetailResponse getPlaceDetailByCoord(double latitude, double longitude);
     List<String> searchPlaceKeywords(String query);
 }

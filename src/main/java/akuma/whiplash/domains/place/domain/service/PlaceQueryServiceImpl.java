@@ -7,6 +7,7 @@ import akuma.whiplash.domains.place.application.dto.response.ReverseGeocodeApiRe
 import akuma.whiplash.domains.place.application.dto.response.PlaceDetailResponse;
 import akuma.whiplash.global.exception.ApplicationException;
 import akuma.whiplash.global.response.code.CommonErrorCode;
+import akuma.whiplash.global.util.GeoUtils;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -50,7 +51,7 @@ public class PlaceQueryServiceImpl implements PlaceQueryService {
     private static final String NCP_REVERSE_GEOCODE_URL = "https://maps.apigw.ntruss.com/map-reversegeocode/v2/gc";
 
     @Override
-    public List<PlaceInfoResponse> searchPlaces(String query) {
+    public List<PlaceInfoResponse> searchPlaces(String query, Double latitude, Double longitude) {
         String uri = UriComponentsBuilder
             .fromUriString(NAVER_LOCAL_SEARCH_URL)
             .queryParam("query", query)
@@ -69,13 +70,7 @@ public class PlaceQueryServiceImpl implements PlaceQueryService {
         if (response == null || response.getItems() == null) return List.of();
 
         return response.getItems().stream()
-            .map(item -> PlaceInfoResponse.builder()
-                .name(sanitize(item.getTitle()))
-                .address(item.getAddress())
-                .latitude(parseDouble(item.getMapy()) / 1e7)
-                .longitude(parseDouble(item.getMapx()) / 1e7)
-                .build()
-            )
+            .map(item -> mapToPlaceInfoResponse(item, latitude, longitude))
             .toList();
     }
 
@@ -171,6 +166,33 @@ public class PlaceQueryServiceImpl implements PlaceQueryService {
         if (address == null) return Optional.empty();
         Matcher matcher = pattern.matcher(address);
         return matcher.find() ? Optional.of(matcher.group()) : Optional.empty();
+    }
+
+    private PlaceInfoResponse mapToPlaceInfoResponse(NaverPlaceItem item, Double requestLatitude, Double requestLongitude) {
+        double placeLatitude = parseDouble(item.getMapy()) / 1e7;
+        double placeLongitude = parseDouble(item.getMapx()) / 1e7;
+
+        return PlaceInfoResponse.builder()
+            .name(sanitize(item.getTitle()))
+            .address(resolveDisplayAddress(item))
+            .latitude(placeLatitude)
+            .longitude(placeLongitude)
+            .distanceMeters(calculateDistanceMeters(requestLatitude, requestLongitude, placeLatitude, placeLongitude))
+            .build();
+    }
+
+    private String resolveDisplayAddress(NaverPlaceItem item) {
+        if (item.getRoadAddress() != null && !item.getRoadAddress().isBlank()) {
+            return item.getRoadAddress();
+        }
+        return item.getAddress() != null ? item.getAddress() : "";
+    }
+
+    private Integer calculateDistanceMeters(Double requestLatitude, Double requestLongitude, double placeLatitude, double placeLongitude) {
+        if (requestLatitude == null || requestLongitude == null) {
+            return null;
+        }
+        return GeoUtils.calculateDistanceMeters(requestLatitude, requestLongitude, placeLatitude, placeLongitude);
     }
 
     private String sanitize(String html) {

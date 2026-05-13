@@ -57,7 +57,7 @@ class PlaceQueryServiceTest {
             // given (서비스의 변환 규칙에 맞춘 응답)
             String body = """
                 {"items":[
-                  {"title":"<b>카페</b>","roadAddress":"서울시 강남구","latitude":37.0,"longitude":127.0}
+                  {"title":"<b>카페</b>","address":"서울시 강남구 역삼동","roadAddress":"서울시 강남구","mapx":"1270000000","mapy":"370000000"}
                 ]}
                 """;
             mockWebServer.enqueue(new MockResponse()
@@ -66,7 +66,7 @@ class PlaceQueryServiceTest {
                 .addHeader("Content-Type", "application/json"));
 
             // when
-            List<PlaceInfoResponse> responses = placeQueryService.searchPlaces("카페");
+            List<PlaceInfoResponse> responses = placeQueryService.searchPlaces("카페", null, null);
 
             // then
             assertThat(responses).hasSize(1);
@@ -90,7 +90,7 @@ class PlaceQueryServiceTest {
             mockWebServer.enqueue(new MockResponse().setResponseCode(400));
 
             // when & then (구현이 retrieve() 기본 onStatus 사용 시 WebClientResponseException 발생)
-            assertThatThrownBy(() -> placeQueryService.searchPlaces("카페"))
+            assertThatThrownBy(() -> placeQueryService.searchPlaces("카페", null, null))
                 .isInstanceOf(WebClientResponseException.class);
 
             // ✅ 요청이 MockWebServer로 갔는지 확인
