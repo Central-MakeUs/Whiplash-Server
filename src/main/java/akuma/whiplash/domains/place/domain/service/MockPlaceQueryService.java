@@ -29,8 +29,9 @@ public class MockPlaceQueryService implements PlaceQueryService {
     @Override
     public PlaceDetailResponse getPlaceDetailByCoord(double latitude, double longitude) {
         return PlaceDetailResponse.builder()
-            .name("Mock Detail Place")
+            .placeName("Mock Detail Place")
             .address("Seoul, Gangnam-gu, Mock-ro 123")
+            .roadAddress("Seoul, Gangnam-gu, Mock-ro 123")
             .build();
     }
 

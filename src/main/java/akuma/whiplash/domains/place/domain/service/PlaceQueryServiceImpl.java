@@ -22,11 +22,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.util.UriComponentsBuilder;
 
-@Transactional(readOnly = true)
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -127,7 +125,8 @@ public class PlaceQueryServiceImpl implements PlaceQueryService {
 
         return PlaceDetailResponse.builder()
             .address(fullAddress)
-            .name(placeName != null ? placeName : "장소 없음")
+            .placeName(placeName != null ? placeName : "장소 없음")
+            .roadAddress(fullAddress)
             .build();
     }
 
