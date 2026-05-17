@@ -23,6 +23,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.context.request.ServletWebRequest;
 import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
@@ -105,6 +106,29 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             LogUtils.maskSensitiveQuery(extractQueryString(request)),
             CommonErrorCode.METHOD_ARGUMENT_NOT_VALID.getCustomCode(),
             CommonErrorCode.METHOD_ARGUMENT_NOT_VALID.getHttpStatus()
+        );
+
+        return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
+    }
+
+    @Override
+    protected ResponseEntity<Object> handleMissingServletRequestParameter(
+        MissingServletRequestParameterException ex,
+        HttpHeaders headers,
+        HttpStatusCode status,
+        WebRequest request
+    ) {
+        sendErrorToSentry(
+            ex,
+            extractRequestUri(request),
+            LogUtils.maskSensitiveQuery(extractQueryString(request)),
+            CommonErrorCode.BAD_REQUEST.getCustomCode(),
+            CommonErrorCode.BAD_REQUEST.getHttpStatus()
+        );
+
+        ApplicationResponse<Void> response = ApplicationResponse.onFailure(
+            CommonErrorCode.BAD_REQUEST.getCustomCode(),
+            CommonErrorCode.BAD_REQUEST.getMessage()
         );
 
         return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);

@@ -17,7 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/api/places")
+@RequestMapping("/api/v1/places")
 public class PlaceController {
 
     private final PlaceUseCase placeUseCase;
@@ -25,8 +25,12 @@ public class PlaceController {
     @CustomErrorCodes(commonErrorCodes = {BAD_REQUEST})
     @Operation(summary = "장소 목록 검색", description = "키워드 기반 장소 검색을 제공합니다.")
     @GetMapping("/search")
-    public ApplicationResponse<List<PlaceInfoResponse>> searchPlaces(@RequestParam String query) {
-        List<PlaceInfoResponse> placeInfoResponses = placeUseCase.searchPlaces(query);
+    public ApplicationResponse<List<PlaceInfoResponse>> searchPlaces(
+        @RequestParam String query,
+        @RequestParam(required = false) Double latitude,
+        @RequestParam(required = false) Double longitude
+    ) {
+        List<PlaceInfoResponse> placeInfoResponses = placeUseCase.searchPlaces(query, latitude, longitude);
         return ApplicationResponse.onSuccess(placeInfoResponses);
     }
 

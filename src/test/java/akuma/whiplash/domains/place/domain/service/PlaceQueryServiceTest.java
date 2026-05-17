@@ -12,15 +12,13 @@ import okhttp3.mockwebserver.MockWebServer;
 import okhttp3.mockwebserver.RecordedRequest;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 
-// TODO: 테스트 코드 고치고 이 애노테이션 제거
-@Disabled
 class PlaceQueryServiceTest {
 
     private PlaceQueryServiceImpl placeQueryService;
@@ -31,15 +29,16 @@ class PlaceQueryServiceTest {
         mockWebServer = new MockWebServer();
         mockWebServer.start();
 
-        // ✅ MockWebServer 주소를 baseUrl로 설정하고, 네이버 헤더를 기본 헤더로 세팅
-        WebClient webClient = WebClient.builder()
-            .baseUrl(mockWebServer.url("/").toString()) // e.g. http://127.0.0.1:50543/
-            .defaultHeader("X-Naver-Client-Id", "test-id")
-            .defaultHeader("X-Naver-Client-Secret", "test-secret")
-            .build();
+        WebClient webClient = WebClient.builder().build();
 
-        // ✅ 구현체가 WebClient를 주입받아 상대경로로 호출한다고 가정
         placeQueryService = new PlaceQueryServiceImpl(webClient);
+        ReflectionTestUtils.setField(placeQueryService, "naverClientId", "test-id");
+        ReflectionTestUtils.setField(placeQueryService, "naverClientSecret", "test-secret");
+        ReflectionTestUtils.setField(
+            placeQueryService,
+            "naverLocalSearchUrl",
+            mockWebServer.url("/v1/search/local.json").toString()
+        );
     }
 
     @AfterEach
@@ -54,10 +53,10 @@ class PlaceQueryServiceTest {
         @Test
         @DisplayName("성공: 키워드 검색 결과를 반환한다")
         void success() throws Exception {
-            // given (서비스의 변환 규칙에 맞춘 응답)
+            // given
             String body = """
                 {"items":[
-                  {"title":"<b>카페</b>","roadAddress":"서울시 강남구","latitude":37.0,"longitude":127.0}
+                  {"title":"<b>카페</b>","address":"서울시 강남구 역삼동","roadAddress":"서울시 강남구","mapx":"1270000000","mapy":"370000000"}
                 ]}
                 """;
             mockWebServer.enqueue(new MockResponse()
@@ -66,7 +65,7 @@ class PlaceQueryServiceTest {
                 .addHeader("Content-Type", "application/json"));
 
             // when
-            List<PlaceInfoResponse> responses = placeQueryService.searchPlaces("카페");
+            List<PlaceInfoResponse> responses = placeQueryService.searchPlaces("카페", null, null);
 
             // then
             assertThat(responses).hasSize(1);
@@ -75,7 +74,6 @@ class PlaceQueryServiceTest {
             assertThat(responses.get(0).latitude()).isEqualTo(37.0);
             assertThat(responses.get(0).longitude()).isEqualTo(127.0);
 
-            // ✅ 실제로 MockWebServer가 호출되었는지 검증(외부로 나가지 않음 보장)
             RecordedRequest req = mockWebServer.takeRequest(3, TimeUnit.SECONDS);
             assertThat(req).isNotNull();
             assertThat(req.getPath()).startsWith("/v1/search/local.json");
@@ -89,11 +87,10 @@ class PlaceQueryServiceTest {
             // given
             mockWebServer.enqueue(new MockResponse().setResponseCode(400));
 
-            // when & then (구현이 retrieve() 기본 onStatus 사용 시 WebClientResponseException 발생)
-            assertThatThrownBy(() -> placeQueryService.searchPlaces("카페"))
+            // when & then
+            assertThatThrownBy(() -> placeQueryService.searchPlaces("카페", null, null))
                 .isInstanceOf(WebClientResponseException.class);
 
-            // ✅ 요청이 MockWebServer로 갔는지 확인
             RecordedRequest req = mockWebServer.takeRequest(3, TimeUnit.SECONDS);
             assertThat(req).isNotNull();
             assertThat(req.getPath()).startsWith("/v1/search/local.json");

@@ -1,6 +1,8 @@
 package akuma.whiplash.domains.place.presentation;
 
+import static org.hamcrest.CoreMatchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import akuma.whiplash.common.config.IntegrationTest;
@@ -8,23 +10,14 @@ import akuma.whiplash.common.fixture.MemberFixture;
 import akuma.whiplash.domains.member.persistence.entity.MemberEntity;
 import akuma.whiplash.domains.member.persistence.repository.MemberRepository;
 import akuma.whiplash.global.config.security.jwt.JwtProvider;
-import okhttp3.mockwebserver.MockResponse;
-import okhttp3.mockwebserver.MockWebServer;
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.http.HttpHeaders;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 
-// TODO: 테스트 코드 고치고 이 애노테이션 제거
-@Disabled
 @IntegrationTest
 @AutoConfigureMockMvc
 @DisplayName("PlaceController Integration Test")
@@ -34,28 +27,8 @@ class PlaceControllerIntegrationTest {
     @Autowired private JwtProvider jwtProvider;
     @Autowired private MemberRepository memberRepository;
 
-    private static MockWebServer mockWebServer;
-
-    @BeforeAll
-    static void beforeAll() throws Exception {
-        mockWebServer = new MockWebServer();
-        mockWebServer.start();
-    }
-
-    @AfterAll
-    static void afterAll() throws Exception {
-        mockWebServer.shutdown();
-    }
-
-    @DynamicPropertySource
-    static void registerProps(DynamicPropertyRegistry registry) {
-        // 서비스가 사용하는 base-url 속성 주입
-        registry.add("naver.search.base-url",
-            () -> mockWebServer.url("/").toString());
-    }
-
     @Nested
-    @DisplayName("[GET] /api/places/search - 장소 목록 검색")
+    @DisplayName("[GET] /api/v1/places/search - 장소 목록 검색")
     class SearchPlacesTest {
 
         @Test
@@ -64,15 +37,18 @@ class PlaceControllerIntegrationTest {
             // given
             MemberEntity member = memberRepository.save(MemberFixture.MEMBER_1.toEntity());
             String token = jwtProvider.generateAccessToken(member.getId(), member.getRole(), "device");
-            String body = "{\"items\":[{\"title\":\"<b>카페</b>\",\"address\":\"서울시 강남구\",\"roadAddress\":\"서울시 강남구\",\"mapx\":\"127000000\",\"mapy\":\"37000000\"}]}";
-            mockWebServer.enqueue(new MockResponse().setResponseCode(200).setBody(body).addHeader("Content-Type", "application/json"));
 
-            // when & then
-            mockMvc.perform(get("/api/places/search")
+            // when
+            var resultActions = mockMvc.perform(get("/api/v1/places/search")
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
-                    .param("query", "카페"))
-                .andExpect(status().isOk());
-//                .andExpect(jsonPath("$.result[0].name").value("카페"));
+                    .param("query", "카페"));
+
+            // then
+            resultActions
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result[0].name").value("Mock Place 1 for 카페"))
+                .andExpect(jsonPath("$.result[0].address").value("Seoul, Gangnam-gu, Teheran-ro 1"))
+                .andExpect(jsonPath("$.result[0].distanceMeters").value(nullValue()));
         }
 
         @Test
@@ -82,33 +58,127 @@ class PlaceControllerIntegrationTest {
             MemberEntity member = memberRepository.save(MemberFixture.MEMBER_2.toEntity());
             String token = jwtProvider.generateAccessToken(member.getId(), member.getRole(), "device");
 
-            // when & then
-            mockMvc.perform(get("/api/places/search")
-                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
-                .andExpect(status().isBadRequest());
+            // when
+            var resultActions = mockMvc.perform(get("/api/v1/places/search")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token));
+
+            // then
+            resultActions.andExpect(status().isBadRequest());
         }
 
         @Test
         @DisplayName("실패: 인증 토큰이 없으면 401과 에러 코드를 반환한다")
         void fail_tokenMissing() throws Exception {
-            // when & then
-            mockMvc.perform(get("/api/places/search").param("query", "카페"))
-                .andExpect(status().isUnauthorized());
+            // when
+            var resultActions = mockMvc.perform(get("/api/v1/places/search").param("query", "카페"));
+
+            // then
+            resultActions.andExpect(status().isUnauthorized());
+        }
+    }
+
+    @Nested
+    @DisplayName("[GET] /api/v1/places/detail - 장소 상세 조회")
+    class GetPlaceDetailTest {
+
+        @Test
+        @DisplayName("성공: 좌표로 장소 상세를 조회하면 200과 상세 정보가 반환된다")
+        void success() throws Exception {
+            // given
+            MemberEntity member = memberRepository.save(MemberFixture.MEMBER_1.toEntity());
+            String token = jwtProvider.generateAccessToken(member.getId(), member.getRole(), "device");
+
+            // when
+            var resultActions = mockMvc.perform(get("/api/v1/places/detail")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                .param("latitude", "37.4979")
+                .param("longitude", "127.0276"));
+
+            // then
+            resultActions
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.placeName").value("Mock Detail Place"))
+                .andExpect(jsonPath("$.result.address").value("Seoul, Gangnam-gu, Mock-ro 123"))
+                .andExpect(jsonPath("$.result.roadAddress").value("Seoul, Gangnam-gu, Mock-ro 123"));
         }
 
         @Test
-        @DisplayName("실패: 외부 API가 400을 반환하면 500과 에러 코드를 반환한다")
-        void fail_externalApiError() throws Exception {
+        @DisplayName("실패: 좌표 파라미터가 없으면 400과 에러 코드를 반환한다")
+        void fail_coordinateMissing() throws Exception {
+            // given
+            MemberEntity member = memberRepository.save(MemberFixture.MEMBER_2.toEntity());
+            String token = jwtProvider.generateAccessToken(member.getId(), member.getRole(), "device");
+
+            // when
+            var resultActions = mockMvc.perform(get("/api/v1/places/detail")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                .param("latitude", "37.4979"));
+
+            // then
+            resultActions.andExpect(status().isBadRequest());
+        }
+
+        @Test
+        @DisplayName("실패: 인증 토큰이 없으면 401과 에러 코드를 반환한다")
+        void fail_tokenMissing() throws Exception {
+            // when
+            var resultActions = mockMvc.perform(get("/api/v1/places/detail")
+                .param("latitude", "37.4979")
+                .param("longitude", "127.0276"));
+
+            // then
+            resultActions.andExpect(status().isUnauthorized());
+        }
+    }
+
+    @Nested
+    @DisplayName("[GET] /api/v1/places/keywords - 연관 장소 키워드 추천")
+    class SearchPlaceKeywordsTest {
+
+        @Test
+        @DisplayName("성공: 검색어로 연관 키워드를 조회하면 200과 목록이 반환된다")
+        void success() throws Exception {
             // given
             MemberEntity member = memberRepository.save(MemberFixture.MEMBER_3.toEntity());
             String token = jwtProvider.generateAccessToken(member.getId(), member.getRole(), "device");
-            mockWebServer.enqueue(new MockResponse().setResponseCode(400));
 
-            // when & then
-            mockMvc.perform(get("/api/places/search")
-                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
-                    .param("query", "카페"))
-                .andExpect(status().isInternalServerError());
+            // when
+            var resultActions = mockMvc.perform(get("/api/v1/places/keywords")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                .param("query", "카페"));
+
+            // then
+            resultActions
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result[0]").value("카페 station"))
+                .andExpect(jsonPath("$.result[1]").value("카페 park"))
+                .andExpect(jsonPath("$.result[2]").value("카페 school"));
+        }
+
+        @Test
+        @DisplayName("실패: query 파라미터가 없으면 400과 에러 코드를 반환한다")
+        void fail_queryMissing() throws Exception {
+            // given
+            MemberEntity member = memberRepository.save(MemberFixture.MEMBER_4.toEntity());
+            String token = jwtProvider.generateAccessToken(member.getId(), member.getRole(), "device");
+
+            // when
+            var resultActions = mockMvc.perform(get("/api/v1/places/keywords")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token));
+
+            // then
+            resultActions.andExpect(status().isBadRequest());
+        }
+
+        @Test
+        @DisplayName("실패: 인증 토큰이 없으면 401과 에러 코드를 반환한다")
+        void fail_tokenMissing() throws Exception {
+            // when
+            var resultActions = mockMvc.perform(get("/api/v1/places/keywords")
+                .param("query", "카페"));
+
+            // then
+            resultActions.andExpect(status().isUnauthorized());
         }
     }
 }
