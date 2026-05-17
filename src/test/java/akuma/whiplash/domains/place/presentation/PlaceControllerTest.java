@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import akuma.whiplash.domains.place.application.dto.response.PlaceDetailResponse;
 import akuma.whiplash.domains.place.application.dto.response.PlaceInfoResponse;
 import akuma.whiplash.domains.place.application.usecase.PlaceUseCase;
 import akuma.whiplash.global.config.security.SecurityConfig;
@@ -161,6 +162,123 @@ class PlaceControllerTest {
             var resultActions = mockMvc.perform(get(BASE + "/search")
                 .param("query", "카페")
                 .param("latitude", "37.0"));
+
+            // then
+            resultActions
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.isSuccess").value(false))
+                .andExpect(jsonPath("$.code").value(CommonErrorCode.BAD_REQUEST.getCustomCode()));
+        }
+    }
+
+    @Nested
+    @DisplayName("getPlaceDetail - 장소 상세 조회")
+    class GetPlaceDetailTest {
+
+        @Test
+        @DisplayName("성공: 200 OK와 장소 상세 정보를 반환한다")
+        void success() throws Exception {
+            // given
+            PlaceDetailResponse response = PlaceDetailResponse.builder()
+                .placeName("강남역")
+                .address("서울특별시 강남구 강남대로 396")
+                .roadAddress("서울특별시 강남구 강남대로 396")
+                .build();
+            when(placeUseCase.getPlaceDetail(eq(37.4979), eq(127.0276))).thenReturn(response);
+
+            // when
+            var resultActions = mockMvc.perform(get(BASE + "/detail")
+                .param("latitude", "37.4979")
+                .param("longitude", "127.0276"));
+
+            // then
+            resultActions
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.placeName").value("강남역"))
+                .andExpect(jsonPath("$.result.address").value("서울특별시 강남구 강남대로 396"))
+                .andExpect(jsonPath("$.result.roadAddress").value("서울특별시 강남구 강남대로 396"));
+        }
+
+        @Test
+        @DisplayName("실패: 좌표 파라미터가 없으면 400과 에러 코드를 반환한다")
+        void fail_coordinateMissing() throws Exception {
+            // when
+            var resultActions = mockMvc.perform(get(BASE + "/detail")
+                .param("latitude", "37.4979"));
+
+            // then
+            resultActions
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.isSuccess").value(false))
+                .andExpect(jsonPath("$.code").value(CommonErrorCode.BAD_REQUEST.getCustomCode()));
+        }
+
+        @Test
+        @DisplayName("실패: 서비스에서 예외가 발생하면 400과 에러 코드를 반환한다")
+        void fail_serviceThrows() throws Exception {
+            // given
+            when(placeUseCase.getPlaceDetail(eq(37.4979), eq(127.0276)))
+                .thenThrow(ApplicationException.from(CommonErrorCode.BAD_REQUEST));
+
+            // when
+            var resultActions = mockMvc.perform(get(BASE + "/detail")
+                .param("latitude", "37.4979")
+                .param("longitude", "127.0276"));
+
+            // then
+            resultActions
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.isSuccess").value(false))
+                .andExpect(jsonPath("$.code").value(CommonErrorCode.BAD_REQUEST.getCustomCode()));
+        }
+    }
+
+    @Nested
+    @DisplayName("searchPlaceKeywords - 연관 장소 키워드 추천")
+    class SearchPlaceKeywordsTest {
+
+        @Test
+        @DisplayName("성공: 200 OK와 연관 키워드 목록을 반환한다")
+        void success() throws Exception {
+            // given
+            List<String> responses = List.of("포켓몬", "포켓몬카드", "포켓몬 팝업");
+            when(placeUseCase.searchPlaceKeywords(eq("포켓몬"))).thenReturn(responses);
+
+            // when
+            var resultActions = mockMvc.perform(get(BASE + "/keywords")
+                .param("query", "포켓몬"));
+
+            // then
+            resultActions
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result[0]").value("포켓몬"))
+                .andExpect(jsonPath("$.result[1]").value("포켓몬카드"))
+                .andExpect(jsonPath("$.result[2]").value("포켓몬 팝업"));
+        }
+
+        @Test
+        @DisplayName("실패: query 파라미터가 없으면 400과 에러 코드를 반환한다")
+        void fail_queryMissing() throws Exception {
+            // when
+            var resultActions = mockMvc.perform(get(BASE + "/keywords"));
+
+            // then
+            resultActions
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.isSuccess").value(false))
+                .andExpect(jsonPath("$.code").value(CommonErrorCode.BAD_REQUEST.getCustomCode()));
+        }
+
+        @Test
+        @DisplayName("실패: 서비스에서 예외가 발생하면 400과 에러 코드를 반환한다")
+        void fail_serviceThrows() throws Exception {
+            // given
+            when(placeUseCase.searchPlaceKeywords(eq("포켓몬")))
+                .thenThrow(ApplicationException.from(CommonErrorCode.BAD_REQUEST));
+
+            // when
+            var resultActions = mockMvc.perform(get(BASE + "/keywords")
+                .param("query", "포켓몬"));
 
             // then
             resultActions
