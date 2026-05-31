@@ -23,9 +23,9 @@ public enum Weekday {
     private final String description;
     private final DayOfWeek dayOfWeek;
 
-    public static Weekday from(String description) {
+    public static Weekday from(String code) {
         return Arrays.stream(values())
-            .filter(w -> w.description.equals(description))
+            .filter(weekday -> weekday.name().equals(code))
             .findFirst()
             .orElseThrow(() -> ApplicationException.from(INVALID_WEEKDAY));
     }

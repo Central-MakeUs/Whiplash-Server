@@ -7,22 +7,22 @@ import lombok.RequiredArgsConstructor;
 @Getter
 @RequiredArgsConstructor
 public enum SoundType {
-    NONE("소리 없음"),
-    ONE("알람 소리1"),
-    TWO("알람 소리2"),
-    THREE("알람 소리3"),
-    FOUR("알람 소리4");
+    VIBRATION_ONLY("소리 없음(진동 모드)"),
+    KARINA_SCOLDING("카리나의 쓴소리"),
+    WAKE_AND_MOVE("일어나 움직여"),
+    KIMDUHAN_WAKE_UP("일어나셔야 합니다-김두한"),
+    LIFE_WARNING("인생 경고음");
 
     private final String description;
 
-    public static SoundType from(String description) {
-        if (description == null) {
-            return NONE;
+    public static SoundType from(String code) {
+        if (code == null) {
+            return VIBRATION_ONLY;
         }
 
         return Arrays.stream(values())
-            .filter(s -> s.description.equals(description))
+            .filter(soundType -> soundType.name().equals(code))
             .findFirst()
-            .orElse(NONE);
+            .orElse(VIBRATION_ONLY);
     }
 }

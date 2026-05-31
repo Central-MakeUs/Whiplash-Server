@@ -104,7 +104,7 @@ class AlarmControllerIntegrationTest {
             .alarmPurpose("test")
             .time(LocalTime.of(7, 0))
             .repeatDays(List.of(Weekday.from(today)))
-            .soundType(SoundType.ONE)
+            .soundType(SoundType.KARINA_SCOLDING)
             .latitude(37.5665)
             .longitude(126.9780)
             .address("서울특별시 중구 퇴계로 123")
@@ -119,7 +119,7 @@ class AlarmControllerIntegrationTest {
             .alarmPurpose("test")
             .time(LocalTime.of(7, 0))
             .repeatDays(List.of(Weekday.from(previous)))
-            .soundType(SoundType.ONE)
+            .soundType(SoundType.KARINA_SCOLDING)
             .latitude(37.5665)
             .longitude(126.9780)
             .address("서울특별시 중구 퇴계로 123")
@@ -166,8 +166,8 @@ class AlarmControllerIntegrationTest {
                 ),
                 fixture.getAlarmPurpose(),
                 fixture.getTime(),
-                fixture.getRepeatDays().stream().map(Weekday::getDescription).toList(),
-                fixture.getSoundType().getDescription()
+                fixture.getRepeatDays().stream().map(Weekday::name).toList(),
+                fixture.getSoundType().name()
             );
             String accessToken = jwtProvider.generateAccessToken(member.getId(), member.getRole(), "mock_device_id");
 
@@ -197,7 +197,7 @@ class AlarmControllerIntegrationTest {
                 fixture.getAlarmPurpose(),
                 fixture.getTime(),
                 List.of(),
-                fixture.getSoundType().getDescription()
+                fixture.getSoundType().name()
             );
             String accessToken = jwtProvider.generateAccessToken(member.getId(), member.getRole(), "mock_device_id");
 
@@ -224,8 +224,8 @@ class AlarmControllerIntegrationTest {
                 ),
                 fixture.getAlarmPurpose(),
                 fixture.getTime(),
-                fixture.getRepeatDays().stream().map(Weekday::getDescription).toList(),
-                fixture.getSoundType().getDescription()
+                fixture.getRepeatDays().stream().map(Weekday::name).toList(),
+                fixture.getSoundType().name()
             );
             String accessToken = jwtProvider.generateAccessToken(member.getId(), member.getRole(), "mock_device_id");
 
