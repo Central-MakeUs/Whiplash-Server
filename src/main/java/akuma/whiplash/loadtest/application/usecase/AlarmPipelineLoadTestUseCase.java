@@ -82,7 +82,7 @@ public class AlarmPipelineLoadTestUseCase {
                 .repeatDays(List.of(
                     Weekday.MONDAY, Weekday.TUESDAY, Weekday.WEDNESDAY,
                     Weekday.THURSDAY, Weekday.FRIDAY, Weekday.SATURDAY, Weekday.SUNDAY))
-                .soundType(SoundType.NONE)
+                .soundType(SoundType.KARINA_SCOLDING)
                 .latitude(37.5665)
                 .longitude(126.9780)
                 .address("서울특별시 중구 세종대로 110")

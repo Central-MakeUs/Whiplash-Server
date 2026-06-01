@@ -137,8 +137,8 @@ class AlarmControllerTest {
                 ),
                 fixture.getAlarmPurpose(),
                 LocalTime.parse("08:30"),
-                fixture.getRepeatDays().stream().map(Weekday::getDescription).toList(),
-                fixture.getSoundType().getDescription()
+                fixture.getRepeatDays().stream().map(Weekday::name).toList(),
+                fixture.getSoundType().name()
             );
             setSecurityContext(buildContext(MEMBER_3));
             CreateAlarmResponse response = CreateAlarmResponse.builder().alarmId(123L).build();
@@ -170,8 +170,8 @@ class AlarmControllerTest {
                   },
                   "alarmPurpose": "도서관 정기 출석 알람",
                   "alarmTime": "24:30",
-                  "repeatDays": ["월"],
-                  "soundType": "알람 소리1"
+                  "repeatDays": ["MONDAY"],
+                  "soundType": "KARINA_SCOLDING"
                 }
                 """;
             CreateAlarmResponse response = CreateAlarmResponse.builder().alarmId(1L).build();
@@ -204,8 +204,8 @@ class AlarmControllerTest {
                 ),
                 fixture.getAlarmPurpose(),
                 fixture.getTime(),
-                fixture.getRepeatDays().stream().map(Weekday::getDescription).toList(),
-                fixture.getSoundType().getDescription()
+                fixture.getRepeatDays().stream().map(Weekday::name).toList(),
+                fixture.getSoundType().name()
             );
             setSecurityContext(buildContext(MEMBER_4));
 
@@ -235,8 +235,8 @@ class AlarmControllerTest {
             ),
             fixture.getAlarmPurpose(),
             fixture.getTime(),
-            fixture.getRepeatDays().stream().map(Weekday::getDescription).toList(),
-            fixture.getSoundType().getDescription()
+            fixture.getRepeatDays().stream().map(Weekday::name).toList(),
+            fixture.getSoundType().name()
         );
         setSecurityContext(buildContext(MEMBER_3));
 

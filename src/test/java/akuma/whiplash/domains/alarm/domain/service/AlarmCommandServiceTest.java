@@ -129,8 +129,8 @@ class AlarmCommandServiceTest {
                 ),
                 fixture.getAlarmPurpose(),
                 fixture.getTime(),
-                fixture.getRepeatDays().stream().map(Weekday::getDescription).toList(),
-                fixture.getSoundType().getDescription()
+                fixture.getRepeatDays().stream().map(Weekday::name).toList(),
+                fixture.getSoundType().name()
             );
             given(memberRepository.findById(member.getId())).willReturn(Optional.of(member));
 
@@ -156,8 +156,8 @@ class AlarmCommandServiceTest {
                 ),
                 fixture.getAlarmPurpose(),
                 fixture.getTime(),
-                fixture.getRepeatDays().stream().map(Weekday::getDescription).toList(),
-                    fixture.getSoundType().getDescription()
+                fixture.getRepeatDays().stream().map(Weekday::name).toList(),
+                fixture.getSoundType().name()
             );
             given(memberRepository.findById(MemberFixture.MEMBER_6.getId())).willReturn(Optional.empty());
 
@@ -182,8 +182,8 @@ class AlarmCommandServiceTest {
                 ),
                 fixture.getAlarmPurpose(),
                 fixture.getTime(),
-                fixture.getRepeatDays().stream().map(Weekday::getDescription).toList(),
-                fixture.getSoundType().getDescription()
+                fixture.getRepeatDays().stream().map(Weekday::name).toList(),
+                fixture.getSoundType().name()
             );
             given(memberRepository.findById(member.getId())).willReturn(Optional.of(member));
             given(alarmRepository.existsByMemberIdAndAlarmPurpose(member.getId(), request.alarmPurpose())).willReturn(true);

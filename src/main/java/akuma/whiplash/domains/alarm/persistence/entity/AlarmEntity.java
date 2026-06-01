@@ -59,7 +59,7 @@ public class AlarmEntity extends BaseTimeEntity {
     @Builder.Default
     @Enumerated(EnumType.STRING)
     @Column(name = "sound_type", length = 20, nullable = false)
-    private SoundType soundType = SoundType.NONE;
+    private SoundType soundType = SoundType.VIBRATION_ONLY;
 
     @Column(nullable = false)
     private Double latitude;

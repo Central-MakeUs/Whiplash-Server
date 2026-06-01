@@ -17,6 +17,7 @@ Java 17, Spring Boot 3.5, JPA, Redis 기준으로 리뷰한다.
 - 트랜잭션 내부 외부 API 호출 점검
 - Redis 사용 패턴 점검
 - 시간/공간 복잡도 리스크 탐지
+- 변경이 latency, availability, error rate SLO에 영향을 주는지 점검
 
 ## 1. N+1 문제
 
@@ -73,6 +74,15 @@ Java 17, Spring Boot 3.5, JPA, Redis 기준으로 리뷰한다.
 - 원본 데이터 외에 파생 컬렉션을 과도하게 여러 개 생성하는가
 - 대용량 데이터를 한 번에 적재하는가
 - 캐시나 누적 구조에 크기 제한이 없는가
+
+## 8. SLO 영향
+
+중점 확인:
+
+- 사용자가 체감하는 API latency가 악화될 수 있는가
+- scheduler, Redis, FCM, 외부 API 실패가 availability나 error rate에 영향을 주는가
+- 기존 metric으로 p95/p99, 성공률, 실패율을 관측할 수 있는가
+- SLO 관점 정리가 필요하면 [slo-check](../slo-check/SKILL.md)를 함께 사용한다.
 
 ## 출력 방식
 

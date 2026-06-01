@@ -185,7 +185,7 @@ class AlarmQueryServiceTest {
                 .alarmPurpose("휴식")
                 .time(LocalTime.of(9, 0))
                 .repeatDays(List.of(Weekday.MONDAY))
-                .soundType(SoundType.ONE)
+                .soundType(SoundType.KARINA_SCOLDING)
                 .latitude(37.0)
                 .longitude(127.0)
                 .address("서울")

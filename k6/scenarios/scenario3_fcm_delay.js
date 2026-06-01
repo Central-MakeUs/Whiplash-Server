@@ -66,8 +66,8 @@ export function trafficGenerator(data) {
       latitude: 37.5, longitude: 127.0,
       alarmPurpose: "Delay Test",
       time: "12:00",
-      repeatDays: ["월", "화", "수"],
-      soundType: "Basic"
+      repeatDays: ["MONDAY", "TUESDAY", "WEDNESDAY"],
+      soundType: "KARINA_SCOLDING"
     });
     
     const res = http.post(`${BASE_URL}/api/alarms`, payload, { headers });

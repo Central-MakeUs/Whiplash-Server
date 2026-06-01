@@ -24,6 +24,7 @@ public record SocialLoginRequest(
     String platform,
 
     @Schema(description = "FCM 푸시 토큰", example = "fcm-token")
+    @NotBlank(message = "FCM 토큰을 입력해주세요")
     String fcmToken,
 
     @Schema(description = "앱 버전", example = "1.0.0")

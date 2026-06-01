@@ -82,17 +82,18 @@ class AuthControllerIntegrationTest {
     class LogoutTest {
 
         @Test
-        @DisplayName("성공: 리프레시 토큰과 FCM 토큰을 삭제한다")
+        @DisplayName("성공: 액세스 토큰으로 현재 디바이스의 리프레시 토큰과 FCM 토큰을 삭제한다")
         void success() throws Exception {
             // given
             MemberEntity member = memberRepository.save(MemberFixture.MEMBER_1.toEntity());
             String deviceId = "device-logout-success";
-            String refreshToken = jwtProvider.generateRefreshToken(member.getId(), deviceId, member.getRole());
+            String accessToken = jwtProvider.generateAccessToken(member.getId(), member.getRole(), deviceId);
+            jwtProvider.generateRefreshToken(member.getId(), deviceId, member.getRole());
             redisService.upsertFcmToken(member.getId(), deviceId, "fcmToken");
 
             // when
             mockMvc.perform(post(BASE + "/logout")
-                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + refreshToken))
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
                 .andExpect(status().isOk());
 
             // then
@@ -123,7 +124,7 @@ class AuthControllerIntegrationTest {
             SecretKey key = Keys.hmacShaKeyFor(Decoders.BASE64.decode(secretKeyStr));
             String expiredToken = Jwts.builder()
                 .claim("role", member.getRole())
-                .claim("type", "REFRESH")
+                .claim("type", "ACCESS")
                 .claim("deviceId", deviceId)
                 .setSubject(member.getId().toString())
                 .setExpiration(Date.from(Instant.now().minusSeconds(60)))
@@ -139,13 +140,12 @@ class AuthControllerIntegrationTest {
         }
 
         @Test
-        @DisplayName("실패: 토큰이 저장되어 있지 않으면 401와 에러 코드를 반환한다")
-        void fail_tokenNotFound() throws Exception {
+        @DisplayName("실패: 리프레시 토큰으로 요청하면 401과 에러 코드를 반환한다")
+        void fail_refreshToken() throws Exception {
             // given
             MemberEntity member = memberRepository.save(MemberFixture.MEMBER_3.toEntity());
-            String deviceId = "device-notfound";
+            String deviceId = "device-refresh-token";
             String refreshToken = jwtProvider.generateRefreshToken(member.getId(), deviceId, member.getRole());
-            redisRepository.deleteValues("REFRESH:" + member.getId() + ":" + deviceId);
 
             // when & then
             mockMvc.perform(post(BASE + "/logout")
@@ -156,14 +156,14 @@ class AuthControllerIntegrationTest {
     }
 
     @Nested
-    @DisplayName("[POST] /api/auth/reissue - 토큰 재발급")
+    @DisplayName("[POST] /api/auth/token/reissue - 토큰 재발급")
     class ReissueTokenTest {
 
         @Test
         @DisplayName("실패: 토큰이 유효하지 않으면 401과 에러 코드를 반환한다")
         void fail_invalidToken() throws Exception {
             // when & then
-            mockMvc.perform(post(BASE + "/reissue")
+            mockMvc.perform(post(BASE + "/token/reissue")
                     .header(HttpHeaders.AUTHORIZATION, "Bearer invalid"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value(AuthErrorCode.INVALID_TOKEN.getCustomCode()));
@@ -178,7 +178,7 @@ class AuthControllerIntegrationTest {
             redisRepository.deleteValues("REFRESH:" + member.getId() + ":" + DEVICE);
 
             // when & then
-            mockMvc.perform(post(BASE + "/reissue")
+            mockMvc.perform(post(BASE + "/token/reissue")
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + refreshToken))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value(AuthErrorCode.INVALID_TOKEN.getCustomCode()));
@@ -201,7 +201,7 @@ class AuthControllerIntegrationTest {
             redisRepository.setValues("REFRESH:" + member.getId() + ":" + DEVICE, expiredToken, Duration.ofMinutes(5));
 
             // when & then
-            mockMvc.perform(post(BASE + "/reissue")
+            mockMvc.perform(post(BASE + "/token/reissue")
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + expiredToken))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value(AuthErrorCode.TOKEN_EXPIRED.getCustomCode()));

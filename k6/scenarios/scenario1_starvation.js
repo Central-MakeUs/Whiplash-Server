@@ -94,8 +94,8 @@ export function stressRinging(data) {
       latitude: 37.5, longitude: 127.0,
       alarmPurpose: `Starve Test ${randomString(5)}`,
       time: "12:00",
-      repeatDays: ["월", "화", "수", "목", "금"],
-      soundType: "Basic"
+      repeatDays: ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY"],
+      soundType: "KARINA_SCOLDING"
     });
 
     const createRes = http.post(`${BASE_URL}/api/alarms`, payload, { headers });

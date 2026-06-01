@@ -17,6 +17,7 @@ import akuma.whiplash.domains.member.persistence.repository.MemberRepository;
 import akuma.whiplash.global.config.security.jwt.JwtProvider;
 import akuma.whiplash.global.config.security.jwt.JwtUtils;
 import akuma.whiplash.global.exception.ApplicationException;
+import akuma.whiplash.global.util.date.TimeProvider;
 import akuma.whiplash.infrastructure.redis.RedisService;
 import java.util.Map;
 import java.util.Optional;
@@ -37,6 +38,7 @@ public class AuthCommandServiceImpl implements AuthCommandService {
     private final JwtProvider jwtProvider;
     private final JwtUtils jwtUtils;
     private final RedisService redisService;
+    private final TimeProvider timeProvider;
 
     @Override
     public LoginResponse login(SocialLoginRequest request) {
@@ -103,7 +105,7 @@ public class AuthCommandServiceImpl implements AuthCommandService {
     private void upsertMemberDevice(MemberEntity member, SocialLoginRequest request) {
         memberDeviceRepository.findByMember_IdAndDeviceId(member.getId(), request.deviceId())
             .ifPresentOrElse(
-                device -> device.updateOnLogin(request.fcmToken(), request.platform(), request.appVersion(), request.osVersion()),
+                device -> device.updateOnLogin(request.fcmToken(), request.platform(), request.appVersion(), request.osVersion(), timeProvider.now()),
                 () -> memberDeviceRepository.save(AuthMapper.mapToMemberDeviceEntity(member, request))
             );
     }
