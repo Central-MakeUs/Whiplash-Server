@@ -59,18 +59,18 @@ public class MemberDeviceEntity extends BaseTimeEntity {
     @Column(name = "last_active_at")
     private LocalDateTime lastActiveAt;
 
-    public void updateOnLogin(String fcmToken, String platform, String appVersion, String osVersion) {
+    public void updateOnLogin(String fcmToken, String platform, String appVersion, String osVersion, LocalDateTime now) {
         this.fcmToken = fcmToken;
         this.platform = platform;
         this.appVersion = appVersion;
         this.osVersion = osVersion;
         this.isLoggedIn = true;
-        this.lastActiveAt = LocalDateTime.now();
+        this.lastActiveAt = now;
     }
 
-    public void updateFcmToken(String fcmToken) {
+    public void updateFcmToken(String fcmToken, LocalDateTime now) {
         this.fcmToken = fcmToken;
-        this.lastActiveAt = LocalDateTime.now();
+        this.lastActiveAt = now;
     }
 
     public void logout() {

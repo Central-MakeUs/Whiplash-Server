@@ -3,11 +3,12 @@ package akuma.whiplash.domains.device.domain.service;
 import static akuma.whiplash.domains.device.exception.DeviceErrorCode.DEVICE_NOT_FOUND;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import static org.mockito.ArgumentMatchers.any;
 
 import akuma.whiplash.domains.device.application.dto.request.FcmTokenUpdateRequest;
 import akuma.whiplash.domains.device.application.dto.response.FcmTokenUpdateResponse;
@@ -18,7 +19,9 @@ import akuma.whiplash.domains.member.persistence.entity.MemberDeviceEntity;
 import akuma.whiplash.domains.member.persistence.entity.MemberEntity;
 import akuma.whiplash.domains.member.persistence.repository.MemberDeviceRepository;
 import akuma.whiplash.global.exception.ApplicationException;
+import akuma.whiplash.global.util.date.TimeProvider;
 import akuma.whiplash.infrastructure.redis.RedisService;
+import java.time.LocalDateTime;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -34,9 +37,12 @@ class DeviceCommandServiceTest {
 
     @Mock private MemberDeviceRepository memberDeviceRepository;
     @Mock private RedisService redisService;
+    @Mock private TimeProvider timeProvider;
 
     @InjectMocks
     private DeviceCommandServiceImpl deviceCommandService;
+
+    private static final LocalDateTime FIXED_NOW = LocalDateTime.of(2026, 1, 1, 0, 0);
 
     private MemberEntity buildMember(Long memberId) {
         return MemberEntity.builder()
@@ -81,12 +87,13 @@ class DeviceCommandServiceTest {
 
             when(memberDeviceRepository.findByMember_IdAndDeviceId(memberId, deviceId))
                 .thenReturn(Optional.of(device));
+            when(timeProvider.now()).thenReturn(FIXED_NOW);
 
             // when
             FcmTokenUpdateResponse response = deviceCommandService.modifyFcmToken(memberId, request);
 
             // then
-            verify(device).updateFcmToken(newFcmToken);
+            verify(device).updateFcmToken(eq(newFcmToken), eq(FIXED_NOW));
             verify(redisService).upsertFcmToken(memberId, deviceId, newFcmToken);
             assertThat(response.deviceId()).isEqualTo(deviceId);
             assertThat(response.fcmToken()).isEqualTo(newFcmToken);
@@ -126,13 +133,14 @@ class DeviceCommandServiceTest {
 
             when(memberDeviceRepository.findByMember_IdAndDeviceId(memberId, deviceId))
                 .thenReturn(Optional.of(device));
+            when(timeProvider.now()).thenReturn(FIXED_NOW);
 
             // when
             deviceCommandService.modifyFcmToken(memberId, request);
 
             // then: updateFcmToken만 호출되고, updateOnLogin(platform 덮어쓰기)은 호출되지 않는다
-            verify(device).updateFcmToken("updated-fcm");
-            verify(device, never()).updateOnLogin(any(), any(), any(), any());
+            verify(device).updateFcmToken(eq("updated-fcm"), eq(FIXED_NOW));
+            verify(device, never()).updateOnLogin(any(), any(), any(), any(), any());
         }
     }
 }
