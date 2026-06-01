@@ -219,7 +219,7 @@ class AuthControllerTest {
     }
 
     @Nested
-    @DisplayName("[POST] /api/v1/auth/reissue - 토큰 재발급")
+    @DisplayName("[POST] /api/v1/auth/token/reissue - 토큰 재발급")
     class ReissueTokenTest {
 
         @Test
@@ -235,7 +235,7 @@ class AuthControllerTest {
                 .thenReturn(response);
 
             // when & then
-            mockMvc.perform(post(BASE + "/reissue"))
+            mockMvc.perform(post(BASE + "/token/reissue"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.result.accessToken").value("Bearer newAccess"))
                 .andExpect(jsonPath("$.result.refreshToken").value("Bearer newRefresh"));
@@ -250,7 +250,7 @@ class AuthControllerTest {
                 .thenThrow(ApplicationException.from(AuthErrorCode.INVALID_TOKEN));
 
             // when & then
-            mockMvc.perform(post(BASE + "/reissue"))
+            mockMvc.perform(post(BASE + "/token/reissue"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value(AuthErrorCode.INVALID_TOKEN.getCustomCode()));
         }
@@ -264,7 +264,7 @@ class AuthControllerTest {
                 .thenThrow(ApplicationException.from(AuthErrorCode.INVALID_TOKEN));
 
             // when & then
-            mockMvc.perform(post(BASE + "/reissue"))
+            mockMvc.perform(post(BASE + "/token/reissue"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value(AuthErrorCode.INVALID_TOKEN.getCustomCode()));
         }
@@ -278,7 +278,7 @@ class AuthControllerTest {
                 .thenThrow(ApplicationException.from(AuthErrorCode.TOKEN_EXPIRED));
 
             // when & then
-            mockMvc.perform(post(BASE + "/reissue"))
+            mockMvc.perform(post(BASE + "/token/reissue"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value(AuthErrorCode.TOKEN_EXPIRED.getCustomCode()));
         }

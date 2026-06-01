@@ -31,10 +31,7 @@ public class RequestMatcherHolder {
 
         // auth
         new RequestInfo(POST, "/api/v1/auth/social-login", null),
-        new RequestInfo(GET, "/api/v1/auth/*", null),
-        new RequestInfo(POST, "/api/v1/auth/*", USER),
-        new RequestInfo(PUT, "/api/v1/auth/*", USER),
-        new RequestInfo(DELETE, "/api/v1/auth/*", USER),
+        new RequestInfo(POST, "/api/v1/auth/**", USER),
 
         // swagger
         new RequestInfo(GET, "/api/nuntteo/swagger-ui.html", null),              // 진입점
