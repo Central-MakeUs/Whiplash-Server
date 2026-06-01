@@ -1,11 +1,37 @@
 ---
 name: write-test-code
-description: 이 저장소에서 controller, service, repository, Redis, integration 테스트를 작성하거나 수정할 때 사용한다. 어노테이션 선택, fixture 사용, nested 테스트 구조, DisplayName 규칙, 현재 코드베이스의 테스트 패턴을 다룬다.
+description: 이 저장소에서 controller, service, repository, Redis, integration 테스트를 작성하거나 수정할 때 사용한다. TDD red-green-refactor 흐름, 어노테이션 선택, fixture 사용, nested 테스트 구조, DisplayName 규칙, 현재 코드베이스의 테스트 패턴을 다룬다.
 ---
 
 # Write Test Code
 
 루트 [AGENTS.md](../../../AGENTS.md) 규칙을 전제로 사용한다.
+
+## 목적
+
+- 기능 추가나 버그 수정을 테스트로 먼저 고정한다.
+- Whiplash 테스트 컨벤션에 맞는 테스트를 작성한다.
+- 실패 테스트를 green으로 만든 뒤 중복과 구조를 정리한다.
+
+## TDD 진행 순서
+
+가능한 경우 red-green-refactor 흐름을 따른다.
+
+1. 요구사항을 성공/실패 시나리오로 나눈다.
+2. 가장 핵심 계약을 검증하는 테스트 하나를 먼저 작성한다.
+3. SLO 영향이 있는 기능이면 latency, availability, error rate 관점의 검증 필요성을 확인한다.
+4. 테스트가 의도한 이유로 실패하는지 확인한다.
+5. 최소 구현으로 green을 만든다.
+6. 기존 규칙에 맞게 리팩터링한다.
+7. 필요한 실패 케이스와 경계값 테스트를 추가한다.
+
+## 구현 시 지킬 규칙
+
+- 예외는 `ApplicationException.from(ErrorCode)`로 발생시킨다.
+- 새 ErrorCode나 validation이 필요하면 [handle-exception](../handle-exception/SKILL.md)를 따른다.
+- 새 도메인 레이어가 필요하면 [create-domain-layer](../create-domain-layer/SKILL.md)를 따른다.
+- 성능 약속이나 운영 관측이 필요한 기능이면 [slo-check](../slo-check/SKILL.md)를 따른다.
+- 테스트 통과만을 위해 production 코드를 우회하거나 테스트 전용 분기를 만들지 않는다.
 
 ## 테스트 어노테이션 선택
 
@@ -105,6 +131,8 @@ assertThatThrownBy(() -> alarmCommandService.removeAlarmByAd(memberId, alarmId, 
 
 ## 마무리 전 체크
 
+- 실패 테스트가 먼저 있었고, 최종적으로 관련 테스트가 통과하는가?
+- 성공 케이스와 의미 있는 실패 케이스가 포함되는가?
 - 가장 적절한 테스트 슬라이스를 선택했는가?
 - 가능한 경우 ad-hoc builder 대신 fixture helper를 사용했는가?
 - nested 구조와 네이밍을 정확히 맞췄는가?

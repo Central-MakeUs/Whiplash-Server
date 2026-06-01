@@ -1,6 +1,6 @@
 ---
 name: grill-with-docs
-description: 이 저장소에서 큰 기능 설계나 정책 변경을 시작하기 전에 AGENTS.md, CONTEXT.md, docs/adr, docs/PLAN.md, 실제 코드를 근거로 요구사항을 질문하고 도메인 용어와 아키텍처 결정을 문서화할 때 사용한다.
+description: 이 저장소에서 큰 기능 설계나 정책 변경을 시작하기 전에 AGENTS.md, CONTEXT.md, docs/adr, docs/history, 실제 코드를 근거로 요구사항을 질문하고 도메인 용어와 아키텍처 결정 및 작업 이력을 문서화할 때 사용한다.
 ---
 
 # Grill With Docs
@@ -12,24 +12,41 @@ description: 이 저장소에서 큰 기능 설계나 정책 변경을 시작하
 - 큰 기능을 구현하기 전에 애매한 요구사항을 줄인다.
 - 사용자 표현, 기존 코드, 도메인 용어, 과거 결정이 같은 의미를 가리키는지 확인한다.
 - `CONTEXT.md`로 프로젝트 glossary를 유지하고, 필요한 경우 ADR로 결정 배경을 남긴다.
-- 기존 `docs/*/PLAN.md`, API 계약, 도메인 규칙과 충돌하지 않게 한다.
-- 질문 결과를 공유된 이해, PRD, PLAN.md, CONTEXT.md, ADR 후보로 정리한다.
+- 기존 `docs/history/0001-feature-slug/PLAN.md` 형식의 작업 이력, API 계약, 도메인 규칙과 충돌하지 않게 한다.
+- 질문 결과를 공유된 이해, PRD, PLAN.md, CONTEXT.md, ADR 후보, history 반영 후보로 정리한다.
 
 ## 진행 순서
 
-1. `AGENTS.md`와 관련 `CONTEXT.md`, `docs/adr/*`, `docs/*/PLAN.md`가 있는지 먼저 확인한다.
+1. `AGENTS.md`와 관련 `CONTEXT.md`, `CONTEXT-MAP.md`, `docs/adr/*`, `docs/history/0001-feature-slug/PLAN.md` 형식의 PLAN이 있는지 먼저 확인한다.
 2. 관련 controller, DTO, use case, service, exception, repository를 읽어 코드가 실제로 어떤 용어와 정책을 쓰는지 확인한다.
 3. 사용자 설명과 문서/코드 사이의 용어 불일치, 정책 충돌, 빠진 결정을 찾는다.
 4. 코드베이스 탐색으로 답할 수 없는 질문만 사용자에게 묻는다.
-5. 답변을 “확정된 이해”, “CONTEXT.md 갱신 후보”, “ADR 후보”, “PLAN.md 반영 후보”로 분류한다.
+5. 답변을 “확정된 이해”, “CONTEXT.md 갱신 후보”, “ADR 후보”, “history/PLAN.md 반영 후보”로 분류한다.
 6. 필요하면 [to-prd](../to-prd/SKILL.md) 형식으로 계획을 만든다.
+
+## 컨텍스트 구조
+
+대부분의 저장소는 단일 컨텍스트를 가진다.
+
+```text
+/
+├── CONTEXT.md
+├── docs/
+│   ├── adr/
+│   └── history/
+└── src/
+```
+
+루트에 `CONTEXT-MAP.md`가 있으면 여러 컨텍스트가 있는 저장소로 본다. 이 경우 map은 각 컨텍스트의 `CONTEXT.md`와 context-specific `docs/adr/` 위치를 가리킨다.
+
+파일은 필요할 때만 만든다. `CONTEXT.md`가 없으면 첫 용어가 확정될 때 만들고, `docs/adr/`는 첫 ADR이 필요할 때, `docs/history/`는 작업 계획이나 PLAN을 남길 때 사용한다.
 
 ## 문서 역할
 
-- `CONTEXT.md`: 프로젝트 전체 glossary와 도메인 언어를 담는다. 새 용어, 기존 용어의 의미 변경, 팀이 반복해서 헷갈릴 표현이 생기면 갱신 후보로 남긴다.
+- `CONTEXT.md`: 이 앱에서 쓰는 용어의 정확한 의미를 담는 용어 정의서다. 같은 단어라도 사람마다 해석이 달라질 수 있는 표현을 프로젝트 기준으로 고정한다.
 - `CONTEXT-MAP.md`: 도메인 간 관계나 bounded context 경계가 중요해질 때만 사용한다. 현재 저장소에 없으면 억지로 만들지 않는다.
-- `docs/adr/`: 되돌리기 어렵거나, trade-off가 있었거나, 나중에 “왜 이렇게 했지?”가 될 아키텍처/정책 결정을 기록한다.
-- `docs/{번호}.{기능명}/PLAN.md`: 특정 기능의 구현 계획과 API/테스트/마이그레이션 결정을 기록한다.
+- `docs/adr/`: 시스템 구조 설계 시 내린 결정의 기록을 둔다. 개발자들이 근거를 가지고 토론한 뒤 결정한 아키텍처/정책 선택을 남긴다.
+- `docs/history/`: 작업 시 사용한 PLAN 파일, PRD, 구현 계획, 진행 이력처럼 특정 작업의 기록을 둔다. 디렉터리는 `0001-feature-slug`처럼 4자리 번호와 하이픈 slug를 사용한다.
 
 ## CONTEXT.md에 남길 것
 
@@ -38,16 +55,28 @@ description: 이 저장소에서 큰 기능 설계나 정책 변경을 시작하
 - 사용자나 클라이언트가 쓰는 표현과 서버 코드 용어의 매핑
 - 여러 기능에서 반복해서 참조되는 정책의 짧은 요약
 
-구현 절차, 상세 API 스펙, 일회성 작업 TODO는 `CONTEXT.md`가 아니라 PLAN.md에 둔다.
+구현 절차, 상세 API 스펙, 일회성 작업 TODO는 `CONTEXT.md`가 아니라 `docs/history/0001-feature-slug/PLAN.md`에 둔다.
 
 ## ADR로 남길 것
 
+- 시스템 구조 설계 시 내린 결정
+- 여러 개발자가 의견이나 근거 자료를 가지고 토론한 뒤 정한 결정
+- 한번 정하면 일단 따르는 것이 원칙인 결정
+- 기존 ADR을 따를 수 없어 바꿔야 하는 경우 ADR 자체를 수정하거나 새 ADR로 대체해야 하는 결정
 - 되돌리기 어렵거나 데이터/운영/클라이언트 호환성에 영향을 주는 결정
 - 여러 선택지 중 하나를 고른 이유가 중요한 결정
 - 현재 코드만 보면 이상해 보일 수 있어 배경 설명이 필요한 결정
 - 결제, 알람 삭제, 위치 인증, FCM 실패 처리, Redis key 정책처럼 운영 의미가 큰 정책
 
 단순 네이밍, 작은 리팩터링, AGENTS.md에 이미 있는 규칙 반복은 ADR로 남기지 않는다.
+
+## history에 남길 것
+
+- 기능 구현 또는 수정 시 사용한 PLAN.md
+- 요구사항 정리, API 계약, 테스트 계획, 마이그레이션 계획
+- 완료된 작업의 구현 이력과 후속 작업
+- 디렉터리명은 `0001-기능명-slug` 형식으로 작성한다.
+- ADR 수준의 구조 결정은 history가 아니라 `docs/adr/`로 분리한다.
 
 ## 질문해야 하는 경우
 
@@ -56,7 +85,7 @@ description: 이 저장소에서 큰 기능 설계나 정책 변경을 시작하
 - 결제, 알람 삭제, 위치 인증처럼 클라이언트 UX와 서버 정책이 함께 바뀌는 경우
 - ErrorCode 또는 상태 코드 정책 선택이 필요한 경우
 - DB migration이나 Redis key 정책이 필요한 경우
-- 기존 PLAN.md 또는 ADR과 다른 방향의 요구사항이 들어온 경우
+- 기존 `docs/history/0001-feature-slug/PLAN.md` 또는 ADR과 다른 방향의 요구사항이 들어온 경우
 
 ## 질문하지 말아야 하는 경우
 
