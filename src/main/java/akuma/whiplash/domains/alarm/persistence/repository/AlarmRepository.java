@@ -2,6 +2,7 @@ package akuma.whiplash.domains.alarm.persistence.repository;
 
 import akuma.whiplash.domains.alarm.domain.constant.AlarmStatus;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmEntity;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -25,8 +26,18 @@ public interface AlarmRepository extends JpaRepository<AlarmEntity, Long> {
 
     boolean existsByMemberIdAndAlarmPurpose(Long memberId, String alarmPurpose);
 
-    @Query(value = "SELECT * FROM alarm WHERE repeat_days LIKE %:day%", nativeQuery = true)
-    List<AlarmEntity> findByRepeatDaysLike(@Param("day") String day);
+    @Query(value = """
+        SELECT
+            id AS alarmId,
+            alarm_time AS alarmTime
+        FROM alarm
+        WHERE repeat_days LIKE %:day%
+          AND status = :status
+    """, nativeQuery = true)
+    List<AlarmOccurrenceBatchTarget> findBatchTargetsByRepeatDaysLikeAndStatus(
+        @Param("day") String day,
+        @Param("status") String status
+    );
 
     @Modifying
     @Query("""
@@ -34,4 +45,10 @@ public interface AlarmRepository extends JpaRepository<AlarmEntity, Long> {
         WHERE a.member.id = :memberId
     """)
     void deleteByMemberId(@Param("memberId") Long memberId);
+
+    interface AlarmOccurrenceBatchTarget {
+        Long getAlarmId();
+
+        LocalTime getAlarmTime();
+    }
 }

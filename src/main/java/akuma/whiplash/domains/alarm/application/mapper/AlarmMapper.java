@@ -107,11 +107,15 @@ public class AlarmMapper {
     }
 
     public static AlarmOccurrenceEntity mapToAlarmOccurrenceForDate(AlarmEntity alarm, LocalDate date) {
+        return mapToAlarmOccurrenceForDate(alarm, alarm.getTime(), date);
+    }
+
+    public static AlarmOccurrenceEntity mapToAlarmOccurrenceForDate(AlarmEntity alarm, LocalTime alarmTime, LocalDate date) {
         return AlarmOccurrenceEntity.builder()
             .alarm(alarm)
             .occurrenceDate(date)
-            .occurrenceTime(alarm.getTime())
-            .scheduledAt(LocalDateTime.of(date, alarm.getTime()))
+            .occurrenceTime(alarmTime)
+            .scheduledAt(LocalDateTime.of(date, alarmTime))
             .status(OccurrenceStatus.SCHEDULED)
             .deactivatedAt(null)
             .checkinTime(null)

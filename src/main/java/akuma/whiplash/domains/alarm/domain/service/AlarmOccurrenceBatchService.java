@@ -2,10 +2,12 @@ package akuma.whiplash.domains.alarm.domain.service;
 
 import akuma.whiplash.domains.alarm.application.dto.etc.AlarmOccurrenceCreateBatchResult;
 import akuma.whiplash.domains.alarm.application.mapper.AlarmMapper;
+import akuma.whiplash.domains.alarm.domain.constant.AlarmStatus;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmEntity;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmOccurrenceEntity;
 import akuma.whiplash.domains.alarm.persistence.repository.AlarmOccurrenceRepository;
 import akuma.whiplash.domains.alarm.persistence.repository.AlarmRepository;
+import akuma.whiplash.domains.alarm.persistence.repository.AlarmRepository.AlarmOccurrenceBatchTarget;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.util.List;
@@ -33,9 +35,12 @@ public class AlarmOccurrenceBatchService {
         LocalDate today = LocalDate.now();
         DayOfWeek todayDayOfWeek = today.getDayOfWeek();
 
-        // 1. 오늘 반복 요일에 해당하는 알람만 DB에서 조회 (native query + LIKE)
+        // 1. 오늘 반복 요일에 해당하는 활성 알람만 DB에서 조회
         String likeKeyword = "\"" + todayDayOfWeek.name() + "\""; // ex: "MONDAY"
-        List<AlarmEntity> todayAlarms = alarmRepository.findByRepeatDaysLike(likeKeyword);
+        List<AlarmOccurrenceBatchTarget> todayAlarms = alarmRepository.findBatchTargetsByRepeatDaysLikeAndStatus(
+            likeKeyword,
+            AlarmStatus.ACTIVE.name()
+        );
 
         log.info("[AlarmOccurrence Create Batch] 오늘({}) 울릴 알람 수: {}", todayDayOfWeek, todayAlarms.size());
 
@@ -47,23 +52,30 @@ public class AlarmOccurrenceBatchService {
         int failedCount = 0;
 
         // 3. 생성되지 않은 알람에 대해서만 alarm_occurrence 생성
-        for (AlarmEntity alarm : todayAlarms) {
-            if (existingAlarmIds.contains(alarm.getId())) {
+        for (AlarmOccurrenceBatchTarget target : todayAlarms) {
+            Long alarmId = target.getAlarmId();
+
+            if (existingAlarmIds.contains(alarmId)) {
                 skippedCount++;
                 continue;
             }
 
             try {
-                AlarmOccurrenceEntity occurrence = AlarmMapper.mapToAlarmOccurrenceForDate(alarm, today);
+                AlarmEntity alarmReference = alarmRepository.getReferenceById(alarmId);
+                AlarmOccurrenceEntity occurrence = AlarmMapper.mapToAlarmOccurrenceForDate(
+                    alarmReference,
+                    target.getAlarmTime(),
+                    today
+                );
                 alarmOccurrenceRepository.save(occurrence);
 
                 createdCount++;
 
-                log.info("[AlarmOccurrence Create Batch] 생성 완료: alarmId={}, date={}", alarm.getId(), today);
+                log.info("[AlarmOccurrence Create Batch] 생성 완료: alarmId={}, date={}", alarmId, today);
 
             } catch (Exception e) {
                 failedCount++;
-                log.error("[AlarmOccurrence Create Batch] 생성 실패: alarmId={}, error={}", alarm.getId(), e.getMessage());
+                log.error("[AlarmOccurrence Create Batch] 생성 실패: alarmId={}, error={}", alarmId, e.getMessage());
             }
         }
 
