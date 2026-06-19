@@ -1,12 +1,13 @@
 package akuma.whiplash.domains.place.domain.service;
 
-import akuma.whiplash.domains.place.application.dto.response.PlaceInfoResponse;
-import akuma.whiplash.domains.place.application.dto.response.PlaceDetailResponse;
+import akuma.whiplash.domains.place.domain.model.PlaceDetail;
+import akuma.whiplash.domains.place.domain.model.PlaceSearchCriteria;
+import akuma.whiplash.domains.place.domain.model.PlaceSearchResult;
 import java.util.List;
 
 public interface PlaceQueryService {
 
-    List<PlaceInfoResponse> searchPlaces(String query, Double latitude, Double longitude);
-    PlaceDetailResponse getPlaceDetailByCoord(double latitude, double longitude);
+    List<PlaceSearchResult> searchPlaces(PlaceSearchCriteria criteria);
+    PlaceDetail getPlaceDetailByCoord(double latitude, double longitude, String languageCode);
     List<String> searchPlaceKeywords(String query);
 }
