@@ -5,6 +5,7 @@ import akuma.whiplash.domains.auth.exception.AuthErrorCode;
 import akuma.whiplash.domains.device.exception.DeviceErrorCode;
 import akuma.whiplash.domains.member.exception.MemberErrorCode;
 import akuma.whiplash.domains.payment.exception.PaymentErrorCode;
+import akuma.whiplash.domains.place.exception.PlaceErrorCode;
 import akuma.whiplash.global.annotation.swagger.CustomErrorCodes;
 import akuma.whiplash.global.response.ApplicationResponse;
 import akuma.whiplash.global.response.code.BaseErrorCode;
@@ -96,7 +97,8 @@ public class SwaggerConfig {
                     customErrorCodes.authErrorCodes(),
                     customErrorCodes.memberErrorCodes(),
                     customErrorCodes.deviceErrorCodes(),
-                    customErrorCodes.paymentErrorCodes()
+                    customErrorCodes.paymentErrorCodes(),
+                    customErrorCodes.placeErrorCodes()
                 );
             }
 
@@ -111,7 +113,8 @@ public class SwaggerConfig {
             AuthErrorCode[] authErrorCodes,
             MemberErrorCode[] memberErrorCodes,
             DeviceErrorCode[] deviceErrorCodes,
-            PaymentErrorCode[] paymentErrorCodes
+            PaymentErrorCode[] paymentErrorCodes,
+            PlaceErrorCode[] placeErrorCodes
     ) {
         ApiResponses responses = operation.getResponses();
 
@@ -142,6 +145,11 @@ public class SwaggerConfig {
             }
 
             for (PaymentErrorCode errorCode : paymentErrorCodes) {
+                SwaggerExampleHolder SwaggerExampleHolder = getSwaggerExampleHolder(errorCode);
+                addExamplesToResponses(responses, SwaggerExampleHolder);
+            }
+
+            for (PlaceErrorCode errorCode : placeErrorCodes) {
                 SwaggerExampleHolder SwaggerExampleHolder = getSwaggerExampleHolder(errorCode);
                 addExamplesToResponses(responses, SwaggerExampleHolder);
             }

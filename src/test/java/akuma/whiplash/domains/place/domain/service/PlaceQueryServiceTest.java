@@ -2,48 +2,35 @@ package akuma.whiplash.domains.place.domain.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import akuma.whiplash.domains.place.application.dto.response.PlaceInfoResponse;
-import java.io.IOException;
+import akuma.whiplash.domains.place.domain.client.NaverClient;
+import akuma.whiplash.domains.place.domain.client.dto.NaverLocalSearchResponse;
+import akuma.whiplash.domains.place.domain.client.dto.NaverLocalSearchResponse.Item;
+import akuma.whiplash.domains.place.domain.constant.PlaceProvider;
+import akuma.whiplash.domains.place.domain.model.PlaceDetail;
+import akuma.whiplash.domains.place.exception.PlaceErrorCode;
+import akuma.whiplash.global.exception.ApplicationException;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
-import okhttp3.mockwebserver.MockResponse;
-import okhttp3.mockwebserver.MockWebServer;
-import okhttp3.mockwebserver.RecordedRequest;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-import org.springframework.test.util.ReflectionTestUtils;
-import org.springframework.web.reactive.function.client.WebClient;
-import org.springframework.web.reactive.function.client.WebClientResponseException;
 
 class PlaceQueryServiceTest {
 
     private PlaceQueryServiceImpl placeQueryService;
-    private MockWebServer mockWebServer;
+    private PlaceProviderRouter placeProviderRouter;
+    private NaverClient naverClient;
 
     @BeforeEach
-    void setUp() throws Exception {
-        mockWebServer = new MockWebServer();
-        mockWebServer.start();
-
-        WebClient webClient = WebClient.builder().build();
-
-        placeQueryService = new PlaceQueryServiceImpl(webClient);
-        ReflectionTestUtils.setField(placeQueryService, "naverClientId", "test-id");
-        ReflectionTestUtils.setField(placeQueryService, "naverClientSecret", "test-secret");
-        ReflectionTestUtils.setField(
-            placeQueryService,
-            "naverLocalSearchUrl",
-            mockWebServer.url("/v1/search/local.json").toString()
-        );
-    }
-
-    @AfterEach
-    void tearDown() throws IOException {
-        mockWebServer.shutdown();
+    void setUp() {
+        naverClient = mock(NaverClient.class);
+        placeProviderRouter = mock(PlaceProviderRouter.class);
+        placeQueryService = new PlaceQueryServiceImpl(naverClient, placeProviderRouter);
     }
 
     @Nested
@@ -52,48 +39,85 @@ class PlaceQueryServiceTest {
 
         @Test
         @DisplayName("성공: 키워드 검색 결과를 반환한다")
-        void success() throws Exception {
+        void success() {
             // given
-            String body = """
-                {"items":[
-                  {"title":"<b>카페</b>","address":"서울시 강남구 역삼동","roadAddress":"서울시 강남구","mapx":"1270000000","mapy":"370000000"}
-                ]}
-                """;
-            mockWebServer.enqueue(new MockResponse()
-                .setResponseCode(200)
-                .setBody(body)
-                .addHeader("Content-Type", "application/json"));
+            when(naverClient.searchLocal("카페")).thenReturn(new NaverLocalSearchResponse(List.of(
+                new Item("<b>카페</b>", "서울시 강남구 역삼동", "서울시 강남구", "1270000000", "370000000")
+            )));
 
             // when
             List<PlaceInfoResponse> responses = placeQueryService.searchPlaces("카페", null, null);
 
             // then
             assertThat(responses).hasSize(1);
-            assertThat(responses.get(0).name()).isEqualTo("카페");           // <b> 제거 로직 반영
+            assertThat(responses.get(0).name()).isEqualTo("카페");
             assertThat(responses.get(0).address()).isEqualTo("서울시 강남구");
             assertThat(responses.get(0).latitude()).isEqualTo(37.0);
             assertThat(responses.get(0).longitude()).isEqualTo(127.0);
-
-            RecordedRequest req = mockWebServer.takeRequest(3, TimeUnit.SECONDS);
-            assertThat(req).isNotNull();
-            assertThat(req.getPath()).startsWith("/v1/search/local.json");
-            assertThat(req.getHeader("X-Naver-Client-Id")).isEqualTo("test-id");
-            assertThat(req.getHeader("X-Naver-Client-Secret")).isEqualTo("test-secret");
+            verify(naverClient).searchLocal("카페");
         }
 
         @Test
         @DisplayName("실패: 외부 API가 에러를 반환하면 예외를 던진다")
-        void fail_externalApiError() throws Exception {
+        void fail_externalApiError() {
             // given
-            mockWebServer.enqueue(new MockResponse().setResponseCode(400));
+            when(naverClient.searchLocal("카페"))
+                .thenThrow(ApplicationException.from(PlaceErrorCode.PROVIDER_ERROR));
 
             // when & then
             assertThatThrownBy(() -> placeQueryService.searchPlaces("카페", null, null))
-                .isInstanceOf(WebClientResponseException.class);
+                .isInstanceOfSatisfying(ApplicationException.class, exception ->
+                    assertThat(exception.getCode()).isEqualTo(PlaceErrorCode.PROVIDER_ERROR)
+                );
+        }
+    }
 
-            RecordedRequest req = mockWebServer.takeRequest(3, TimeUnit.SECONDS);
-            assertThat(req).isNotNull();
-            assertThat(req.getPath()).startsWith("/v1/search/local.json");
+    @Nested
+    @DisplayName("searchPlaceKeywords - 연관 장소 키워드 조회")
+    class SearchPlaceKeywordsTest {
+
+        @Test
+        @DisplayName("성공: Naver 검색 결과에서 주소 키워드를 추출한다")
+        void success() {
+            // given
+            when(naverClient.searchLocal("강남")).thenReturn(new NaverLocalSearchResponse(List.of(
+                new Item("강남역", "서울시 강남구 역삼동", "서울시 강남구 강남대로", "1270000000", "370000000")
+            )));
+
+            // when
+            List<String> result = placeQueryService.searchPlaceKeywords("강남");
+
+            // then
+            assertThat(result).containsExactly("서울시 강남구 역삼동", "서울시 강남구 강남대로");
+            verify(naverClient).searchLocal("강남");
+        }
+    }
+
+    @Nested
+    @DisplayName("getPlaceDetailByCoord - 장소 상세 조회")
+    class GetPlaceDetailByCoordTest {
+
+        @Test
+        @DisplayName("성공: 좌표와 응답 언어를 provider router에 전달한다")
+        void success() {
+            // given
+            PlaceDetail expected = new PlaceDetail(
+                "New York, NY, USA",
+                "New York",
+                "New York, NY, USA",
+                40.7128,
+                -74.0060,
+                "US",
+                PlaceProvider.GOOGLE
+            );
+            when(placeProviderRouter.getPlaceDetail(40.7128, -74.0060, "en")).thenReturn(expected);
+
+            // when
+            PlaceDetail result = placeQueryService.getPlaceDetailByCoord(40.7128, -74.0060, "en");
+
+            // then
+            assertThat(result).isEqualTo(expected);
+            verify(placeProviderRouter).getPlaceDetail(40.7128, -74.0060, "en");
         }
     }
 }

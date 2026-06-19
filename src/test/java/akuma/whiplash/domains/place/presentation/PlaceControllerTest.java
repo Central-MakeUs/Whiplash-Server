@@ -13,6 +13,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import akuma.whiplash.domains.place.application.dto.response.PlaceDetailResponse;
 import akuma.whiplash.domains.place.application.dto.response.PlaceInfoResponse;
 import akuma.whiplash.domains.place.application.usecase.PlaceUseCase;
+import akuma.whiplash.domains.place.exception.PlaceErrorCode;
 import akuma.whiplash.global.config.security.SecurityConfig;
 import akuma.whiplash.global.config.security.jwt.JwtAuthenticationFilter;
 import akuma.whiplash.global.exception.ApplicationException;
@@ -180,23 +181,32 @@ class PlaceControllerTest {
         void success() throws Exception {
             // given
             PlaceDetailResponse response = PlaceDetailResponse.builder()
-                .placeName("강남역")
-                .address("서울특별시 강남구 강남대로 396")
-                .roadAddress("서울특별시 강남구 강남대로 396")
+                .placeName("New York")
+                .address("New York, NY, USA")
+                .roadAddress("New York, NY, USA")
+                .latitude(40.7128)
+                .longitude(-74.0060)
+                .countryCode("US")
+                .provider("GOOGLE")
                 .build();
-            when(placeUseCase.getPlaceDetail(eq(37.4979), eq(127.0276))).thenReturn(response);
+            when(placeUseCase.getPlaceDetail(eq(40.7128), eq(-74.0060), eq("en"))).thenReturn(response);
 
             // when
             var resultActions = mockMvc.perform(get(BASE + "/detail")
-                .param("latitude", "37.4979")
-                .param("longitude", "127.0276"));
+                .param("latitude", "40.7128")
+                .param("longitude", "-74.0060")
+                .param("languageCode", "en"));
 
             // then
             resultActions
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.result.placeName").value("강남역"))
-                .andExpect(jsonPath("$.result.address").value("서울특별시 강남구 강남대로 396"))
-                .andExpect(jsonPath("$.result.roadAddress").value("서울특별시 강남구 강남대로 396"));
+                .andExpect(jsonPath("$.result.placeName").value("New York"))
+                .andExpect(jsonPath("$.result.address").value("New York, NY, USA"))
+                .andExpect(jsonPath("$.result.roadAddress").value("New York, NY, USA"))
+                .andExpect(jsonPath("$.result.latitude").value(40.7128))
+                .andExpect(jsonPath("$.result.longitude").value(-74.0060))
+                .andExpect(jsonPath("$.result.countryCode").value("US"))
+                .andExpect(jsonPath("$.result.provider").value("GOOGLE"));
         }
 
         @Test
@@ -217,7 +227,7 @@ class PlaceControllerTest {
         @DisplayName("실패: 서비스에서 예외가 발생하면 400과 에러 코드를 반환한다")
         void fail_serviceThrows() throws Exception {
             // given
-            when(placeUseCase.getPlaceDetail(eq(37.4979), eq(127.0276)))
+            when(placeUseCase.getPlaceDetail(eq(37.4979), eq(127.0276), isNull()))
                 .thenThrow(ApplicationException.from(CommonErrorCode.BAD_REQUEST));
 
             // when
@@ -230,6 +240,26 @@ class PlaceControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.isSuccess").value(false))
                 .andExpect(jsonPath("$.code").value(CommonErrorCode.BAD_REQUEST.getCustomCode()));
+        }
+
+        @Test
+        @DisplayName("실패: 지원하지 않는 응답 언어이면 400과 에러 코드를 반환한다")
+        void fail_unsupportedLanguage() throws Exception {
+            // given
+            when(placeUseCase.getPlaceDetail(eq(37.4979), eq(127.0276), eq("ja")))
+                .thenThrow(ApplicationException.from(PlaceErrorCode.UNSUPPORTED_LANGUAGE));
+
+            // when
+            var resultActions = mockMvc.perform(get(BASE + "/detail")
+                .param("latitude", "37.4979")
+                .param("longitude", "127.0276")
+                .param("languageCode", "ja"));
+
+            // then
+            resultActions
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.isSuccess").value(false))
+                .andExpect(jsonPath("$.code").value(PlaceErrorCode.UNSUPPORTED_LANGUAGE.getCustomCode()));
         }
     }
 

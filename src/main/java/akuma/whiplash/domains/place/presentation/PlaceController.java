@@ -1,6 +1,14 @@
 package akuma.whiplash.domains.place.presentation;
 
 import static akuma.whiplash.global.response.code.CommonErrorCode.BAD_REQUEST;
+import static akuma.whiplash.domains.place.exception.PlaceErrorCode.INVALID_COORDINATE;
+import static akuma.whiplash.domains.place.exception.PlaceErrorCode.PLACE_NOT_FOUND;
+import static akuma.whiplash.domains.place.exception.PlaceErrorCode.PROVIDER_AUTHENTICATION_FAILED;
+import static akuma.whiplash.domains.place.exception.PlaceErrorCode.PROVIDER_ERROR;
+import static akuma.whiplash.domains.place.exception.PlaceErrorCode.PROVIDER_PERMISSION_DENIED;
+import static akuma.whiplash.domains.place.exception.PlaceErrorCode.PROVIDER_QUOTA_EXCEEDED;
+import static akuma.whiplash.domains.place.exception.PlaceErrorCode.PROVIDER_TIMEOUT;
+import static akuma.whiplash.domains.place.exception.PlaceErrorCode.UNSUPPORTED_LANGUAGE;
 
 import akuma.whiplash.domains.place.application.dto.response.PlaceDetailResponse;
 import akuma.whiplash.domains.place.application.dto.response.PlaceInfoResponse;
@@ -34,11 +42,27 @@ public class PlaceController {
         return ApplicationResponse.onSuccess(placeInfoResponses);
     }
 
-    @CustomErrorCodes(commonErrorCodes = {BAD_REQUEST})
+    @CustomErrorCodes(
+        commonErrorCodes = {BAD_REQUEST},
+        placeErrorCodes = {
+            INVALID_COORDINATE,
+            UNSUPPORTED_LANGUAGE,
+            PROVIDER_AUTHENTICATION_FAILED,
+            PROVIDER_PERMISSION_DENIED,
+            PLACE_NOT_FOUND,
+            PROVIDER_QUOTA_EXCEEDED,
+            PROVIDER_TIMEOUT,
+            PROVIDER_ERROR
+        }
+    )
     @Operation(summary = "장소 상세 조회", description = "위/경도를 기반으로 장소 상세 정보를 조회합니다.")
     @GetMapping("/detail")
-    public ApplicationResponse<PlaceDetailResponse> getPlaceDetail(@RequestParam double latitude, @RequestParam double longitude) {
-        PlaceDetailResponse placeDetail = placeUseCase.getPlaceDetail(latitude, longitude);
+    public ApplicationResponse<PlaceDetailResponse> getPlaceDetail(
+        @RequestParam double latitude,
+        @RequestParam double longitude,
+        @RequestParam(required = false) String languageCode
+    ) {
+        PlaceDetailResponse placeDetail = placeUseCase.getPlaceDetail(latitude, longitude, languageCode);
         return ApplicationResponse.onSuccess(placeDetail);
     }
 

@@ -99,7 +99,34 @@ class PlaceControllerIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.result.placeName").value("Mock Detail Place"))
                 .andExpect(jsonPath("$.result.address").value("Seoul, Gangnam-gu, Mock-ro 123"))
-                .andExpect(jsonPath("$.result.roadAddress").value("Seoul, Gangnam-gu, Mock-ro 123"));
+                .andExpect(jsonPath("$.result.roadAddress").value("Seoul, Gangnam-gu, Mock-ro 123"))
+                .andExpect(jsonPath("$.result.latitude").value(37.4979))
+                .andExpect(jsonPath("$.result.longitude").value(127.0276))
+                .andExpect(jsonPath("$.result.countryCode").value("KR"))
+                .andExpect(jsonPath("$.result.provider").value("NAVER"));
+        }
+
+        @Test
+        @DisplayName("성공: 해외 좌표는 Google mock으로 장소 상세를 조회한다")
+        void success_globalCoordinate() throws Exception {
+            // given
+            MemberEntity member = memberRepository.save(MemberFixture.MEMBER_2.toEntity());
+            String token = jwtProvider.generateAccessToken(member.getId(), member.getRole(), "device");
+
+            // when
+            var resultActions = mockMvc.perform(get("/api/v1/places/detail")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                .param("latitude", "40.7128")
+                .param("longitude", "-74.0060")
+                .param("languageCode", "en"));
+
+            // then
+            resultActions
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.placeName").value("Mock Google Place"))
+                .andExpect(jsonPath("$.result.address").value("Mock Google Address"))
+                .andExpect(jsonPath("$.result.countryCode").value("US"))
+                .andExpect(jsonPath("$.result.provider").value("GOOGLE"));
         }
 
         @Test
@@ -150,9 +177,9 @@ class PlaceControllerIntegrationTest {
             // then
             resultActions
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.result[0]").value("카페 station"))
-                .andExpect(jsonPath("$.result[1]").value("카페 park"))
-                .andExpect(jsonPath("$.result[2]").value("카페 school"));
+                .andExpect(jsonPath("$.result[0]").value("카페동"))
+                .andExpect(jsonPath("$.result[1]").value("카페로"))
+                .andExpect(jsonPath("$.result[2]").value("카페길"));
         }
 
         @Test
