@@ -63,22 +63,33 @@ class PlaceControllerTest {
                     .latitude(37.0)
                     .longitude(127.0)
                     .distanceMeters(120)
+                    .provider("NAVER")
+                    .providerPlaceId(null)
+                    .countryCode("KR")
                     .build()
             );
-            when(placeUseCase.searchPlaces(eq("카페"), eq(37.0), eq(127.0))).thenReturn(responses);
+            when(placeUseCase.searchPlaces(
+                eq("카페"), eq(37.0), eq(127.0), eq(3), eq("ko"), eq("KR")
+            )).thenReturn(responses);
 
             // when
             var resultActions = mockMvc.perform(get(BASE + "/search")
                 .param("query", "카페")
                 .param("latitude", "37.0")
-                .param("longitude", "127.0"));
+                .param("longitude", "127.0")
+                .param("size", "3")
+                .param("languageCode", "ko")
+                .param("regionCode", "KR"));
 
             // then
             resultActions
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.result[0].name").value("카페"))
                 .andExpect(jsonPath("$.result[0].address").value("서울시 강남구"))
-                .andExpect(jsonPath("$.result[0].distanceMeters").value(120));
+                .andExpect(jsonPath("$.result[0].distanceMeters").value(120))
+                .andExpect(jsonPath("$.result[0].provider").value("NAVER"))
+                .andExpect(jsonPath("$.result[0].providerPlaceId").value(nullValue()))
+                .andExpect(jsonPath("$.result[0].countryCode").value("KR"));
         }
 
         @Test
@@ -92,9 +103,14 @@ class PlaceControllerTest {
                     .latitude(37.0)
                     .longitude(127.0)
                     .distanceMeters(null)
+                    .provider("NAVER")
+                    .providerPlaceId(null)
+                    .countryCode("KR")
                     .build()
             );
-            when(placeUseCase.searchPlaces(eq("카페"), isNull(), isNull())).thenReturn(responses);
+            when(placeUseCase.searchPlaces(
+                eq("카페"), isNull(), isNull(), eq(5), isNull(), isNull()
+            )).thenReturn(responses);
 
             // when
             var resultActions = mockMvc.perform(get(BASE + "/search").param("query", "카페"));
@@ -122,7 +138,7 @@ class PlaceControllerTest {
         @DisplayName("실패: query가 빈 문자열이면 400과 에러 코드를 반환한다")
         void fail_queryBlank() throws Exception {
             // given
-            when(placeUseCase.searchPlaces(eq(""), isNull(), isNull()))
+            when(placeUseCase.searchPlaces(eq(""), isNull(), isNull(), eq(5), isNull(), isNull()))
                 .thenThrow(ApplicationException.from(CommonErrorCode.BAD_REQUEST));
 
             // when
@@ -139,7 +155,9 @@ class PlaceControllerTest {
         @DisplayName("실패: 서비스에서 예외가 발생하면 400과 에러 코드를 반환한다")
         void fail_serviceThrows() throws Exception {
             // given
-            when(placeUseCase.searchPlaces(anyString(), nullable(Double.class), nullable(Double.class)))
+            when(placeUseCase.searchPlaces(
+                anyString(), nullable(Double.class), nullable(Double.class), eq(5), isNull(), isNull()
+            ))
                 .thenThrow(ApplicationException.from(CommonErrorCode.BAD_REQUEST));
 
             // when
@@ -156,7 +174,7 @@ class PlaceControllerTest {
         @DisplayName("실패: 현재 좌표가 하나만 전달되면 400과 에러 코드를 반환한다")
         void fail_partialCoordinates() throws Exception {
             // given
-            when(placeUseCase.searchPlaces(eq("카페"), eq(37.0), isNull()))
+            when(placeUseCase.searchPlaces(eq("카페"), eq(37.0), isNull(), eq(5), isNull(), isNull()))
                 .thenThrow(ApplicationException.from(CommonErrorCode.BAD_REQUEST));
 
             // when
@@ -169,6 +187,42 @@ class PlaceControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.isSuccess").value(false))
                 .andExpect(jsonPath("$.code").value(CommonErrorCode.BAD_REQUEST.getCustomCode()));
+        }
+
+        @Test
+        @DisplayName("실패: size가 최대값을 초과하면 400과 에러 코드를 반환한다")
+        void fail_sizeOutOfRange() throws Exception {
+            // given
+            when(placeUseCase.searchPlaces("카페", null, null, 6, null, null))
+                .thenThrow(ApplicationException.from(CommonErrorCode.BAD_REQUEST));
+
+            // when
+            var resultActions = mockMvc.perform(get(BASE + "/search")
+                .param("query", "카페")
+                .param("size", "6"));
+
+            // then
+            resultActions
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(CommonErrorCode.BAD_REQUEST.getCustomCode()));
+        }
+
+        @Test
+        @DisplayName("실패: 지원하지 않는 지역 코드이면 400과 에러 코드를 반환한다")
+        void fail_unsupportedRegion() throws Exception {
+            // given
+            when(placeUseCase.searchPlaces("카페", null, null, 5, null, "JP"))
+                .thenThrow(ApplicationException.from(PlaceErrorCode.UNSUPPORTED_REGION));
+
+            // when
+            var resultActions = mockMvc.perform(get(BASE + "/search")
+                .param("query", "카페")
+                .param("regionCode", "JP"));
+
+            // then
+            resultActions
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(PlaceErrorCode.UNSUPPORTED_REGION.getCustomCode()));
         }
     }
 

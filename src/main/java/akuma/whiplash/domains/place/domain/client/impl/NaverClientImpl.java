@@ -90,9 +90,13 @@ public class NaverClientImpl implements NaverClient {
 
     @Override
     public NaverLocalSearchResponse searchLocal(String query) {
+        return searchLocal(query, 5);
+    }
+
+    private NaverLocalSearchResponse searchLocal(String query, int size) {
         String uri = UriComponentsBuilder.fromUriString(localSearchUrl)
             .queryParam("query", query)
-            .queryParam("display", "5")
+            .queryParam("display", size)
             .build()
             .toUriString();
 
@@ -115,7 +119,30 @@ public class NaverClientImpl implements NaverClient {
 
     @Override
     public List<PlaceSearchResult> searchPlaces(String query, int size) {
-        return List.of();
+        NaverLocalSearchResponse response = searchLocal(query, size);
+        if (response == null || response.items() == null) {
+            return List.of();
+        }
+        try {
+            return response.items().stream().map(this::mapToPlaceSearchResult).toList();
+        } catch (RuntimeException exception) {
+            throw ApplicationException.from(PlaceErrorCode.PROVIDER_ERROR);
+        }
+    }
+
+    private PlaceSearchResult mapToPlaceSearchResult(NaverLocalSearchResponse.Item item) {
+        return new PlaceSearchResult(
+            item.title() == null ? "" : item.title().replaceAll("<[^>]*>", ""),
+            item.roadAddress() != null && !item.roadAddress().isBlank()
+                ? item.roadAddress()
+                : Optional.ofNullable(item.address()).orElse(""),
+            Double.parseDouble(item.mapy()) / 1e7,
+            Double.parseDouble(item.mapx()) / 1e7,
+            PlaceProvider.NAVER,
+            null,
+            "KR",
+            null
+        );
     }
 
     private NaverReverseGeocodeResponse request(double latitude, double longitude) {

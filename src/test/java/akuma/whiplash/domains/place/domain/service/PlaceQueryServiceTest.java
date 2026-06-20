@@ -6,12 +6,13 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import akuma.whiplash.domains.place.application.dto.response.PlaceInfoResponse;
 import akuma.whiplash.domains.place.domain.client.NaverClient;
 import akuma.whiplash.domains.place.domain.client.dto.NaverLocalSearchResponse;
 import akuma.whiplash.domains.place.domain.client.dto.NaverLocalSearchResponse.Item;
 import akuma.whiplash.domains.place.domain.constant.PlaceProvider;
 import akuma.whiplash.domains.place.domain.model.PlaceDetail;
+import akuma.whiplash.domains.place.domain.model.PlaceSearchCriteria;
+import akuma.whiplash.domains.place.domain.model.PlaceSearchResult;
 import akuma.whiplash.domains.place.exception.PlaceErrorCode;
 import akuma.whiplash.global.exception.ApplicationException;
 import java.util.List;
@@ -41,12 +42,13 @@ class PlaceQueryServiceTest {
         @DisplayName("성공: 키워드 검색 결과를 반환한다")
         void success() {
             // given
-            when(naverClient.searchLocal("카페")).thenReturn(new NaverLocalSearchResponse(List.of(
-                new Item("<b>카페</b>", "서울시 강남구 역삼동", "서울시 강남구", "1270000000", "370000000")
+            PlaceSearchCriteria criteria = new PlaceSearchCriteria("카페", 37.0, 127.0, 5, "ko", "KR");
+            when(placeProviderRouter.searchPlaces(criteria)).thenReturn(List.of(new PlaceSearchResult(
+                "카페", "서울시 강남구", 37.0, 127.0, PlaceProvider.NAVER, null, "KR", null
             )));
 
             // when
-            List<PlaceInfoResponse> responses = placeQueryService.searchPlaces("카페", null, null);
+            List<PlaceSearchResult> responses = placeQueryService.searchPlaces(criteria);
 
             // then
             assertThat(responses).hasSize(1);
@@ -54,18 +56,20 @@ class PlaceQueryServiceTest {
             assertThat(responses.get(0).address()).isEqualTo("서울시 강남구");
             assertThat(responses.get(0).latitude()).isEqualTo(37.0);
             assertThat(responses.get(0).longitude()).isEqualTo(127.0);
-            verify(naverClient).searchLocal("카페");
+            assertThat(responses.get(0).distanceMeters()).isZero();
+            verify(placeProviderRouter).searchPlaces(criteria);
         }
 
         @Test
         @DisplayName("실패: 외부 API가 에러를 반환하면 예외를 던진다")
         void fail_externalApiError() {
             // given
-            when(naverClient.searchLocal("카페"))
+            PlaceSearchCriteria criteria = new PlaceSearchCriteria("카페", null, null, 5, null, null);
+            when(placeProviderRouter.searchPlaces(criteria))
                 .thenThrow(ApplicationException.from(PlaceErrorCode.PROVIDER_ERROR));
 
             // when & then
-            assertThatThrownBy(() -> placeQueryService.searchPlaces("카페", null, null))
+            assertThatThrownBy(() -> placeQueryService.searchPlaces(criteria))
                 .isInstanceOfSatisfying(ApplicationException.class, exception ->
                     assertThat(exception.getCode()).isEqualTo(PlaceErrorCode.PROVIDER_ERROR)
                 );

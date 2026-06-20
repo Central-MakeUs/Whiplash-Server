@@ -48,7 +48,34 @@ class PlaceControllerIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.result[0].name").value("Mock Place 1 for 카페"))
                 .andExpect(jsonPath("$.result[0].address").value("Seoul, Gangnam-gu, Teheran-ro 1"))
-                .andExpect(jsonPath("$.result[0].distanceMeters").value(nullValue()));
+                .andExpect(jsonPath("$.result[0].distanceMeters").value(nullValue()))
+                .andExpect(jsonPath("$.result[0].provider").value("NAVER"))
+                .andExpect(jsonPath("$.result[0].providerPlaceId").value(nullValue()))
+                .andExpect(jsonPath("$.result[0].countryCode").value("KR"));
+        }
+
+        @Test
+        @DisplayName("성공: 글로벌 지역 코드로 검색하면 Google 장소 목록을 반환한다")
+        void success_globalRegion() throws Exception {
+            // given
+            MemberEntity member = memberRepository.save(MemberFixture.MEMBER_2.toEntity());
+            String token = jwtProvider.generateAccessToken(member.getId(), member.getRole(), "device");
+
+            // when
+            var resultActions = mockMvc.perform(get("/api/v1/places/search")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                .param("query", "Starbucks")
+                .param("size", "3")
+                .param("languageCode", "en")
+                .param("regionCode", "US"));
+
+            // then
+            resultActions
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.length()").value(3))
+                .andExpect(jsonPath("$.result[0].provider").value("GOOGLE"))
+                .andExpect(jsonPath("$.result[0].providerPlaceId").value("mock-google-1"))
+                .andExpect(jsonPath("$.result[0].countryCode").value("US"));
         }
 
         @Test
