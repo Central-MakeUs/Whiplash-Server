@@ -9,6 +9,7 @@ import static akuma.whiplash.domains.place.exception.PlaceErrorCode.PROVIDER_PER
 import static akuma.whiplash.domains.place.exception.PlaceErrorCode.PROVIDER_QUOTA_EXCEEDED;
 import static akuma.whiplash.domains.place.exception.PlaceErrorCode.PROVIDER_TIMEOUT;
 import static akuma.whiplash.domains.place.exception.PlaceErrorCode.UNSUPPORTED_LANGUAGE;
+import static akuma.whiplash.domains.place.exception.PlaceErrorCode.UNSUPPORTED_REGION;
 
 import akuma.whiplash.domains.place.application.dto.response.PlaceDetailResponse;
 import akuma.whiplash.domains.place.application.dto.response.PlaceInfoResponse;
@@ -30,15 +31,33 @@ public class PlaceController {
 
     private final PlaceUseCase placeUseCase;
 
-    @CustomErrorCodes(commonErrorCodes = {BAD_REQUEST})
+    @CustomErrorCodes(
+        commonErrorCodes = {BAD_REQUEST},
+        placeErrorCodes = {
+            INVALID_COORDINATE,
+            UNSUPPORTED_LANGUAGE,
+            UNSUPPORTED_REGION,
+            PROVIDER_AUTHENTICATION_FAILED,
+            PROVIDER_PERMISSION_DENIED,
+            PLACE_NOT_FOUND,
+            PROVIDER_QUOTA_EXCEEDED,
+            PROVIDER_TIMEOUT,
+            PROVIDER_ERROR
+        }
+    )
     @Operation(summary = "장소 목록 검색", description = "키워드 기반 장소 검색을 제공합니다.")
     @GetMapping("/search")
     public ApplicationResponse<List<PlaceInfoResponse>> searchPlaces(
         @RequestParam String query,
         @RequestParam(required = false) Double latitude,
-        @RequestParam(required = false) Double longitude
+        @RequestParam(required = false) Double longitude,
+        @RequestParam(defaultValue = "5") int size,
+        @RequestParam(required = false) String languageCode,
+        @RequestParam(required = false) String regionCode
     ) {
-        List<PlaceInfoResponse> placeInfoResponses = placeUseCase.searchPlaces(query, latitude, longitude);
+        List<PlaceInfoResponse> placeInfoResponses = placeUseCase.searchPlaces(
+            query, latitude, longitude, size, languageCode, regionCode
+        );
         return ApplicationResponse.onSuccess(placeInfoResponses);
     }
 

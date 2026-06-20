@@ -46,6 +46,17 @@ public class MockNaverClient implements NaverClient {
 
     @Override
     public List<PlaceSearchResult> searchPlaces(String query, int size) {
-        return List.of();
+        return IntStream.rangeClosed(1, size)
+            .mapToObj(index -> new PlaceSearchResult(
+                "Mock Place " + index + " for " + query,
+                "Seoul, Gangnam-gu, Teheran-ro " + index,
+                37.4979 + (index * 0.001),
+                127.0276 + (index * 0.001),
+                PlaceProvider.NAVER,
+                null,
+                "KR",
+                null
+            ))
+            .toList();
     }
 }

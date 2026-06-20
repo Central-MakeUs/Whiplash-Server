@@ -31,8 +31,71 @@ class GoogleClientTest {
         client = new GoogleClientImpl(
             WebClient.builder().build(),
             "test-key",
-            mockWebServer.url("/geocode/json").toString()
+            mockWebServer.url("/geocode/json").toString(),
+            mockWebServer.url("/").toString()
         );
+    }
+
+    @Nested
+    @DisplayName("searchPlaces - Google 장소 검색")
+    class SearchPlacesTest {
+
+        @Test
+        @DisplayName("성공: Text Search 요청을 보내고 표준 검색 결과로 변환한다")
+        void success() throws Exception {
+            // given
+            mockWebServer.enqueue(jsonResponse("""
+                {
+                  "places":[{
+                    "id":"ChIJ",
+                    "displayName":{"text":"Starbucks","languageCode":"en"},
+                    "formattedAddress":"New York, NY, USA",
+                    "location":{"latitude":40.7128,"longitude":-74.0060},
+                    "addressComponents":[
+                      {"longText":"United States","shortText":"US","types":["country"]}
+                    ]
+                  }]
+                }
+                """));
+
+            // when
+            var results = client.searchPlaces("Starbucks", 3, "en", "US");
+
+            // then
+            assertThat(results).hasSize(1);
+            assertThat(results.get(0).name()).isEqualTo("Starbucks");
+            assertThat(results.get(0).address()).isEqualTo("New York, NY, USA");
+            assertThat(results.get(0).provider()).isEqualTo(PlaceProvider.GOOGLE);
+            assertThat(results.get(0).providerPlaceId()).isEqualTo("ChIJ");
+            assertThat(results.get(0).countryCode()).isEqualTo("US");
+
+            RecordedRequest request = mockWebServer.takeRequest(3, TimeUnit.SECONDS);
+            assertThat(request).isNotNull();
+            assertThat(request.getMethod()).isEqualTo("POST");
+            assertThat(request.getPath()).isEqualTo("/v1/places:searchText");
+            assertThat(request.getHeader("X-Goog-Api-Key")).isEqualTo("test-key");
+            assertThat(request.getHeader("X-Goog-FieldMask")).isEqualTo(
+                "places.id,places.displayName,places.formattedAddress,places.location,places.addressComponents"
+            );
+            assertThat(request.getBody().readUtf8())
+                .contains("\"textQuery\":\"Starbucks\"")
+                .contains("\"pageSize\":3")
+                .contains("\"languageCode\":\"en\"")
+                .contains("\"regionCode\":\"US\"");
+        }
+
+        @Test
+        @DisplayName("실패: 검색 결과가 없으면 404 예외로 매핑한다")
+        void fail_resultEmpty() {
+            // given
+            mockWebServer.enqueue(jsonResponse("{\"places\":[]}"));
+
+            // when & then
+            assertPlaceError(
+                () -> client.searchPlaces("unknown", 5, null, null),
+                PlaceErrorCode.PLACE_NOT_FOUND
+            );
+        }
     }
 
     @AfterEach

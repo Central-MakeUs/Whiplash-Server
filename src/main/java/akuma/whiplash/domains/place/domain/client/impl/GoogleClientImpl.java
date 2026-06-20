@@ -2,6 +2,9 @@ package akuma.whiplash.domains.place.domain.client.impl;
 
 import akuma.whiplash.domains.place.domain.client.GoogleClient;
 import akuma.whiplash.domains.place.domain.client.dto.GoogleReverseGeocodeResponse;
+import akuma.whiplash.domains.place.domain.client.dto.GooglePlaceSearchRequest;
+import akuma.whiplash.domains.place.domain.client.dto.GooglePlaceSearchResponse;
+import akuma.whiplash.domains.place.domain.client.dto.GooglePlaceSearchResponse.Place;
 import akuma.whiplash.domains.place.domain.client.dto.GoogleReverseGeocodeResponse.AddressComponent;
 import akuma.whiplash.domains.place.domain.client.dto.GoogleReverseGeocodeResponse.Result;
 import akuma.whiplash.domains.place.domain.constant.PlaceProvider;
@@ -23,6 +26,9 @@ import org.springframework.web.util.UriComponentsBuilder;
 @Profile("!local & !test")
 public class GoogleClientImpl implements GoogleClient {
 
+    private static final String PLACE_SEARCH_FIELD_MASK =
+        "places.id,places.displayName,places.formattedAddress,places.location,places.addressComponents";
+
     private static final List<String> PLACE_NAME_TYPE_PRIORITY = List.of(
         "point_of_interest",
         "establishment",
@@ -37,16 +43,19 @@ public class GoogleClientImpl implements GoogleClient {
     private final WebClient webClient;
     private final String apiKey;
     private final String geocodingUrl;
+    private final String placeSearchUrl;
 
     public GoogleClientImpl(
         WebClient webClient,
         @Value("${google.maps.api-key}") String apiKey,
         @Value("${google.maps.geocoding-base-url:https://maps.googleapis.com/maps/api/geocode/json}")
-        String geocodingUrl
+        String geocodingUrl,
+        @Value("${google.maps.places-base-url:https://places.googleapis.com}") String placesBaseUrl
     ) {
         this.webClient = webClient;
         this.apiKey = apiKey;
         this.geocodingUrl = geocodingUrl;
+        this.placeSearchUrl = placesBaseUrl.replaceAll("/+$", "") + "/v1/places:searchText";
     }
 
     @Override
@@ -73,7 +82,62 @@ public class GoogleClientImpl implements GoogleClient {
 
     @Override
     public List<PlaceSearchResult> searchPlaces(String query, int size, String languageCode, String regionCode) {
-        return List.of();
+        GooglePlaceSearchResponse response = requestPlaces(query, size, languageCode, regionCode);
+        if (response == null || response.places() == null || response.places().isEmpty()) {
+            throw ApplicationException.from(PlaceErrorCode.PLACE_NOT_FOUND);
+        }
+        return response.places().stream().map(this::mapToPlaceSearchResult).toList();
+    }
+
+    private GooglePlaceSearchResponse requestPlaces(
+        String query,
+        int size,
+        String languageCode,
+        String regionCode
+    ) {
+        try {
+            return webClient.post()
+                .uri(placeSearchUrl)
+                .header("X-Goog-Api-Key", apiKey)
+                .header("X-Goog-FieldMask", PLACE_SEARCH_FIELD_MASK)
+                .bodyValue(new GooglePlaceSearchRequest(query, size, languageCode, regionCode))
+                .retrieve()
+                .bodyToMono(GooglePlaceSearchResponse.class)
+                .block();
+        } catch (WebClientResponseException exception) {
+            throw PlaceProviderErrorMapper.map(exception);
+        } catch (WebClientRequestException exception) {
+            throw PlaceProviderErrorMapper.map(exception);
+        } catch (RuntimeException exception) {
+            throw ApplicationException.from(PlaceErrorCode.PROVIDER_ERROR);
+        }
+    }
+
+    private PlaceSearchResult mapToPlaceSearchResult(Place place) {
+        if (place.displayName() == null || place.location() == null) {
+            throw ApplicationException.from(PlaceErrorCode.PROVIDER_ERROR);
+        }
+        return new PlaceSearchResult(
+            place.displayName().text(),
+            place.formattedAddress(),
+            place.location().latitude(),
+            place.location().longitude(),
+            PlaceProvider.GOOGLE,
+            place.id(),
+            findCountryCode(place),
+            null
+        );
+    }
+
+    private String findCountryCode(Place place) {
+        if (place.addressComponents() == null) {
+            return null;
+        }
+        return place.addressComponents().stream()
+            .filter(component -> component.types() != null && component.types().contains("country"))
+            .map(GooglePlaceSearchResponse.AddressComponent::shortText)
+            .findFirst()
+            .orElse(null);
     }
 
     private GoogleReverseGeocodeResponse request(double latitude, double longitude, String languageCode) {
