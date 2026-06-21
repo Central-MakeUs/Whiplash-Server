@@ -26,13 +26,21 @@ import org.springframework.web.util.UriComponentsBuilder;
 @Profile("!local & !test")
 public class GoogleClientImpl implements GoogleClient {
 
+    private static final String REVERSE_GEOCODE_FIELD_MASK =
+        "results.formattedAddress,results.addressComponents,results.types";
     private static final String PLACE_SEARCH_FIELD_MASK =
         "places.id,places.displayName,places.formattedAddress,places.location,places.addressComponents";
 
     private static final List<String> PLACE_NAME_TYPE_PRIORITY = List.of(
-        "point_of_interest",
-        "establishment",
         "premise",
+        "subpremise",
+        "sublocality_level_5",
+        "sublocality_level_4",
+        "sublocality_level_3",
+        "sublocality_level_2",
+        "sublocality_level_1",
+        "neighborhood",
+        "administrative_area_level_3",
         "locality",
         "sublocality",
         "administrative_area_level_2",
@@ -48,7 +56,7 @@ public class GoogleClientImpl implements GoogleClient {
     public GoogleClientImpl(
         WebClient webClient,
         @Value("${google.maps.api-key}") String apiKey,
-        @Value("${google.maps.geocoding-base-url:https://maps.googleapis.com/maps/api/geocode/json}")
+        @Value("${google.maps.geocoding-base-url:https://geocode.googleapis.com/v4/geocode/location}")
         String geocodingUrl,
         @Value("${google.maps.places-base-url:https://places.googleapis.com}") String placesBaseUrl
     ) {
@@ -61,7 +69,7 @@ public class GoogleClientImpl implements GoogleClient {
     @Override
     public PlaceDetail reverseGeocode(double latitude, double longitude, String languageCode) {
         GoogleReverseGeocodeResponse response = request(latitude, longitude, languageCode);
-        validateStatus(response);
+        validateResponse(response);
 
         Result result = response.results().get(0);
         String address = result.formattedAddress();
@@ -71,11 +79,11 @@ public class GoogleClientImpl implements GoogleClient {
 
         return new PlaceDetail(
             address,
-            resolvePlaceName(result).orElse(address),
+            findAddressLabel(result).orElse(address),
             address,
             latitude,
             longitude,
-            findComponent(result, "country").map(AddressComponent::shortName).orElse(null),
+            findComponent(result, "country").map(AddressComponent::shortText).orElse(null),
             PlaceProvider.GOOGLE
         );
     }
@@ -142,15 +150,17 @@ public class GoogleClientImpl implements GoogleClient {
 
     private GoogleReverseGeocodeResponse request(double latitude, double longitude, String languageCode) {
         UriComponentsBuilder uriBuilder = UriComponentsBuilder.fromUriString(geocodingUrl)
-            .queryParam("latlng", latitude + "," + longitude)
-            .queryParam("key", apiKey);
+            .queryParam("location.latitude", latitude)
+            .queryParam("location.longitude", longitude);
         if (languageCode != null) {
-            uriBuilder.queryParam("language", languageCode);
+            uriBuilder.queryParam("languageCode", languageCode);
         }
 
         try {
             return webClient.get()
                 .uri(uriBuilder.build().toUriString())
+                .header("X-Goog-Api-Key", apiKey)
+                .header("X-Goog-FieldMask", REVERSE_GEOCODE_FIELD_MASK)
                 .retrieve()
                 .bodyToMono(GoogleReverseGeocodeResponse.class)
                 .block();
@@ -163,30 +173,17 @@ public class GoogleClientImpl implements GoogleClient {
         }
     }
 
-    private void validateStatus(GoogleReverseGeocodeResponse response) {
-        if (response == null || response.status() == null) {
-            throw ApplicationException.from(PlaceErrorCode.PROVIDER_ERROR);
-        }
-
-        switch (response.status()) {
-            case "OK" -> {
-                if (response.results() == null || response.results().isEmpty()) {
-                    throw ApplicationException.from(PlaceErrorCode.PLACE_NOT_FOUND);
-                }
-            }
-            case "ZERO_RESULTS" -> throw ApplicationException.from(PlaceErrorCode.PLACE_NOT_FOUND);
-            case "REQUEST_DENIED" -> throw ApplicationException.from(PlaceErrorCode.PROVIDER_PERMISSION_DENIED);
-            case "OVER_QUERY_LIMIT", "OVER_DAILY_LIMIT" ->
-                throw ApplicationException.from(PlaceErrorCode.PROVIDER_QUOTA_EXCEEDED);
-            default -> throw ApplicationException.from(PlaceErrorCode.PROVIDER_ERROR);
+    private void validateResponse(GoogleReverseGeocodeResponse response) {
+        if (response == null || response.results() == null || response.results().isEmpty()) {
+            throw ApplicationException.from(PlaceErrorCode.PLACE_NOT_FOUND);
         }
     }
 
-    private Optional<String> resolvePlaceName(Result result) {
+    private Optional<String> findAddressLabel(Result result) {
         return PLACE_NAME_TYPE_PRIORITY.stream()
             .map(type -> findComponent(result, type))
             .flatMap(Optional::stream)
-            .map(AddressComponent::longName)
+            .map(AddressComponent::longText)
             .filter(value -> value != null && !value.isBlank())
             .findFirst();
     }

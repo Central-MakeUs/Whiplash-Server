@@ -1,6 +1,7 @@
 package akuma.whiplash.domains.place.domain.service;
 
 import akuma.whiplash.domains.place.domain.client.NaverClient;
+import akuma.whiplash.domains.place.domain.client.GoogleClient;
 import akuma.whiplash.domains.place.domain.client.dto.NaverLocalSearchResponse;
 import akuma.whiplash.domains.place.domain.client.dto.NaverLocalSearchResponse.Item;
 import akuma.whiplash.domains.place.domain.model.PlaceDetail;
@@ -22,6 +23,7 @@ import org.springframework.stereotype.Service;
 public class PlaceQueryServiceImpl implements PlaceQueryService {
 
     private final NaverClient naverClient;
+    private final GoogleClient googleClient;
     private final PlaceProviderRouter placeProviderRouter;
 
     @Override
@@ -33,7 +35,7 @@ public class PlaceQueryServiceImpl implements PlaceQueryService {
 
     @Override
     public PlaceDetail getPlaceDetailByCoord(double latitude, double longitude, String languageCode) {
-        return placeProviderRouter.getPlaceDetail(latitude, longitude, languageCode);
+        return googleClient.reverseGeocode(latitude, longitude, languageCode);
     }
 
     @Override

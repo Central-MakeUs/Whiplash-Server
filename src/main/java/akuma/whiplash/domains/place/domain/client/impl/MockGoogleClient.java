@@ -13,6 +13,11 @@ import org.springframework.stereotype.Component;
 @Profile({"local", "test"})
 public class MockGoogleClient implements GoogleClient {
 
+    private static final double KOREA_MIN_LATITUDE = 33.0;
+    private static final double KOREA_MAX_LATITUDE = 38.7;
+    private static final double KOREA_MIN_LONGITUDE = 124.5;
+    private static final double KOREA_MAX_LONGITUDE = 132.0;
+
     @Override
     public PlaceDetail reverseGeocode(double latitude, double longitude, String languageCode) {
         return new PlaceDetail(
@@ -21,7 +26,7 @@ public class MockGoogleClient implements GoogleClient {
             "Mock Google Address",
             latitude,
             longitude,
-            "US",
+            isKoreaCoordinate(latitude, longitude) ? "KR" : "US",
             PlaceProvider.GOOGLE
         );
     }
@@ -40,5 +45,10 @@ public class MockGoogleClient implements GoogleClient {
                 null
             ))
             .toList();
+    }
+
+    private boolean isKoreaCoordinate(double latitude, double longitude) {
+        return latitude >= KOREA_MIN_LATITUDE && latitude <= KOREA_MAX_LATITUDE
+            && longitude >= KOREA_MIN_LONGITUDE && longitude <= KOREA_MAX_LONGITUDE;
     }
 }

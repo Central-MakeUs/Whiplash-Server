@@ -109,7 +109,7 @@ class PlaceControllerIntegrationTest {
     class GetPlaceDetailTest {
 
         @Test
-        @DisplayName("성공: 좌표로 장소 상세를 조회하면 200과 상세 정보가 반환된다")
+        @DisplayName("성공: 한국 좌표도 Google 장소 상세 정보로 반환된다")
         void success() throws Exception {
             // given
             MemberEntity member = memberRepository.save(MemberFixture.MEMBER_1.toEntity());
@@ -124,13 +124,13 @@ class PlaceControllerIntegrationTest {
             // then
             resultActions
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.result.placeName").value("Mock Detail Place"))
-                .andExpect(jsonPath("$.result.address").value("Seoul, Gangnam-gu, Mock-ro 123"))
-                .andExpect(jsonPath("$.result.roadAddress").value("Seoul, Gangnam-gu, Mock-ro 123"))
+                .andExpect(jsonPath("$.result.placeName").value("Mock Google Place"))
+                .andExpect(jsonPath("$.result.address").value("Mock Google Address"))
+                .andExpect(jsonPath("$.result.roadAddress").value("Mock Google Address"))
                 .andExpect(jsonPath("$.result.latitude").value(37.4979))
                 .andExpect(jsonPath("$.result.longitude").value(127.0276))
                 .andExpect(jsonPath("$.result.countryCode").value("KR"))
-                .andExpect(jsonPath("$.result.provider").value("NAVER"));
+                .andExpect(jsonPath("$.result.provider").value("GOOGLE"));
         }
 
         @Test

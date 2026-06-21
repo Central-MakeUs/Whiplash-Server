@@ -2,7 +2,6 @@ package akuma.whiplash.domains.place.domain.service;
 
 import akuma.whiplash.domains.place.domain.client.GoogleClient;
 import akuma.whiplash.domains.place.domain.client.NaverClient;
-import akuma.whiplash.domains.place.domain.model.PlaceDetail;
 import akuma.whiplash.domains.place.domain.model.PlaceSearchCriteria;
 import akuma.whiplash.domains.place.domain.model.PlaceSearchResult;
 import akuma.whiplash.domains.place.exception.PlaceErrorCode;
@@ -37,14 +36,6 @@ public class PlaceProviderRouter {
             throw ApplicationException.from(PlaceErrorCode.PLACE_NOT_FOUND);
         }
         return results;
-    }
-
-    public PlaceDetail getPlaceDetail(double latitude, double longitude, String languageCode) {
-        // 조회하려고 하는 장소가 한국이면 Naver API 이용
-        if (isKoreaCoordinate(latitude, longitude)) {
-            return naverClient.reverseGeocode(latitude, longitude);
-        }
-        return googleClient.reverseGeocode(latitude, longitude, languageCode);
     }
 
     private boolean shouldUseNaver(PlaceSearchCriteria criteria) {

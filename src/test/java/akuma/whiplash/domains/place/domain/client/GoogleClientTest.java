@@ -8,16 +8,20 @@ import akuma.whiplash.domains.place.domain.constant.PlaceProvider;
 import akuma.whiplash.domains.place.exception.PlaceErrorCode;
 import akuma.whiplash.global.exception.ApplicationException;
 import java.io.IOException;
+import java.time.Duration;
 import java.util.concurrent.TimeUnit;
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
 import okhttp3.mockwebserver.RecordedRequest;
+import okhttp3.mockwebserver.SocketPolicy;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.web.reactive.function.client.WebClient;
+import reactor.netty.http.client.HttpClient;
 
 class GoogleClientTest {
 
@@ -28,10 +32,15 @@ class GoogleClientTest {
     void setUp() throws IOException {
         mockWebServer = new MockWebServer();
         mockWebServer.start();
+        WebClient webClient = WebClient.builder()
+            .clientConnector(new ReactorClientHttpConnector(
+                HttpClient.create().responseTimeout(Duration.ofMillis(500))
+            ))
+            .build();
         client = new GoogleClientImpl(
-            WebClient.builder().build(),
+            webClient,
             "test-key",
-            mockWebServer.url("/geocode/json").toString(),
+            mockWebServer.url("/v4/geocode/location").toString(),
             mockWebServer.url("/").toString()
         );
     }
@@ -113,34 +122,40 @@ class GoogleClientTest {
             // given
             mockWebServer.enqueue(jsonResponse("""
                 {
-                  "status":"OK",
                   "results":[{
-                    "formatted_address":"New York, NY, USA",
-                    "address_components":[
-                      {"long_name":"New York","short_name":"New York","types":["locality","political"]},
-                      {"long_name":"United States","short_name":"US","types":["country","political"]}
+                    "formattedAddress":"경기도 구리시 갈매동",
+                    "addressComponents":[
+                      {"longText":"갈매동","shortText":"갈매동","types":["sublocality_level_2","political"]},
+                      {"longText":"대한민국","shortText":"KR","types":["country","political"]}
                     ]
                   }]
                 }
                 """));
 
             // when
-            var result = client.reverseGeocode(40.7128, -74.0060, "en");
+            var result = client.reverseGeocode(37.6340, 127.1150, "ko");
 
             // then
-            assertThat(result.address()).isEqualTo("New York, NY, USA");
-            assertThat(result.roadAddress()).isEqualTo("New York, NY, USA");
-            assertThat(result.placeName()).isEqualTo("New York");
-            assertThat(result.countryCode()).isEqualTo("US");
+            assertThat(result.address()).isEqualTo("경기도 구리시 갈매동");
+            assertThat(result.roadAddress()).isEqualTo("경기도 구리시 갈매동");
+            assertThat(result.placeName()).isEqualTo("갈매동");
+            assertThat(result.countryCode()).isEqualTo("KR");
             assertThat(result.provider()).isEqualTo(PlaceProvider.GOOGLE);
-            assertThat(result.latitude()).isEqualTo(40.7128);
-            assertThat(result.longitude()).isEqualTo(-74.0060);
+            assertThat(result.latitude()).isEqualTo(37.6340);
+            assertThat(result.longitude()).isEqualTo(127.1150);
 
             RecordedRequest request = mockWebServer.takeRequest(3, TimeUnit.SECONDS);
             assertThat(request).isNotNull();
-            assertThat(request.getRequestUrl().queryParameter("latlng")).isEqualTo("40.7128,-74.006");
-            assertThat(request.getRequestUrl().queryParameter("language")).isEqualTo("en");
-            assertThat(request.getRequestUrl().queryParameter("key")).isEqualTo("test-key");
+            assertThat(request.getMethod()).isEqualTo("GET");
+            assertThat(request.getRequestUrl().encodedPath()).isEqualTo("/v4/geocode/location");
+            assertThat(request.getRequestUrl().queryParameter("location.latitude")).isEqualTo("37.634");
+            assertThat(request.getRequestUrl().queryParameter("location.longitude")).isEqualTo("127.115");
+            assertThat(request.getRequestUrl().queryParameter("languageCode")).isEqualTo("ko");
+            assertThat(request.getRequestUrl().queryParameter("key")).isNull();
+            assertThat(request.getHeader("X-Goog-Api-Key")).isEqualTo("test-key");
+            assertThat(request.getHeader("X-Goog-FieldMask")).isEqualTo(
+                "results.formattedAddress,results.addressComponents,results.types"
+            );
         }
 
         @Test
@@ -149,12 +164,11 @@ class GoogleClientTest {
             // given
             mockWebServer.enqueue(jsonResponse("""
                 {
-                  "status":"OK",
                   "results":[{
-                    "formatted_address":"Sydney NSW, Australia",
-                    "address_components":[
-                      {"long_name":"Sydney","short_name":"Sydney","types":["locality","political"]},
-                      {"long_name":"Australia","short_name":"AU","types":["country","political"]}
+                    "formattedAddress":"Sydney NSW, Australia",
+                    "addressComponents":[
+                      {"longText":"Sydney","shortText":"Sydney","types":["locality","political"]},
+                      {"longText":"Australia","shortText":"AU","types":["country","political"]}
                     ]
                   }]
                 }
@@ -166,28 +180,37 @@ class GoogleClientTest {
             // then
             RecordedRequest request = mockWebServer.takeRequest(3, TimeUnit.SECONDS);
             assertThat(request).isNotNull();
-            assertThat(request.getRequestUrl().queryParameter("language")).isNull();
+            assertThat(request.getRequestUrl().queryParameter("languageCode")).isNull();
         }
 
         @Test
-        @DisplayName("실패: 결과 없음 상태이면 404 예외로 매핑한다")
+        @DisplayName("실패: 결과가 비어 있으면 404 예외로 매핑한다")
         void fail_zeroResults() {
             // given
-            mockWebServer.enqueue(jsonResponse("""
-                {"status":"ZERO_RESULTS","results":[]}
-                """));
+            mockWebServer.enqueue(jsonResponse("{\"results\":[]}"));
 
             // when & then
             assertPlaceError(() -> client.reverseGeocode(0.0, 0.0, null), PlaceErrorCode.PLACE_NOT_FOUND);
         }
 
         @Test
-        @DisplayName("실패: 요청 거부 상태이면 403 예외로 매핑한다")
-        void fail_requestDenied() {
+        @DisplayName("실패: 인증되지 않은 요청이면 401 예외로 매핑한다")
+        void fail_unauthorized() {
             // given
-            mockWebServer.enqueue(jsonResponse("""
-                {"status":"REQUEST_DENIED","results":[]}
-                """));
+            mockWebServer.enqueue(new MockResponse().setResponseCode(401));
+
+            // when & then
+            assertPlaceError(
+                () -> client.reverseGeocode(40.0, -74.0, null),
+                PlaceErrorCode.PROVIDER_AUTHENTICATION_FAILED
+            );
+        }
+
+        @Test
+        @DisplayName("실패: 권한이 없는 요청이면 403 예외로 매핑한다")
+        void fail_forbidden() {
+            // given
+            mockWebServer.enqueue(new MockResponse().setResponseCode(403));
 
             // when & then
             assertPlaceError(
@@ -197,17 +220,28 @@ class GoogleClientTest {
         }
 
         @Test
-        @DisplayName("실패: quota 초과 상태이면 409 예외로 매핑한다")
+        @DisplayName("실패: 사용량 제한을 초과하면 409 예외로 매핑한다")
         void fail_quotaExceeded() {
             // given
-            mockWebServer.enqueue(jsonResponse("""
-                {"status":"OVER_QUERY_LIMIT","results":[]}
-                """));
+            mockWebServer.enqueue(new MockResponse().setResponseCode(429));
 
             // when & then
             assertPlaceError(
                 () -> client.reverseGeocode(40.0, -74.0, null),
                 PlaceErrorCode.PROVIDER_QUOTA_EXCEEDED
+            );
+        }
+
+        @Test
+        @DisplayName("실패: provider 응답 시간이 초과되면 409 예외로 매핑한다")
+        void fail_timeout() {
+            // given
+            mockWebServer.enqueue(new MockResponse().setSocketPolicy(SocketPolicy.NO_RESPONSE));
+
+            // when & then
+            assertPlaceError(
+                () -> client.reverseGeocode(40.0, -74.0, null),
+                PlaceErrorCode.PROVIDER_TIMEOUT
             );
         }
 

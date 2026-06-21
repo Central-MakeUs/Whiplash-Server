@@ -7,6 +7,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import akuma.whiplash.domains.place.domain.client.NaverClient;
+import akuma.whiplash.domains.place.domain.client.GoogleClient;
 import akuma.whiplash.domains.place.domain.client.dto.NaverLocalSearchResponse;
 import akuma.whiplash.domains.place.domain.client.dto.NaverLocalSearchResponse.Item;
 import akuma.whiplash.domains.place.domain.constant.PlaceProvider;
@@ -26,12 +27,14 @@ class PlaceQueryServiceTest {
     private PlaceQueryServiceImpl placeQueryService;
     private PlaceProviderRouter placeProviderRouter;
     private NaverClient naverClient;
+    private GoogleClient googleClient;
 
     @BeforeEach
     void setUp() {
         naverClient = mock(NaverClient.class);
+        googleClient = mock(GoogleClient.class);
         placeProviderRouter = mock(PlaceProviderRouter.class);
-        placeQueryService = new PlaceQueryServiceImpl(naverClient, placeProviderRouter);
+        placeQueryService = new PlaceQueryServiceImpl(naverClient, googleClient, placeProviderRouter);
     }
 
     @Nested
@@ -102,26 +105,28 @@ class PlaceQueryServiceTest {
     class GetPlaceDetailByCoordTest {
 
         @Test
-        @DisplayName("성공: 좌표와 응답 언어를 provider router에 전달한다")
+        @DisplayName("성공: 한국 좌표와 응답 언어를 Google client에 전달한다")
         void success() {
             // given
+            double latitude = 37.5665;
+            double longitude = 126.9780;
             PlaceDetail expected = new PlaceDetail(
-                "New York, NY, USA",
-                "New York",
-                "New York, NY, USA",
-                40.7128,
-                -74.0060,
-                "US",
+                "대한민국 서울특별시",
+                "서울특별시",
+                "대한민국 서울특별시",
+                latitude,
+                longitude,
+                "KR",
                 PlaceProvider.GOOGLE
             );
-            when(placeProviderRouter.getPlaceDetail(40.7128, -74.0060, "en")).thenReturn(expected);
+            when(googleClient.reverseGeocode(latitude, longitude, "ko")).thenReturn(expected);
 
             // when
-            PlaceDetail result = placeQueryService.getPlaceDetailByCoord(40.7128, -74.0060, "en");
+            PlaceDetail result = placeQueryService.getPlaceDetailByCoord(latitude, longitude, "ko");
 
             // then
             assertThat(result).isEqualTo(expected);
-            verify(placeProviderRouter).getPlaceDetail(40.7128, -74.0060, "en");
+            verify(googleClient).reverseGeocode(latitude, longitude, "ko");
         }
     }
 }
