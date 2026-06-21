@@ -129,8 +129,7 @@ class PlaceControllerIntegrationTest {
                 .andExpect(jsonPath("$.result.roadAddress").value("Mock Google Address"))
                 .andExpect(jsonPath("$.result.latitude").value(37.4979))
                 .andExpect(jsonPath("$.result.longitude").value(127.0276))
-                .andExpect(jsonPath("$.result.countryCode").value("KR"))
-                .andExpect(jsonPath("$.result.provider").value("GOOGLE"));
+                .andExpect(jsonPath("$.result.countryCode").value("KR"));
         }
 
         @Test
@@ -152,8 +151,7 @@ class PlaceControllerIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.result.placeName").value("Mock Google Place"))
                 .andExpect(jsonPath("$.result.address").value("Mock Google Address"))
-                .andExpect(jsonPath("$.result.countryCode").value("US"))
-                .andExpect(jsonPath("$.result.provider").value("GOOGLE"));
+                .andExpect(jsonPath("$.result.countryCode").value("US"));
         }
 
         @Test

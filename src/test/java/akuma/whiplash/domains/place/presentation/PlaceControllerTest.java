@@ -241,7 +241,6 @@ class PlaceControllerTest {
                 .latitude(40.7128)
                 .longitude(-74.0060)
                 .countryCode("US")
-                .provider("GOOGLE")
                 .build();
             when(placeUseCase.getPlaceDetail(eq(40.7128), eq(-74.0060), eq("en"))).thenReturn(response);
 
@@ -259,8 +258,7 @@ class PlaceControllerTest {
                 .andExpect(jsonPath("$.result.roadAddress").value("New York, NY, USA"))
                 .andExpect(jsonPath("$.result.latitude").value(40.7128))
                 .andExpect(jsonPath("$.result.longitude").value(-74.0060))
-                .andExpect(jsonPath("$.result.countryCode").value("US"))
-                .andExpect(jsonPath("$.result.provider").value("GOOGLE"));
+                .andExpect(jsonPath("$.result.countryCode").value("US"));
         }
 
         @Test

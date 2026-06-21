@@ -51,8 +51,7 @@ class PlaceMapperTest {
                 "New York, NY, USA",
                 40.7128,
                 -74.0060,
-                "US",
-                PlaceProvider.GOOGLE
+                "US"
             );
 
             // when
@@ -65,7 +64,6 @@ class PlaceMapperTest {
             assertThat(response.latitude()).isEqualTo(40.7128);
             assertThat(response.longitude()).isEqualTo(-74.0060);
             assertThat(response.countryCode()).isEqualTo("US");
-            assertThat(response.provider()).isEqualTo("GOOGLE");
         }
     }
 }

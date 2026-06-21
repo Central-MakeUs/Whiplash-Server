@@ -140,7 +140,6 @@ class GoogleClientTest {
             assertThat(result.roadAddress()).isEqualTo("경기도 구리시 갈매동");
             assertThat(result.placeName()).isEqualTo("갈매동");
             assertThat(result.countryCode()).isEqualTo("KR");
-            assertThat(result.provider()).isEqualTo(PlaceProvider.GOOGLE);
             assertThat(result.latitude()).isEqualTo(37.6340);
             assertThat(result.longitude()).isEqualTo(127.1150);
 

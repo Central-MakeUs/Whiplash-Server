@@ -116,8 +116,7 @@ class PlaceQueryServiceTest {
                 "대한민국 서울특별시",
                 latitude,
                 longitude,
-                "KR",
-                PlaceProvider.GOOGLE
+                "KR"
             );
             when(googleClient.reverseGeocode(latitude, longitude, "ko")).thenReturn(expected);
 

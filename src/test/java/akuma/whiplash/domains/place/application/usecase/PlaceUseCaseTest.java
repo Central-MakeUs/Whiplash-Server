@@ -136,8 +136,7 @@ class PlaceUseCaseTest {
                     "New York, NY, USA",
                     latitude,
                     longitude,
-                    "US",
-                    PlaceProvider.GOOGLE
+                    "US"
                 ));
 
             // when
