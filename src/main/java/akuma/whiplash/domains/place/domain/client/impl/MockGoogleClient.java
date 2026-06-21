@@ -26,8 +26,7 @@ public class MockGoogleClient implements GoogleClient {
             "Mock Google Address",
             latitude,
             longitude,
-            isKoreaCoordinate(latitude, longitude) ? "KR" : "US",
-            PlaceProvider.GOOGLE
+            isKoreaCoordinate(latitude, longitude) ? "KR" : "US"
         );
     }
 

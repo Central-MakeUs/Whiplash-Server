@@ -83,8 +83,7 @@ public class GoogleClientImpl implements GoogleClient {
             address,
             latitude,
             longitude,
-            findComponent(result, "country").map(AddressComponent::shortText).orElse(null),
-            PlaceProvider.GOOGLE
+            findComponent(result, "country").map(AddressComponent::shortText).orElse(null)
         );
     }
 

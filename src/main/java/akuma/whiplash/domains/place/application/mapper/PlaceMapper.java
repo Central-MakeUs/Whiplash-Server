@@ -20,7 +20,6 @@ public class PlaceMapper {
             .latitude(placeDetail.latitude())
             .longitude(placeDetail.longitude())
             .countryCode(placeDetail.countryCode())
-            .provider(placeDetail.provider().name())
             .build();
     }
 

@@ -8,6 +8,5 @@ public record PlaceDetail(
     String roadAddress,
     double latitude,
     double longitude,
-    String countryCode,
-    PlaceProvider provider
+    String countryCode
 ) {}

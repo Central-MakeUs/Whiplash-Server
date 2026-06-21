@@ -9,6 +9,5 @@ public record PlaceDetailResponse(
     String roadAddress,
     double latitude,
     double longitude,
-    String countryCode,
-    String provider
+    String countryCode
 ) {}
