@@ -32,7 +32,7 @@ class PlaceControllerIntegrationTest {
     class SearchPlacesTest {
 
         @Test
-        @DisplayName("성공: 검색어로 장소를 조회하면 200과 목록이 반환된다")
+        @DisplayName("성공: 검색 힌트가 없어도 Google 장소 목록을 반환한다")
         void success() throws Exception {
             // given
             MemberEntity member = memberRepository.save(MemberFixture.MEMBER_1.toEntity());
@@ -46,12 +46,12 @@ class PlaceControllerIntegrationTest {
             // then
             resultActions
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.result[0].name").value("Mock Place 1 for 카페"))
-                .andExpect(jsonPath("$.result[0].address").value("Seoul, Gangnam-gu, Teheran-ro 1"))
+                .andExpect(jsonPath("$.result[0].name").value("Mock Google Place 1 for 카페"))
+                .andExpect(jsonPath("$.result[0].address").value("Mock Google Address 1"))
                 .andExpect(jsonPath("$.result[0].distanceMeters").value(nullValue()))
-                .andExpect(jsonPath("$.result[0].provider").value("NAVER"))
-                .andExpect(jsonPath("$.result[0].providerPlaceId").value(nullValue()))
-                .andExpect(jsonPath("$.result[0].countryCode").value("KR"));
+                .andExpect(jsonPath("$.result[0].provider").value("GOOGLE"))
+                .andExpect(jsonPath("$.result[0].providerPlaceId").value("mock-google-1"))
+                .andExpect(jsonPath("$.result[0].countryCode").value(nullValue()));
         }
 
         @Test

@@ -45,7 +45,7 @@ class PlaceUseCaseTest {
             when(placeQueryService.searchPlaces(new PlaceSearchCriteria(
                 query, latitude, longitude, 3, "ko", "KR"
             ))).thenReturn(List.of(new PlaceSearchResult(
-                "카페", "서울", 37.0, 127.0, PlaceProvider.NAVER, null, "KR", 0
+                "카페", "서울", 37.0, 127.0, PlaceProvider.GOOGLE, "ChIJ", "KR", 0
             )));
 
             placeUseCase.searchPlaces(query, latitude, longitude, 3, "ko", "KR");

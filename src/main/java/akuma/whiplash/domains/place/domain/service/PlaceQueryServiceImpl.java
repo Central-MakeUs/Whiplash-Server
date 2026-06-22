@@ -24,11 +24,10 @@ public class PlaceQueryServiceImpl implements PlaceQueryService {
 
     private final NaverClient naverClient;
     private final GoogleClient googleClient;
-    private final PlaceProviderRouter placeProviderRouter;
 
     @Override
     public List<PlaceSearchResult> searchPlaces(PlaceSearchCriteria criteria) {
-        return placeProviderRouter.searchPlaces(criteria).stream()
+        return googleClient.searchPlaces(criteria).stream()
             .map(place -> withDistance(place, criteria.latitude(), criteria.longitude()))
             .toList();
     }

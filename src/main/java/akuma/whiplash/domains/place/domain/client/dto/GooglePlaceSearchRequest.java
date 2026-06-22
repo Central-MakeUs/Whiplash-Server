@@ -7,5 +7,13 @@ public record GooglePlaceSearchRequest(
     String textQuery,
     int pageSize,
     String languageCode,
-    String regionCode
-) {}
+    String regionCode,
+    LocationBias locationBias
+) {
+
+    public record LocationBias(Circle circle) {}
+
+    public record Circle(Center center, double radius) {}
+
+    public record Center(double latitude, double longitude) {}
+}

@@ -3,7 +3,6 @@ package akuma.whiplash.domains.place.domain.client;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import akuma.whiplash.domains.place.domain.client.impl.NaverClientImpl;
-import akuma.whiplash.domains.place.domain.constant.PlaceProvider;
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 import okhttp3.mockwebserver.MockResponse;
@@ -66,33 +65,6 @@ class NaverClientTest {
             assertThat(request.getHeader("X-Naver-Client-Secret")).isEqualTo("test-secret");
         }
 
-        @Test
-        @DisplayName("성공: 요청 size를 display에 반영하고 표준 검색 결과로 변환한다")
-        void success_placeSearch() throws Exception {
-            // given
-            mockWebServer.enqueue(jsonResponse("""
-                {"items":[
-                  {"title":"<b>카페</b>","address":"서울시 강남구 역삼동","roadAddress":"서울시 강남구","mapx":"1270000000","mapy":"370000000"}
-                ]}
-                """));
-
-            // when
-            var results = client.searchPlaces("카페", 3);
-
-            // then
-            assertThat(results).hasSize(1);
-            assertThat(results.get(0).name()).isEqualTo("카페");
-            assertThat(results.get(0).address()).isEqualTo("서울시 강남구");
-            assertThat(results.get(0).latitude()).isEqualTo(37.0);
-            assertThat(results.get(0).longitude()).isEqualTo(127.0);
-            assertThat(results.get(0).provider()).isEqualTo(PlaceProvider.NAVER);
-            assertThat(results.get(0).providerPlaceId()).isNull();
-            assertThat(results.get(0).countryCode()).isEqualTo("KR");
-
-            RecordedRequest request = mockWebServer.takeRequest(3, TimeUnit.SECONDS);
-            assertThat(request).isNotNull();
-            assertThat(request.getRequestUrl().queryParameter("display")).isEqualTo("3");
-        }
     }
 
     private MockResponse jsonResponse(String body) {

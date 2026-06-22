@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import akuma.whiplash.domains.place.domain.client.impl.GoogleClientImpl;
 import akuma.whiplash.domains.place.domain.constant.PlaceProvider;
+import akuma.whiplash.domains.place.domain.model.PlaceSearchCriteria;
 import akuma.whiplash.domains.place.exception.PlaceErrorCode;
 import akuma.whiplash.global.exception.ApplicationException;
 import java.io.IOException;
@@ -68,7 +69,9 @@ class GoogleClientTest {
                 """));
 
             // when
-            var results = client.searchPlaces("Starbucks", 3, "en", "US");
+            var results = client.searchPlaces(new PlaceSearchCriteria(
+                "Starbucks", 40.7128, -74.0060, 3, "en", "US"
+            ));
 
             // then
             assertThat(results).hasSize(1);
@@ -90,7 +93,32 @@ class GoogleClientTest {
                 .contains("\"textQuery\":\"Starbucks\"")
                 .contains("\"pageSize\":3")
                 .contains("\"languageCode\":\"en\"")
-                .contains("\"regionCode\":\"US\"");
+                .contains("\"regionCode\":\"US\"")
+                .contains("\"locationBias\":{\"circle\":{\"center\":{\"latitude\":40.7128,\"longitude\":-74.006},\"radius\":5000.0}}");
+        }
+
+        @Test
+        @DisplayName("성공: 현재 좌표가 없으면 location bias를 전송하지 않는다")
+        void success_withoutCoordinates() throws Exception {
+            // given
+            mockWebServer.enqueue(jsonResponse("""
+                {
+                  "places":[{
+                    "id":"ChIJ",
+                    "displayName":{"text":"Starbucks","languageCode":"en"},
+                    "formattedAddress":"New York, NY, USA",
+                    "location":{"latitude":40.7128,"longitude":-74.0060}
+                  }]
+                }
+                """));
+
+            // when
+            client.searchPlaces(new PlaceSearchCriteria("Starbucks", null, null, 5, null, null));
+
+            // then
+            RecordedRequest request = mockWebServer.takeRequest(3, TimeUnit.SECONDS);
+            assertThat(request).isNotNull();
+            assertThat(request.getBody().readUtf8()).doesNotContain("locationBias");
         }
 
         @Test
@@ -101,7 +129,7 @@ class GoogleClientTest {
 
             // when & then
             assertPlaceError(
-                () -> client.searchPlaces("unknown", 5, null, null),
+                () -> client.searchPlaces(new PlaceSearchCriteria("unknown", null, null, 5, null, null)),
                 PlaceErrorCode.PLACE_NOT_FOUND
             );
         }

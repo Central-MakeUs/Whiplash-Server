@@ -63,8 +63,8 @@ class PlaceControllerTest {
                     .latitude(37.0)
                     .longitude(127.0)
                     .distanceMeters(120)
-                    .provider("NAVER")
-                    .providerPlaceId(null)
+                    .provider("GOOGLE")
+                    .providerPlaceId("ChIJ")
                     .countryCode("KR")
                     .build()
             );
@@ -87,8 +87,8 @@ class PlaceControllerTest {
                 .andExpect(jsonPath("$.result[0].name").value("카페"))
                 .andExpect(jsonPath("$.result[0].address").value("서울시 강남구"))
                 .andExpect(jsonPath("$.result[0].distanceMeters").value(120))
-                .andExpect(jsonPath("$.result[0].provider").value("NAVER"))
-                .andExpect(jsonPath("$.result[0].providerPlaceId").value(nullValue()))
+                .andExpect(jsonPath("$.result[0].provider").value("GOOGLE"))
+                .andExpect(jsonPath("$.result[0].providerPlaceId").value("ChIJ"))
                 .andExpect(jsonPath("$.result[0].countryCode").value("KR"));
         }
 
@@ -103,8 +103,8 @@ class PlaceControllerTest {
                     .latitude(37.0)
                     .longitude(127.0)
                     .distanceMeters(null)
-                    .provider("NAVER")
-                    .providerPlaceId(null)
+                    .provider("GOOGLE")
+                    .providerPlaceId("ChIJ")
                     .countryCode("KR")
                     .build()
             );

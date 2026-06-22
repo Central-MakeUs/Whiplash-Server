@@ -3,8 +3,6 @@ package akuma.whiplash.domains.place.domain.client.impl;
 import akuma.whiplash.domains.place.domain.client.NaverClient;
 import akuma.whiplash.domains.place.domain.client.dto.NaverLocalSearchResponse;
 import akuma.whiplash.domains.place.domain.client.dto.NaverLocalSearchResponse.Item;
-import akuma.whiplash.domains.place.domain.constant.PlaceProvider;
-import akuma.whiplash.domains.place.domain.model.PlaceSearchResult;
 import java.util.List;
 import java.util.stream.IntStream;
 import org.springframework.context.annotation.Profile;
@@ -30,19 +28,4 @@ public class MockNaverClient implements NaverClient {
         return new NaverLocalSearchResponse(items);
     }
 
-    @Override
-    public List<PlaceSearchResult> searchPlaces(String query, int size) {
-        return IntStream.rangeClosed(1, size)
-            .mapToObj(index -> new PlaceSearchResult(
-                "Mock Place " + index + " for " + query,
-                "Seoul, Gangnam-gu, Teheran-ro " + index,
-                37.4979 + (index * 0.001),
-                127.0276 + (index * 0.001),
-                PlaceProvider.NAVER,
-                null,
-                "KR",
-                null
-            ))
-            .toList();
-    }
 }

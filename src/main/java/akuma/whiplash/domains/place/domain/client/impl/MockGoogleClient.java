@@ -3,6 +3,7 @@ package akuma.whiplash.domains.place.domain.client.impl;
 import akuma.whiplash.domains.place.domain.client.GoogleClient;
 import akuma.whiplash.domains.place.domain.constant.PlaceProvider;
 import akuma.whiplash.domains.place.domain.model.PlaceDetail;
+import akuma.whiplash.domains.place.domain.model.PlaceSearchCriteria;
 import akuma.whiplash.domains.place.domain.model.PlaceSearchResult;
 import java.util.List;
 import java.util.stream.IntStream;
@@ -31,16 +32,16 @@ public class MockGoogleClient implements GoogleClient {
     }
 
     @Override
-    public List<PlaceSearchResult> searchPlaces(String query, int size, String languageCode, String regionCode) {
-        return IntStream.rangeClosed(1, size)
+    public List<PlaceSearchResult> searchPlaces(PlaceSearchCriteria criteria) {
+        return IntStream.rangeClosed(1, criteria.size())
             .mapToObj(index -> new PlaceSearchResult(
-                "Mock Google Place " + index + " for " + query,
+                "Mock Google Place " + index + " for " + criteria.query(),
                 "Mock Google Address " + index,
                 40.7128 + (index * 0.001),
                 -74.0060 + (index * 0.001),
                 PlaceProvider.GOOGLE,
                 "mock-google-" + index,
-                regionCode,
+                criteria.regionCode(),
                 null
             ))
             .toList();

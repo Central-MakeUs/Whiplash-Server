@@ -25,7 +25,6 @@ import org.junit.jupiter.api.Test;
 class PlaceQueryServiceTest {
 
     private PlaceQueryServiceImpl placeQueryService;
-    private PlaceProviderRouter placeProviderRouter;
     private NaverClient naverClient;
     private GoogleClient googleClient;
 
@@ -33,8 +32,7 @@ class PlaceQueryServiceTest {
     void setUp() {
         naverClient = mock(NaverClient.class);
         googleClient = mock(GoogleClient.class);
-        placeProviderRouter = mock(PlaceProviderRouter.class);
-        placeQueryService = new PlaceQueryServiceImpl(naverClient, googleClient, placeProviderRouter);
+        placeQueryService = new PlaceQueryServiceImpl(naverClient, googleClient);
     }
 
     @Nested
@@ -42,12 +40,12 @@ class PlaceQueryServiceTest {
     class SearchPlacesTest {
 
         @Test
-        @DisplayName("성공: 키워드 검색 결과를 반환한다")
+        @DisplayName("성공: 한국 검색도 Google을 사용하고 거리를 계산한다")
         void success() {
             // given
             PlaceSearchCriteria criteria = new PlaceSearchCriteria("카페", 37.0, 127.0, 5, "ko", "KR");
-            when(placeProviderRouter.searchPlaces(criteria)).thenReturn(List.of(new PlaceSearchResult(
-                "카페", "서울시 강남구", 37.0, 127.0, PlaceProvider.NAVER, null, "KR", null
+            when(googleClient.searchPlaces(criteria)).thenReturn(List.of(new PlaceSearchResult(
+                "카페", "서울시 강남구", 37.0, 127.0, PlaceProvider.GOOGLE, "ChIJ", "KR", null
             )));
 
             // when
@@ -60,7 +58,25 @@ class PlaceQueryServiceTest {
             assertThat(responses.get(0).latitude()).isEqualTo(37.0);
             assertThat(responses.get(0).longitude()).isEqualTo(127.0);
             assertThat(responses.get(0).distanceMeters()).isZero();
-            verify(placeProviderRouter).searchPlaces(criteria);
+            assertThat(responses.get(0).provider()).isEqualTo(PlaceProvider.GOOGLE);
+            verify(googleClient).searchPlaces(criteria);
+        }
+
+        @Test
+        @DisplayName("성공: 검색 힌트가 없어도 Google을 사용한다")
+        void success_withoutHints() {
+            // given
+            PlaceSearchCriteria criteria = new PlaceSearchCriteria("카페", null, null, 5, null, null);
+            when(googleClient.searchPlaces(criteria)).thenReturn(List.of(new PlaceSearchResult(
+                "카페", "서울시 강남구", 37.0, 127.0, PlaceProvider.GOOGLE, "ChIJ", "KR", null
+            )));
+
+            // when
+            List<PlaceSearchResult> responses = placeQueryService.searchPlaces(criteria);
+
+            // then
+            assertThat(responses.get(0).distanceMeters()).isNull();
+            verify(googleClient).searchPlaces(criteria);
         }
 
         @Test
@@ -68,7 +84,7 @@ class PlaceQueryServiceTest {
         void fail_externalApiError() {
             // given
             PlaceSearchCriteria criteria = new PlaceSearchCriteria("카페", null, null, 5, null, null);
-            when(placeProviderRouter.searchPlaces(criteria))
+            when(googleClient.searchPlaces(criteria))
                 .thenThrow(ApplicationException.from(PlaceErrorCode.PROVIDER_ERROR));
 
             // when & then

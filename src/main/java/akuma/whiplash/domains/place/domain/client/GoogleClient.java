@@ -1,11 +1,12 @@
 package akuma.whiplash.domains.place.domain.client;
 
 import akuma.whiplash.domains.place.domain.model.PlaceDetail;
+import akuma.whiplash.domains.place.domain.model.PlaceSearchCriteria;
 import akuma.whiplash.domains.place.domain.model.PlaceSearchResult;
 import java.util.List;
 
 public interface GoogleClient {
 
     PlaceDetail reverseGeocode(double latitude, double longitude, String languageCode);
-    List<PlaceSearchResult> searchPlaces(String query, int size, String languageCode, String regionCode);
+    List<PlaceSearchResult> searchPlaces(PlaceSearchCriteria criteria);
 }

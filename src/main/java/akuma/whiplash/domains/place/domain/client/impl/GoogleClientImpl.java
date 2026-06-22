@@ -3,12 +3,16 @@ package akuma.whiplash.domains.place.domain.client.impl;
 import akuma.whiplash.domains.place.domain.client.GoogleClient;
 import akuma.whiplash.domains.place.domain.client.dto.GoogleReverseGeocodeResponse;
 import akuma.whiplash.domains.place.domain.client.dto.GooglePlaceSearchRequest;
+import akuma.whiplash.domains.place.domain.client.dto.GooglePlaceSearchRequest.Center;
+import akuma.whiplash.domains.place.domain.client.dto.GooglePlaceSearchRequest.Circle;
+import akuma.whiplash.domains.place.domain.client.dto.GooglePlaceSearchRequest.LocationBias;
 import akuma.whiplash.domains.place.domain.client.dto.GooglePlaceSearchResponse;
 import akuma.whiplash.domains.place.domain.client.dto.GooglePlaceSearchResponse.Place;
 import akuma.whiplash.domains.place.domain.client.dto.GoogleReverseGeocodeResponse.AddressComponent;
 import akuma.whiplash.domains.place.domain.client.dto.GoogleReverseGeocodeResponse.Result;
 import akuma.whiplash.domains.place.domain.constant.PlaceProvider;
 import akuma.whiplash.domains.place.domain.model.PlaceDetail;
+import akuma.whiplash.domains.place.domain.model.PlaceSearchCriteria;
 import akuma.whiplash.domains.place.domain.model.PlaceSearchResult;
 import akuma.whiplash.domains.place.exception.PlaceErrorCode;
 import akuma.whiplash.global.exception.ApplicationException;
@@ -30,6 +34,7 @@ public class GoogleClientImpl implements GoogleClient {
         "results.formattedAddress,results.addressComponents,results.types";
     private static final String PLACE_SEARCH_FIELD_MASK =
         "places.id,places.displayName,places.formattedAddress,places.location,places.addressComponents";
+    private static final double PLACE_SEARCH_BIAS_RADIUS_METERS = 5_000.0;
 
     private static final List<String> PLACE_NAME_TYPE_PRIORITY = List.of(
         "premise",
@@ -88,26 +93,27 @@ public class GoogleClientImpl implements GoogleClient {
     }
 
     @Override
-    public List<PlaceSearchResult> searchPlaces(String query, int size, String languageCode, String regionCode) {
-        GooglePlaceSearchResponse response = requestPlaces(query, size, languageCode, regionCode);
+    public List<PlaceSearchResult> searchPlaces(PlaceSearchCriteria criteria) {
+        GooglePlaceSearchResponse response = requestPlaces(criteria);
         if (response == null || response.places() == null || response.places().isEmpty()) {
             throw ApplicationException.from(PlaceErrorCode.PLACE_NOT_FOUND);
         }
         return response.places().stream().map(this::mapToPlaceSearchResult).toList();
     }
 
-    private GooglePlaceSearchResponse requestPlaces(
-        String query,
-        int size,
-        String languageCode,
-        String regionCode
-    ) {
+    private GooglePlaceSearchResponse requestPlaces(PlaceSearchCriteria criteria) {
         try {
             return webClient.post()
                 .uri(placeSearchUrl)
                 .header("X-Goog-Api-Key", apiKey)
                 .header("X-Goog-FieldMask", PLACE_SEARCH_FIELD_MASK)
-                .bodyValue(new GooglePlaceSearchRequest(query, size, languageCode, regionCode))
+                .bodyValue(new GooglePlaceSearchRequest(
+                    criteria.query(),
+                    criteria.size(),
+                    criteria.languageCode(),
+                    criteria.regionCode(),
+                    createLocationBias(criteria)
+                ))
                 .retrieve()
                 .bodyToMono(GooglePlaceSearchResponse.class)
                 .block();
@@ -118,6 +124,16 @@ public class GoogleClientImpl implements GoogleClient {
         } catch (RuntimeException exception) {
             throw ApplicationException.from(PlaceErrorCode.PROVIDER_ERROR);
         }
+    }
+
+    private LocationBias createLocationBias(PlaceSearchCriteria criteria) {
+        if (criteria.latitude() == null || criteria.longitude() == null) {
+            return null;
+        }
+        return new LocationBias(new Circle(
+            new Center(criteria.latitude(), criteria.longitude()),
+            PLACE_SEARCH_BIAS_RADIUS_METERS
+        ));
     }
 
     private PlaceSearchResult mapToPlaceSearchResult(Place place) {
