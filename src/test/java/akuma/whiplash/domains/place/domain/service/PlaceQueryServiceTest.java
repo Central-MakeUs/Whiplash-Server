@@ -12,6 +12,8 @@ import akuma.whiplash.domains.place.domain.client.dto.NaverLocalSearchResponse;
 import akuma.whiplash.domains.place.domain.client.dto.NaverLocalSearchResponse.Item;
 import akuma.whiplash.domains.place.domain.constant.PlaceProvider;
 import akuma.whiplash.domains.place.domain.model.PlaceDetail;
+import akuma.whiplash.domains.place.domain.model.PlaceAutocompleteCriteria;
+import akuma.whiplash.domains.place.domain.model.PlaceAutocompleteSuggestion;
 import akuma.whiplash.domains.place.domain.model.PlaceSearchCriteria;
 import akuma.whiplash.domains.place.domain.model.PlaceSearchResult;
 import akuma.whiplash.domains.place.exception.PlaceErrorCode;
@@ -33,6 +35,31 @@ class PlaceQueryServiceTest {
         naverClient = mock(NaverClient.class);
         googleClient = mock(GoogleClient.class);
         placeQueryService = new PlaceQueryServiceImpl(naverClient, googleClient);
+    }
+
+    @Nested
+    @DisplayName("getPlaceAutocompleteSuggestions - 장소 자동완성")
+    class GetPlaceAutocompleteSuggestionsTest {
+
+        @Test
+        @DisplayName("성공: 자동완성 조건을 Google client에 전달한다")
+        void success() {
+            // given
+            PlaceAutocompleteCriteria criteria = new PlaceAutocompleteCriteria(
+                "구리", null, null, "ko", "KR", "550e8400-e29b-41d4-a716-446655440000"
+            );
+            List<PlaceAutocompleteSuggestion> expected = List.of(
+                new PlaceAutocompleteSuggestion("구리시청", "경기도 구리시", "ChIJ")
+            );
+            when(googleClient.autocomplete(criteria)).thenReturn(expected);
+
+            // when
+            var result = placeQueryService.getPlaceAutocompleteSuggestions(criteria);
+
+            // then
+            assertThat(result).isEqualTo(expected);
+            verify(googleClient).autocomplete(criteria);
+        }
     }
 
     @Nested

@@ -1,6 +1,7 @@
 package akuma.whiplash.domains.place.presentation;
 
 import static akuma.whiplash.global.response.code.CommonErrorCode.BAD_REQUEST;
+import static akuma.whiplash.domains.place.exception.PlaceErrorCode.AUTOCOMPLETE_NOT_FOUND;
 import static akuma.whiplash.domains.place.exception.PlaceErrorCode.INVALID_COORDINATE;
 import static akuma.whiplash.domains.place.exception.PlaceErrorCode.PLACE_NOT_FOUND;
 import static akuma.whiplash.domains.place.exception.PlaceErrorCode.PROVIDER_AUTHENTICATION_FAILED;
@@ -12,6 +13,7 @@ import static akuma.whiplash.domains.place.exception.PlaceErrorCode.UNSUPPORTED_
 import static akuma.whiplash.domains.place.exception.PlaceErrorCode.UNSUPPORTED_REGION;
 
 import akuma.whiplash.domains.place.application.dto.response.PlaceDetailResponse;
+import akuma.whiplash.domains.place.application.dto.response.PlaceAutocompleteResponse;
 import akuma.whiplash.domains.place.application.dto.response.PlaceInfoResponse;
 import akuma.whiplash.domains.place.application.usecase.PlaceUseCase;
 import akuma.whiplash.global.annotation.swagger.CustomErrorCodes;
@@ -30,6 +32,35 @@ import org.springframework.web.bind.annotation.RestController;
 public class PlaceController {
 
     private final PlaceUseCase placeUseCase;
+
+    @CustomErrorCodes(
+        commonErrorCodes = {BAD_REQUEST},
+        placeErrorCodes = {
+            INVALID_COORDINATE,
+            UNSUPPORTED_LANGUAGE,
+            UNSUPPORTED_REGION,
+            PROVIDER_AUTHENTICATION_FAILED,
+            PROVIDER_PERMISSION_DENIED,
+            AUTOCOMPLETE_NOT_FOUND,
+            PROVIDER_QUOTA_EXCEEDED,
+            PROVIDER_TIMEOUT,
+            PROVIDER_ERROR
+        }
+    )
+    @Operation(summary = "장소 자동완성", description = "검색어 기반 장소 추천을 제공합니다.")
+    @GetMapping("/autocomplete")
+    public ApplicationResponse<PlaceAutocompleteResponse> getPlaceAutocompleteSuggestions(
+        @RequestParam String query,
+        @RequestParam(required = false) Double latitude,
+        @RequestParam(required = false) Double longitude,
+        @RequestParam(required = false) String languageCode,
+        @RequestParam(required = false) String regionCode,
+        @RequestParam String sessionToken
+    ) {
+        return ApplicationResponse.onSuccess(placeUseCase.getPlaceAutocompleteSuggestions(
+            query, latitude, longitude, languageCode, regionCode, sessionToken
+        ));
+    }
 
     @CustomErrorCodes(
         commonErrorCodes = {BAD_REQUEST},

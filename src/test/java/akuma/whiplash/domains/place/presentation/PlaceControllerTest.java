@@ -11,6 +11,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import akuma.whiplash.domains.place.application.dto.response.PlaceDetailResponse;
+import akuma.whiplash.domains.place.application.dto.response.PlaceAutocompleteResponse;
+import akuma.whiplash.domains.place.application.dto.response.PlaceAutocompleteSuggestionResponse;
 import akuma.whiplash.domains.place.application.dto.response.PlaceInfoResponse;
 import akuma.whiplash.domains.place.application.usecase.PlaceUseCase;
 import akuma.whiplash.domains.place.exception.PlaceErrorCode;
@@ -47,6 +49,76 @@ class PlaceControllerTest {
     @MockitoBean private PlaceUseCase placeUseCase;
 
     private static final String BASE = "/api/v1/places";
+
+    @Nested
+    @DisplayName("getPlaceAutocompleteSuggestions - 장소 자동완성")
+    class GetPlaceAutocompleteSuggestionsTest {
+
+        private static final String SESSION_TOKEN = "550e8400-e29b-41d4-a716-446655440000";
+
+        @Test
+        @DisplayName("성공: provider 없이 두 줄 장소 추천 결과를 반환한다")
+        void success() throws Exception {
+            // given
+            when(placeUseCase.getPlaceAutocompleteSuggestions(
+                "구리", 37.5943, 127.1295, "ko", "KR", SESSION_TOKEN
+            )).thenReturn(new PlaceAutocompleteResponse(List.of(
+                new PlaceAutocompleteSuggestionResponse(
+                    "구리시청", "경기도 구리시 아차산로 439", "ChIJ"
+                )
+            )));
+
+            // when
+            var resultActions = mockMvc.perform(get(BASE + "/autocomplete")
+                .param("query", "구리")
+                .param("latitude", "37.5943")
+                .param("longitude", "127.1295")
+                .param("languageCode", "ko")
+                .param("regionCode", "KR")
+                .param("sessionToken", SESSION_TOKEN));
+
+            // then
+            resultActions
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.suggestions[0].mainText").value("구리시청"))
+                .andExpect(jsonPath("$.result.suggestions[0].secondaryText")
+                    .value("경기도 구리시 아차산로 439"))
+                .andExpect(jsonPath("$.result.suggestions[0].providerPlaceId").value("ChIJ"))
+                .andExpect(jsonPath("$.result.suggestions[0].provider").doesNotExist());
+        }
+
+        @Test
+        @DisplayName("실패: sessionToken 파라미터가 없으면 400을 반환한다")
+        void fail_sessionTokenMissing() throws Exception {
+            // when
+            var resultActions = mockMvc.perform(get(BASE + "/autocomplete")
+                .param("query", "구리"));
+
+            // then
+            resultActions
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(CommonErrorCode.BAD_REQUEST.getCustomCode()));
+        }
+
+        @Test
+        @DisplayName("실패: sessionToken이 UUID 형식이 아니면 400을 반환한다")
+        void fail_sessionTokenInvalid() throws Exception {
+            // given
+            when(placeUseCase.getPlaceAutocompleteSuggestions(
+                "구리", null, null, null, null, "invalid-token"
+            )).thenThrow(ApplicationException.from(CommonErrorCode.BAD_REQUEST));
+
+            // when
+            var resultActions = mockMvc.perform(get(BASE + "/autocomplete")
+                .param("query", "구리")
+                .param("sessionToken", "invalid-token"));
+
+            // then
+            resultActions
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(CommonErrorCode.BAD_REQUEST.getCustomCode()));
+        }
+    }
 
     @Nested
     @DisplayName("searchPlaces - 장소 목록 검색")

@@ -3,6 +3,8 @@ package akuma.whiplash.domains.place.domain.client.impl;
 import akuma.whiplash.domains.place.domain.client.GoogleClient;
 import akuma.whiplash.domains.place.domain.constant.PlaceProvider;
 import akuma.whiplash.domains.place.domain.model.PlaceDetail;
+import akuma.whiplash.domains.place.domain.model.PlaceAutocompleteCriteria;
+import akuma.whiplash.domains.place.domain.model.PlaceAutocompleteSuggestion;
 import akuma.whiplash.domains.place.domain.model.PlaceSearchCriteria;
 import akuma.whiplash.domains.place.domain.model.PlaceSearchResult;
 import java.util.List;
@@ -29,6 +31,15 @@ public class MockGoogleClient implements GoogleClient {
             longitude,
             isKoreaCoordinate(latitude, longitude) ? "KR" : "US"
         );
+    }
+
+    @Override
+    public List<PlaceAutocompleteSuggestion> autocomplete(PlaceAutocompleteCriteria criteria) {
+        return List.of(new PlaceAutocompleteSuggestion(
+            "Mock Google Place for " + criteria.query(),
+            "Mock Google Address",
+            "mock-google-autocomplete"
+        ));
     }
 
     @Override

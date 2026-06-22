@@ -8,6 +8,8 @@ import static org.mockito.Mockito.when;
 
 import akuma.whiplash.domains.place.domain.constant.PlaceProvider;
 import akuma.whiplash.domains.place.domain.model.PlaceDetail;
+import akuma.whiplash.domains.place.domain.model.PlaceAutocompleteCriteria;
+import akuma.whiplash.domains.place.domain.model.PlaceAutocompleteSuggestion;
 import akuma.whiplash.domains.place.domain.model.PlaceSearchCriteria;
 import akuma.whiplash.domains.place.domain.model.PlaceSearchResult;
 import akuma.whiplash.domains.place.exception.PlaceErrorCode;
@@ -28,6 +30,106 @@ class PlaceUseCaseTest {
 
     @Mock private PlaceQueryService placeQueryService;
     @InjectMocks private PlaceUseCase placeUseCase;
+
+    @Nested
+    @DisplayName("getPlaceAutocompleteSuggestions - 장소 자동완성")
+    class GetPlaceAutocompleteSuggestionsTest {
+
+        private static final String SESSION_TOKEN = "550e8400-e29b-41d4-a716-446655440000";
+
+        @Test
+        @DisplayName("성공: 자동완성 조건을 서비스에 전달한다")
+        void success() {
+            // given
+            PlaceAutocompleteCriteria criteria = new PlaceAutocompleteCriteria(
+                "구리", 37.5943, 127.1295, "ko", "KR", SESSION_TOKEN
+            );
+            when(placeQueryService.getPlaceAutocompleteSuggestions(criteria)).thenReturn(List.of(
+                new PlaceAutocompleteSuggestion("구리시청", "경기도 구리시", "ChIJ")
+            ));
+
+            // when
+            var response = placeUseCase.getPlaceAutocompleteSuggestions(
+                "구리", 37.5943, 127.1295, "ko", "KR", SESSION_TOKEN
+            );
+
+            // then
+            assertThat(response.suggestions()).hasSize(1);
+            verify(placeQueryService).getPlaceAutocompleteSuggestions(criteria);
+        }
+
+        @Test
+        @DisplayName("실패: sessionToken이 UUID 형식이 아니면 예외가 발생한다")
+        void fail_sessionTokenInvalid() {
+            // when & then
+            assertThatThrownBy(() -> placeUseCase.getPlaceAutocompleteSuggestions(
+                "구리", null, null, null, null, "invalid-token"
+            )).isInstanceOfSatisfying(ApplicationException.class, exception ->
+                assertThat(exception.getCode()).isEqualTo(CommonErrorCode.BAD_REQUEST)
+            );
+            verifyNoInteractions(placeQueryService);
+        }
+
+        @Test
+        @DisplayName("실패: query가 빈 문자열이면 예외가 발생한다")
+        void fail_queryBlank() {
+            // when & then
+            assertThatThrownBy(() -> placeUseCase.getPlaceAutocompleteSuggestions(
+                " ", null, null, null, null, SESSION_TOKEN
+            )).isInstanceOfSatisfying(ApplicationException.class, exception ->
+                assertThat(exception.getCode()).isEqualTo(CommonErrorCode.BAD_REQUEST)
+            );
+            verifyNoInteractions(placeQueryService);
+        }
+
+        @Test
+        @DisplayName("실패: 현재 좌표가 하나만 전달되면 예외가 발생한다")
+        void fail_partialCoordinates() {
+            // when & then
+            assertThatThrownBy(() -> placeUseCase.getPlaceAutocompleteSuggestions(
+                "구리", 37.5943, null, null, null, SESSION_TOKEN
+            )).isInstanceOfSatisfying(ApplicationException.class, exception ->
+                assertThat(exception.getCode()).isEqualTo(CommonErrorCode.BAD_REQUEST)
+            );
+            verifyNoInteractions(placeQueryService);
+        }
+
+        @Test
+        @DisplayName("실패: 좌표가 범위를 벗어나면 예외가 발생한다")
+        void fail_coordinateOutOfRange() {
+            // when & then
+            assertThatThrownBy(() -> placeUseCase.getPlaceAutocompleteSuggestions(
+                "구리", 91.0, 127.0, null, null, SESSION_TOKEN
+            )).isInstanceOfSatisfying(ApplicationException.class, exception ->
+                assertThat(exception.getCode()).isEqualTo(PlaceErrorCode.INVALID_COORDINATE)
+            );
+            verifyNoInteractions(placeQueryService);
+        }
+
+        @Test
+        @DisplayName("실패: 지원하지 않는 언어이면 예외가 발생한다")
+        void fail_unsupportedLanguage() {
+            // when & then
+            assertThatThrownBy(() -> placeUseCase.getPlaceAutocompleteSuggestions(
+                "구리", null, null, "ja", null, SESSION_TOKEN
+            )).isInstanceOfSatisfying(ApplicationException.class, exception ->
+                assertThat(exception.getCode()).isEqualTo(PlaceErrorCode.UNSUPPORTED_LANGUAGE)
+            );
+            verifyNoInteractions(placeQueryService);
+        }
+
+        @Test
+        @DisplayName("실패: 지원하지 않는 지역이면 예외가 발생한다")
+        void fail_unsupportedRegion() {
+            // when & then
+            assertThatThrownBy(() -> placeUseCase.getPlaceAutocompleteSuggestions(
+                "구리", null, null, null, "JP", SESSION_TOKEN
+            )).isInstanceOfSatisfying(ApplicationException.class, exception ->
+                assertThat(exception.getCode()).isEqualTo(PlaceErrorCode.UNSUPPORTED_REGION)
+            );
+            verifyNoInteractions(placeQueryService);
+        }
+    }
 
     @Nested
     @DisplayName("searchPlaces - 장소 목록 검색")

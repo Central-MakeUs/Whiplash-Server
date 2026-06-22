@@ -28,6 +28,67 @@ class PlaceControllerIntegrationTest {
     @Autowired private MemberRepository memberRepository;
 
     @Nested
+    @DisplayName("[GET] /api/v1/places/autocomplete - 장소 자동완성")
+    class GetPlaceAutocompleteSuggestionsTest {
+
+        private static final String SESSION_TOKEN = "550e8400-e29b-41d4-a716-446655440000";
+
+        @Test
+        @DisplayName("성공: 인증된 요청에 Google 장소 추천을 반환한다")
+        void success() throws Exception {
+            // given
+            MemberEntity member = memberRepository.save(MemberFixture.MEMBER_1.toEntity());
+            String token = jwtProvider.generateAccessToken(member.getId(), member.getRole(), "device");
+
+            // when
+            var resultActions = mockMvc.perform(get("/api/v1/places/autocomplete")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                .param("query", "구리")
+                .param("sessionToken", SESSION_TOKEN));
+
+            // then
+            resultActions
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.suggestions[0].mainText")
+                    .value("Mock Google Place for 구리"))
+                .andExpect(jsonPath("$.result.suggestions[0].secondaryText")
+                    .value("Mock Google Address"))
+                .andExpect(jsonPath("$.result.suggestions[0].providerPlaceId")
+                    .value("mock-google-autocomplete"))
+                .andExpect(jsonPath("$.result.suggestions[0].provider").doesNotExist());
+        }
+
+        @Test
+        @DisplayName("실패: sessionToken이 UUID 형식이 아니면 400을 반환한다")
+        void fail_sessionTokenInvalid() throws Exception {
+            // given
+            MemberEntity member = memberRepository.save(MemberFixture.MEMBER_2.toEntity());
+            String token = jwtProvider.generateAccessToken(member.getId(), member.getRole(), "device");
+
+            // when
+            var resultActions = mockMvc.perform(get("/api/v1/places/autocomplete")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                .param("query", "구리")
+                .param("sessionToken", "invalid-token"));
+
+            // then
+            resultActions.andExpect(status().isBadRequest());
+        }
+
+        @Test
+        @DisplayName("실패: 인증 토큰이 없으면 401을 반환한다")
+        void fail_tokenMissing() throws Exception {
+            // when
+            var resultActions = mockMvc.perform(get("/api/v1/places/autocomplete")
+                .param("query", "구리")
+                .param("sessionToken", SESSION_TOKEN));
+
+            // then
+            resultActions.andExpect(status().isUnauthorized());
+        }
+    }
+
+    @Nested
     @DisplayName("[GET] /api/v1/places/search - 장소 목록 검색")
     class SearchPlacesTest {
 

@@ -1,7 +1,10 @@
 package akuma.whiplash.domains.place.application.mapper;
 
 import akuma.whiplash.domains.place.application.dto.response.PlaceDetailResponse;
+import akuma.whiplash.domains.place.application.dto.response.PlaceAutocompleteResponse;
+import akuma.whiplash.domains.place.application.dto.response.PlaceAutocompleteSuggestionResponse;
 import akuma.whiplash.domains.place.domain.model.PlaceDetail;
+import akuma.whiplash.domains.place.domain.model.PlaceAutocompleteSuggestion;
 import akuma.whiplash.domains.place.application.dto.response.PlaceInfoResponse;
 import akuma.whiplash.domains.place.domain.model.PlaceSearchResult;
 import java.util.List;
@@ -10,6 +13,18 @@ public class PlaceMapper {
 
     private PlaceMapper() {
         throw new IllegalArgumentException();
+    }
+
+    public static PlaceAutocompleteResponse mapToPlaceAutocompleteResponse(
+        List<PlaceAutocompleteSuggestion> suggestions
+    ) {
+        return new PlaceAutocompleteResponse(suggestions.stream()
+            .map(suggestion -> new PlaceAutocompleteSuggestionResponse(
+                suggestion.mainText(),
+                suggestion.secondaryText(),
+                suggestion.providerPlaceId()
+            ))
+            .toList());
     }
 
     public static PlaceDetailResponse mapToPlaceDetailResponse(PlaceDetail placeDetail) {

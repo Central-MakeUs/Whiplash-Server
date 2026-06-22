@@ -2,6 +2,11 @@ package akuma.whiplash.domains.place.domain.client.impl;
 
 import akuma.whiplash.domains.place.domain.client.GoogleClient;
 import akuma.whiplash.domains.place.domain.client.dto.GoogleReverseGeocodeResponse;
+import akuma.whiplash.domains.place.domain.client.dto.GooglePlaceAutocompleteRequest;
+import akuma.whiplash.domains.place.domain.client.dto.GooglePlaceAutocompleteRequest.AutocompleteCenter;
+import akuma.whiplash.domains.place.domain.client.dto.GooglePlaceAutocompleteRequest.AutocompleteCircle;
+import akuma.whiplash.domains.place.domain.client.dto.GooglePlaceAutocompleteRequest.AutocompleteLocationBias;
+import akuma.whiplash.domains.place.domain.client.dto.GooglePlaceAutocompleteResponse;
 import akuma.whiplash.domains.place.domain.client.dto.GooglePlaceSearchRequest;
 import akuma.whiplash.domains.place.domain.client.dto.GooglePlaceSearchRequest.Center;
 import akuma.whiplash.domains.place.domain.client.dto.GooglePlaceSearchRequest.Circle;
@@ -12,6 +17,8 @@ import akuma.whiplash.domains.place.domain.client.dto.GoogleReverseGeocodeRespon
 import akuma.whiplash.domains.place.domain.client.dto.GoogleReverseGeocodeResponse.Result;
 import akuma.whiplash.domains.place.domain.constant.PlaceProvider;
 import akuma.whiplash.domains.place.domain.model.PlaceDetail;
+import akuma.whiplash.domains.place.domain.model.PlaceAutocompleteCriteria;
+import akuma.whiplash.domains.place.domain.model.PlaceAutocompleteSuggestion;
 import akuma.whiplash.domains.place.domain.model.PlaceSearchCriteria;
 import akuma.whiplash.domains.place.domain.model.PlaceSearchResult;
 import akuma.whiplash.domains.place.exception.PlaceErrorCode;
@@ -34,6 +41,10 @@ public class GoogleClientImpl implements GoogleClient {
         "results.formattedAddress,results.addressComponents,results.types";
     private static final String PLACE_SEARCH_FIELD_MASK =
         "places.id,places.displayName,places.formattedAddress,places.location,places.addressComponents";
+    private static final String PLACE_AUTOCOMPLETE_FIELD_MASK =
+        "suggestions.placePrediction.placeId,"
+            + "suggestions.placePrediction.structuredFormat.mainText.text,"
+            + "suggestions.placePrediction.structuredFormat.secondaryText.text";
     private static final double PLACE_SEARCH_BIAS_RADIUS_METERS = 5_000.0;
 
     private static final List<String> PLACE_NAME_TYPE_PRIORITY = List.of(
@@ -57,6 +68,7 @@ public class GoogleClientImpl implements GoogleClient {
     private final String apiKey;
     private final String geocodingUrl;
     private final String placeSearchUrl;
+    private final String placeAutocompleteUrl;
 
     public GoogleClientImpl(
         WebClient webClient,
@@ -69,6 +81,72 @@ public class GoogleClientImpl implements GoogleClient {
         this.apiKey = apiKey;
         this.geocodingUrl = geocodingUrl;
         this.placeSearchUrl = placesBaseUrl.replaceAll("/+$", "") + "/v1/places:searchText";
+        this.placeAutocompleteUrl = placesBaseUrl.replaceAll("/+$", "") + "/v1/places:autocomplete";
+    }
+
+    @Override
+    public List<PlaceAutocompleteSuggestion> autocomplete(PlaceAutocompleteCriteria criteria) {
+        GooglePlaceAutocompleteResponse response = requestAutocomplete(criteria);
+        if (response == null || response.suggestions() == null || response.suggestions().isEmpty()) {
+            throw ApplicationException.from(PlaceErrorCode.AUTOCOMPLETE_NOT_FOUND);
+        }
+        return response.suggestions().stream()
+            .map(this::mapToPlaceAutocompleteSuggestion)
+            .toList();
+    }
+
+    private GooglePlaceAutocompleteResponse requestAutocomplete(PlaceAutocompleteCriteria criteria) {
+        try {
+            return webClient.post()
+                .uri(placeAutocompleteUrl)
+                .header("X-Goog-Api-Key", apiKey)
+                .header("X-Goog-FieldMask", PLACE_AUTOCOMPLETE_FIELD_MASK)
+                .bodyValue(new GooglePlaceAutocompleteRequest(
+                    criteria.query(),
+                    criteria.languageCode(),
+                    criteria.regionCode(),
+                    criteria.sessionToken(),
+                    createAutocompleteLocationBias(criteria)
+                ))
+                .retrieve()
+                .bodyToMono(GooglePlaceAutocompleteResponse.class)
+                .block();
+        } catch (WebClientResponseException exception) {
+            throw PlaceProviderErrorMapper.map(exception);
+        } catch (WebClientRequestException exception) {
+            throw PlaceProviderErrorMapper.map(exception);
+        } catch (RuntimeException exception) {
+            throw ApplicationException.from(PlaceErrorCode.PROVIDER_ERROR);
+        }
+    }
+
+    private AutocompleteLocationBias createAutocompleteLocationBias(PlaceAutocompleteCriteria criteria) {
+        if (criteria.latitude() == null || criteria.longitude() == null) {
+            return null;
+        }
+        return new AutocompleteLocationBias(new AutocompleteCircle(
+            new AutocompleteCenter(criteria.latitude(), criteria.longitude()),
+            PLACE_SEARCH_BIAS_RADIUS_METERS
+        ));
+    }
+
+    private PlaceAutocompleteSuggestion mapToPlaceAutocompleteSuggestion(
+        GooglePlaceAutocompleteResponse.Suggestion suggestion
+    ) {
+        if (suggestion.placePrediction() == null
+            || suggestion.placePrediction().placeId() == null
+            || suggestion.placePrediction().structuredFormat() == null
+            || suggestion.placePrediction().structuredFormat().mainText() == null
+            || suggestion.placePrediction().structuredFormat().mainText().text() == null) {
+            throw ApplicationException.from(PlaceErrorCode.PROVIDER_ERROR);
+        }
+        GooglePlaceAutocompleteResponse.StructuredFormat format =
+            suggestion.placePrediction().structuredFormat();
+        return new PlaceAutocompleteSuggestion(
+            format.mainText().text(),
+            format.secondaryText() == null ? null : format.secondaryText().text(),
+            suggestion.placePrediction().placeId()
+        );
     }
 
     @Override

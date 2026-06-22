@@ -5,6 +5,8 @@ import akuma.whiplash.domains.place.domain.client.GoogleClient;
 import akuma.whiplash.domains.place.domain.client.dto.NaverLocalSearchResponse;
 import akuma.whiplash.domains.place.domain.client.dto.NaverLocalSearchResponse.Item;
 import akuma.whiplash.domains.place.domain.model.PlaceDetail;
+import akuma.whiplash.domains.place.domain.model.PlaceAutocompleteCriteria;
+import akuma.whiplash.domains.place.domain.model.PlaceAutocompleteSuggestion;
 import akuma.whiplash.domains.place.domain.model.PlaceSearchCriteria;
 import akuma.whiplash.domains.place.domain.model.PlaceSearchResult;
 import akuma.whiplash.global.util.GeoUtils;
@@ -24,6 +26,13 @@ public class PlaceQueryServiceImpl implements PlaceQueryService {
 
     private final NaverClient naverClient;
     private final GoogleClient googleClient;
+
+    @Override
+    public List<PlaceAutocompleteSuggestion> getPlaceAutocompleteSuggestions(
+        PlaceAutocompleteCriteria criteria
+    ) {
+        return googleClient.autocomplete(criteria);
+    }
 
     @Override
     public List<PlaceSearchResult> searchPlaces(PlaceSearchCriteria criteria) {

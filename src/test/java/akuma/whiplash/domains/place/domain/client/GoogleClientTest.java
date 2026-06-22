@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import akuma.whiplash.domains.place.domain.client.impl.GoogleClientImpl;
 import akuma.whiplash.domains.place.domain.constant.PlaceProvider;
+import akuma.whiplash.domains.place.domain.model.PlaceAutocompleteCriteria;
 import akuma.whiplash.domains.place.domain.model.PlaceSearchCriteria;
 import akuma.whiplash.domains.place.exception.PlaceErrorCode;
 import akuma.whiplash.global.exception.ApplicationException;
@@ -44,6 +45,163 @@ class GoogleClientTest {
             mockWebServer.url("/v4/geocode/location").toString(),
             mockWebServer.url("/").toString()
         );
+    }
+
+    @Nested
+    @DisplayName("autocomplete - Google 장소 자동완성")
+    class AutocompleteTest {
+
+        @Test
+        @DisplayName("성공: Autocomplete 요청을 보내고 두 줄 추천 결과로 변환한다")
+        void success() throws Exception {
+            // given
+            mockWebServer.enqueue(jsonResponse("""
+                {
+                  "suggestions":[{
+                    "placePrediction":{
+                      "placeId":"ChIJ",
+                      "structuredFormat":{
+                        "mainText":{"text":"구리시청"},
+                        "secondaryText":{"text":"경기도 구리시 아차산로 439"}
+                      }
+                    }
+                  }]
+                }
+                """));
+            PlaceAutocompleteCriteria criteria = new PlaceAutocompleteCriteria(
+                "구리", 37.5943, 127.1295, "ko", "KR",
+                "550e8400-e29b-41d4-a716-446655440000"
+            );
+
+            // when
+            var results = client.autocomplete(criteria);
+
+            // then
+            assertThat(results).hasSize(1);
+            assertThat(results.get(0).mainText()).isEqualTo("구리시청");
+            assertThat(results.get(0).secondaryText()).isEqualTo("경기도 구리시 아차산로 439");
+            assertThat(results.get(0).providerPlaceId()).isEqualTo("ChIJ");
+
+            RecordedRequest request = mockWebServer.takeRequest(3, TimeUnit.SECONDS);
+            assertThat(request).isNotNull();
+            assertThat(request.getMethod()).isEqualTo("POST");
+            assertThat(request.getPath()).isEqualTo("/v1/places:autocomplete");
+            assertThat(request.getHeader("X-Goog-Api-Key")).isEqualTo("test-key");
+            assertThat(request.getHeader("X-Goog-FieldMask")).isEqualTo(
+                "suggestions.placePrediction.placeId,"
+                    + "suggestions.placePrediction.structuredFormat.mainText.text,"
+                    + "suggestions.placePrediction.structuredFormat.secondaryText.text"
+            );
+            assertThat(request.getBody().readUtf8())
+                .contains("\"input\":\"구리\"")
+                .contains("\"languageCode\":\"ko\"")
+                .contains("\"regionCode\":\"KR\"")
+                .contains("\"sessionToken\":\"550e8400-e29b-41d4-a716-446655440000\"")
+                .contains("\"locationBias\":{\"circle\":{\"center\":{\"latitude\":37.5943,\"longitude\":127.1295},\"radius\":5000.0}}");
+        }
+
+        @Test
+        @DisplayName("성공: 보조 주소가 없어도 null로 변환한다")
+        void success_withoutSecondaryText() throws Exception {
+            // given
+            mockWebServer.enqueue(jsonResponse("""
+                {
+                  "suggestions":[{
+                    "placePrediction":{
+                      "placeId":"ChIJ",
+                      "structuredFormat":{"mainText":{"text":"구리시청"}}
+                    }
+                  }]
+                }
+                """));
+
+            // when
+            var results = client.autocomplete(new PlaceAutocompleteCriteria(
+                "구리", null, null, null, null, "550e8400-e29b-41d4-a716-446655440000"
+            ));
+
+            // then
+            assertThat(results.get(0).secondaryText()).isNull();
+            RecordedRequest request = mockWebServer.takeRequest(3, TimeUnit.SECONDS);
+            assertThat(request).isNotNull();
+            assertThat(request.getBody().readUtf8()).doesNotContain("locationBias");
+        }
+
+        @Test
+        @DisplayName("실패: 추천 결과가 없으면 404 예외로 매핑한다")
+        void fail_resultEmpty() {
+            // given
+            mockWebServer.enqueue(jsonResponse("{\"suggestions\":[]}"));
+
+            // when & then
+            assertPlaceError(
+                () -> client.autocomplete(new PlaceAutocompleteCriteria(
+                    "unknown", null, null, null, null,
+                    "550e8400-e29b-41d4-a716-446655440000"
+                )),
+                PlaceErrorCode.AUTOCOMPLETE_NOT_FOUND
+            );
+        }
+
+        @Test
+        @DisplayName("실패: 인증되지 않은 요청이면 401 예외로 매핑한다")
+        void fail_unauthorized() {
+            // given
+            mockWebServer.enqueue(new MockResponse().setResponseCode(401));
+
+            // when & then
+            assertAutocompleteError(PlaceErrorCode.PROVIDER_AUTHENTICATION_FAILED);
+        }
+
+        @Test
+        @DisplayName("실패: 권한이 없는 요청이면 403 예외로 매핑한다")
+        void fail_forbidden() {
+            // given
+            mockWebServer.enqueue(new MockResponse().setResponseCode(403));
+
+            // when & then
+            assertAutocompleteError(PlaceErrorCode.PROVIDER_PERMISSION_DENIED);
+        }
+
+        @Test
+        @DisplayName("실패: 사용량 제한을 초과하면 409 예외로 매핑한다")
+        void fail_quotaExceeded() {
+            // given
+            mockWebServer.enqueue(new MockResponse().setResponseCode(429));
+
+            // when & then
+            assertAutocompleteError(PlaceErrorCode.PROVIDER_QUOTA_EXCEEDED);
+        }
+
+        @Test
+        @DisplayName("실패: provider 응답 시간이 초과되면 409 예외로 매핑한다")
+        void fail_timeout() {
+            // given
+            mockWebServer.enqueue(new MockResponse().setSocketPolicy(SocketPolicy.NO_RESPONSE));
+
+            // when & then
+            assertAutocompleteError(PlaceErrorCode.PROVIDER_TIMEOUT);
+        }
+
+        @Test
+        @DisplayName("실패: provider 응답 필수 필드가 없으면 409 예외로 매핑한다")
+        void fail_malformedResponse() {
+            // given
+            mockWebServer.enqueue(jsonResponse("{\"suggestions\":[{\"placePrediction\":{}}]}"));
+
+            // when & then
+            assertAutocompleteError(PlaceErrorCode.PROVIDER_ERROR);
+        }
+
+        private void assertAutocompleteError(PlaceErrorCode errorCode) {
+            assertPlaceError(
+                () -> client.autocomplete(new PlaceAutocompleteCriteria(
+                    "구리", null, null, null, null,
+                    "550e8400-e29b-41d4-a716-446655440000"
+                )),
+                errorCode
+            );
+        }
     }
 
     @Nested
