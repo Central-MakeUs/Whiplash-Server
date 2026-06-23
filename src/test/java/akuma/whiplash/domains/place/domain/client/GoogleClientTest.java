@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import akuma.whiplash.domains.place.domain.client.impl.GoogleClientImpl;
 import akuma.whiplash.domains.place.domain.constant.PlaceProvider;
 import akuma.whiplash.domains.place.domain.model.PlaceAutocompleteCriteria;
+import akuma.whiplash.domains.place.domain.model.PlaceDetailsCriteria;
 import akuma.whiplash.domains.place.domain.model.PlaceSearchCriteria;
 import akuma.whiplash.domains.place.exception.PlaceErrorCode;
 import akuma.whiplash.global.exception.ApplicationException;
@@ -296,6 +297,161 @@ class GoogleClientTest {
     @AfterEach
     void tearDown() throws IOException {
         mockWebServer.shutdown();
+    }
+
+    @Nested
+    @DisplayName("getPlaceDetails - Google 선택 장소 상세 조회")
+    class GetPlaceDetailsTest {
+
+        @Test
+        @DisplayName("성공: Place Details 요청을 보내고 선택 장소 상세 정보로 변환한다")
+        void success() throws Exception {
+            // given
+            mockWebServer.enqueue(jsonResponse("""
+                {
+                  "id":"ChIJ/selected",
+                  "formattedAddress":"경기도 구리시 아차산로 439",
+                  "location":{"latitude":37.5943,"longitude":127.1296},
+                  "addressComponents":[
+                    {"longText":"대한민국","shortText":"KR","types":["country","political"]}
+                  ]
+                }
+                """));
+            PlaceDetailsCriteria criteria = new PlaceDetailsCriteria(
+                "ChIJ/selected",
+                "550e8400-e29b-41d4-a716-446655440000",
+                "ko",
+                "KR"
+            );
+
+            // when
+            var result = client.getPlaceDetails(criteria);
+
+            // then
+            assertThat(result.providerPlaceId()).isEqualTo("ChIJ/selected");
+            assertThat(result.address()).isEqualTo("경기도 구리시 아차산로 439");
+            assertThat(result.latitude()).isEqualTo(37.5943);
+            assertThat(result.longitude()).isEqualTo(127.1296);
+            assertThat(result.countryCode()).isEqualTo("KR");
+
+            RecordedRequest request = mockWebServer.takeRequest(3, TimeUnit.SECONDS);
+            assertThat(request).isNotNull();
+            assertThat(request.getMethod()).isEqualTo("GET");
+            assertThat(request.getRequestUrl().encodedPath())
+                .isEqualTo("/v1/places/ChIJ%2Fselected");
+            assertThat(request.getRequestUrl().queryParameter("sessionToken"))
+                .isEqualTo("550e8400-e29b-41d4-a716-446655440000");
+            assertThat(request.getRequestUrl().queryParameter("languageCode")).isEqualTo("ko");
+            assertThat(request.getRequestUrl().queryParameter("regionCode")).isEqualTo("KR");
+            assertThat(request.getHeader("X-Goog-Api-Key")).isEqualTo("test-key");
+            assertThat(request.getHeader("X-Goog-FieldMask")).isEqualTo(
+                "id,formattedAddress,location,addressComponents"
+            );
+        }
+
+        @Test
+        @DisplayName("성공: 국가 정보와 지역화 파라미터가 없어도 상세 정보를 반환한다")
+        void success_withoutCountryAndLocalization() throws Exception {
+            // given
+            mockWebServer.enqueue(jsonResponse("""
+                {
+                  "id":"ChIJ",
+                  "formattedAddress":"Somewhere",
+                  "location":{"latitude":1.0,"longitude":2.0}
+                }
+                """));
+
+            // when
+            var result = client.getPlaceDetails(new PlaceDetailsCriteria(
+                "ChIJ", "550e8400-e29b-41d4-a716-446655440000", null, null
+            ));
+
+            // then
+            assertThat(result.countryCode()).isNull();
+            RecordedRequest request = mockWebServer.takeRequest(3, TimeUnit.SECONDS);
+            assertThat(request).isNotNull();
+            assertThat(request.getRequestUrl().queryParameter("languageCode")).isNull();
+            assertThat(request.getRequestUrl().queryParameter("regionCode")).isNull();
+        }
+
+        @Test
+        @DisplayName("실패: 장소가 없으면 404 예외로 매핑한다")
+        void fail_notFound() {
+            // given
+            mockWebServer.enqueue(new MockResponse().setResponseCode(404));
+
+            // when & then
+            assertDetailsError(PlaceErrorCode.PLACE_NOT_FOUND);
+        }
+
+        @Test
+        @DisplayName("실패: 인증되지 않은 요청이면 401 예외로 매핑한다")
+        void fail_unauthorized() {
+            // given
+            mockWebServer.enqueue(new MockResponse().setResponseCode(401));
+
+            // when & then
+            assertDetailsError(PlaceErrorCode.PROVIDER_AUTHENTICATION_FAILED);
+        }
+
+        @Test
+        @DisplayName("실패: 권한이 없는 요청이면 403 예외로 매핑한다")
+        void fail_forbidden() {
+            // given
+            mockWebServer.enqueue(new MockResponse().setResponseCode(403));
+
+            // when & then
+            assertDetailsError(PlaceErrorCode.PROVIDER_PERMISSION_DENIED);
+        }
+
+        @Test
+        @DisplayName("실패: 사용량 제한을 초과하면 409 예외로 매핑한다")
+        void fail_quotaExceeded() {
+            // given
+            mockWebServer.enqueue(new MockResponse().setResponseCode(429));
+
+            // when & then
+            assertDetailsError(PlaceErrorCode.PROVIDER_QUOTA_EXCEEDED);
+        }
+
+        @Test
+        @DisplayName("실패: 필수 필드가 없으면 409 예외로 매핑한다")
+        void fail_missingRequiredField() {
+            // given
+            mockWebServer.enqueue(jsonResponse("{\"id\":\"ChIJ\"}"));
+
+            // when & then
+            assertDetailsError(PlaceErrorCode.PROVIDER_ERROR);
+        }
+
+        @Test
+        @DisplayName("실패: provider 응답 시간이 초과되면 409 예외로 매핑한다")
+        void fail_timeout() {
+            // given
+            mockWebServer.enqueue(new MockResponse().setSocketPolicy(SocketPolicy.NO_RESPONSE));
+
+            // when & then
+            assertDetailsError(PlaceErrorCode.PROVIDER_TIMEOUT);
+        }
+
+        @Test
+        @DisplayName("실패: provider 응답을 해석할 수 없으면 409 예외로 매핑한다")
+        void fail_malformedResponse() {
+            // given
+            mockWebServer.enqueue(jsonResponse("not-json"));
+
+            // when & then
+            assertDetailsError(PlaceErrorCode.PROVIDER_ERROR);
+        }
+
+        private void assertDetailsError(PlaceErrorCode errorCode) {
+            assertPlaceError(
+                () -> client.getPlaceDetails(new PlaceDetailsCriteria(
+                    "ChIJ", "550e8400-e29b-41d4-a716-446655440000", null, null
+                )),
+                errorCode
+            );
+        }
     }
 
     @Nested

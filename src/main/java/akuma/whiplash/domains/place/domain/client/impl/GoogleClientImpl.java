@@ -7,6 +7,7 @@ import akuma.whiplash.domains.place.domain.client.dto.GooglePlaceAutocompleteReq
 import akuma.whiplash.domains.place.domain.client.dto.GooglePlaceAutocompleteRequest.AutocompleteCircle;
 import akuma.whiplash.domains.place.domain.client.dto.GooglePlaceAutocompleteRequest.AutocompleteLocationBias;
 import akuma.whiplash.domains.place.domain.client.dto.GooglePlaceAutocompleteResponse;
+import akuma.whiplash.domains.place.domain.client.dto.GooglePlaceDetailsResponse;
 import akuma.whiplash.domains.place.domain.client.dto.GooglePlaceSearchRequest;
 import akuma.whiplash.domains.place.domain.client.dto.GooglePlaceSearchRequest.Center;
 import akuma.whiplash.domains.place.domain.client.dto.GooglePlaceSearchRequest.Circle;
@@ -19,8 +20,10 @@ import akuma.whiplash.domains.place.domain.constant.PlaceProvider;
 import akuma.whiplash.domains.place.domain.model.PlaceDetail;
 import akuma.whiplash.domains.place.domain.model.PlaceAutocompleteCriteria;
 import akuma.whiplash.domains.place.domain.model.PlaceAutocompleteSuggestion;
+import akuma.whiplash.domains.place.domain.model.PlaceDetailsCriteria;
 import akuma.whiplash.domains.place.domain.model.PlaceSearchCriteria;
 import akuma.whiplash.domains.place.domain.model.PlaceSearchResult;
+import akuma.whiplash.domains.place.domain.model.SelectedPlaceDetail;
 import akuma.whiplash.domains.place.exception.PlaceErrorCode;
 import akuma.whiplash.global.exception.ApplicationException;
 import java.util.List;
@@ -45,6 +48,8 @@ public class GoogleClientImpl implements GoogleClient {
         "suggestions.placePrediction.placeId,"
             + "suggestions.placePrediction.structuredFormat.mainText.text,"
             + "suggestions.placePrediction.structuredFormat.secondaryText.text";
+    private static final String PLACE_DETAILS_FIELD_MASK =
+        "id,formattedAddress,location,addressComponents";
     private static final double PLACE_SEARCH_BIAS_RADIUS_METERS = 5_000.0;
 
     private static final List<String> PLACE_NAME_TYPE_PRIORITY = List.of(
@@ -69,6 +74,7 @@ public class GoogleClientImpl implements GoogleClient {
     private final String geocodingUrl;
     private final String placeSearchUrl;
     private final String placeAutocompleteUrl;
+    private final String placeDetailsUrl;
 
     public GoogleClientImpl(
         WebClient webClient,
@@ -82,6 +88,7 @@ public class GoogleClientImpl implements GoogleClient {
         this.geocodingUrl = geocodingUrl;
         this.placeSearchUrl = placesBaseUrl.replaceAll("/+$", "") + "/v1/places:searchText";
         this.placeAutocompleteUrl = placesBaseUrl.replaceAll("/+$", "") + "/v1/places:autocomplete";
+        this.placeDetailsUrl = placesBaseUrl.replaceAll("/+$", "") + "/v1/places";
     }
 
     @Override
@@ -147,6 +154,62 @@ public class GoogleClientImpl implements GoogleClient {
             format.secondaryText() == null ? null : format.secondaryText().text(),
             suggestion.placePrediction().placeId()
         );
+    }
+
+    @Override
+    public SelectedPlaceDetail getPlaceDetails(PlaceDetailsCriteria criteria) {
+        GooglePlaceDetailsResponse response = requestPlaceDetails(criteria);
+        if (response == null || response.id() == null || response.id().isBlank()
+            || response.formattedAddress() == null || response.formattedAddress().isBlank()
+            || response.location() == null) {
+            throw ApplicationException.from(PlaceErrorCode.PROVIDER_ERROR);
+        }
+        return new SelectedPlaceDetail(
+            response.formattedAddress(),
+            response.location().latitude(),
+            response.location().longitude(),
+            findCountryCode(response),
+            response.id()
+        );
+    }
+
+    private GooglePlaceDetailsResponse requestPlaceDetails(PlaceDetailsCriteria criteria) {
+        UriComponentsBuilder uriBuilder = UriComponentsBuilder.fromUriString(placeDetailsUrl)
+            .pathSegment(criteria.providerPlaceId())
+            .queryParam("sessionToken", criteria.sessionToken());
+        if (criteria.languageCode() != null) {
+            uriBuilder.queryParam("languageCode", criteria.languageCode());
+        }
+        if (criteria.regionCode() != null) {
+            uriBuilder.queryParam("regionCode", criteria.regionCode());
+        }
+
+        try {
+            return webClient.get()
+                .uri(uriBuilder.build().encode().toUri())
+                .header("X-Goog-Api-Key", apiKey)
+                .header("X-Goog-FieldMask", PLACE_DETAILS_FIELD_MASK)
+                .retrieve()
+                .bodyToMono(GooglePlaceDetailsResponse.class)
+                .block();
+        } catch (WebClientResponseException exception) {
+            throw PlaceProviderErrorMapper.map(exception);
+        } catch (WebClientRequestException exception) {
+            throw PlaceProviderErrorMapper.map(exception);
+        } catch (RuntimeException exception) {
+            throw ApplicationException.from(PlaceErrorCode.PROVIDER_ERROR);
+        }
+    }
+
+    private String findCountryCode(GooglePlaceDetailsResponse response) {
+        if (response.addressComponents() == null) {
+            return null;
+        }
+        return response.addressComponents().stream()
+            .filter(component -> component.types() != null && component.types().contains("country"))
+            .map(GooglePlaceDetailsResponse.AddressComponent::shortText)
+            .findFirst()
+            .orElse(null);
     }
 
     @Override

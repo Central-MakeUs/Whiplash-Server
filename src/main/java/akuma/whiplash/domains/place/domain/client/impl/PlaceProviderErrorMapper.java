@@ -22,6 +22,9 @@ final class PlaceProviderErrorMapper {
         if (status.value() == 403) {
             return ApplicationException.from(PlaceErrorCode.PROVIDER_PERMISSION_DENIED);
         }
+        if (status.value() == 404) {
+            return ApplicationException.from(PlaceErrorCode.PLACE_NOT_FOUND);
+        }
         if (status.value() == 429) {
             return ApplicationException.from(PlaceErrorCode.PROVIDER_QUOTA_EXCEEDED);
         }

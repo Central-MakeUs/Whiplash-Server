@@ -105,14 +105,22 @@ public class PlaceController {
             PROVIDER_ERROR
         }
     )
-    @Operation(summary = "장소 상세 조회", description = "위/경도를 기반으로 장소 상세 정보를 조회합니다.")
+    @Operation(
+        summary = "장소 상세 조회",
+        description = "좌표를 역지오코딩하거나 선택한 Google place ID의 상세 정보를 조회합니다."
+    )
     @GetMapping("/detail")
     public ApplicationResponse<PlaceDetailResponse> getPlaceDetail(
-        @RequestParam double latitude,
-        @RequestParam double longitude,
-        @RequestParam(required = false) String languageCode
+        @RequestParam(required = false) Double latitude,
+        @RequestParam(required = false) Double longitude,
+        @RequestParam(required = false) String providerPlaceId,
+        @RequestParam(required = false) String sessionToken,
+        @RequestParam(required = false) String languageCode,
+        @RequestParam(required = false) String regionCode
     ) {
-        PlaceDetailResponse placeDetail = placeUseCase.getPlaceDetail(latitude, longitude, languageCode);
+        PlaceDetailResponse placeDetail = placeUseCase.getPlaceDetail(
+            latitude, longitude, providerPlaceId, sessionToken, languageCode, regionCode
+        );
         return ApplicationResponse.onSuccess(placeDetail);
     }
 

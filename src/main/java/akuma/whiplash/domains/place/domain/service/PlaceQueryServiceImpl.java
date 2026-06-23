@@ -7,8 +7,10 @@ import akuma.whiplash.domains.place.domain.client.dto.NaverLocalSearchResponse.I
 import akuma.whiplash.domains.place.domain.model.PlaceDetail;
 import akuma.whiplash.domains.place.domain.model.PlaceAutocompleteCriteria;
 import akuma.whiplash.domains.place.domain.model.PlaceAutocompleteSuggestion;
+import akuma.whiplash.domains.place.domain.model.PlaceDetailsCriteria;
 import akuma.whiplash.domains.place.domain.model.PlaceSearchCriteria;
 import akuma.whiplash.domains.place.domain.model.PlaceSearchResult;
+import akuma.whiplash.domains.place.domain.model.SelectedPlaceDetail;
 import akuma.whiplash.global.util.GeoUtils;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -32,6 +34,11 @@ public class PlaceQueryServiceImpl implements PlaceQueryService {
         PlaceAutocompleteCriteria criteria
     ) {
         return googleClient.autocomplete(criteria);
+    }
+
+    @Override
+    public SelectedPlaceDetail getPlaceDetails(PlaceDetailsCriteria criteria) {
+        return googleClient.getPlaceDetails(criteria);
     }
 
     @Override

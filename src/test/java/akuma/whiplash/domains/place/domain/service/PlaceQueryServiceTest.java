@@ -14,8 +14,10 @@ import akuma.whiplash.domains.place.domain.constant.PlaceProvider;
 import akuma.whiplash.domains.place.domain.model.PlaceDetail;
 import akuma.whiplash.domains.place.domain.model.PlaceAutocompleteCriteria;
 import akuma.whiplash.domains.place.domain.model.PlaceAutocompleteSuggestion;
+import akuma.whiplash.domains.place.domain.model.PlaceDetailsCriteria;
 import akuma.whiplash.domains.place.domain.model.PlaceSearchCriteria;
 import akuma.whiplash.domains.place.domain.model.PlaceSearchResult;
+import akuma.whiplash.domains.place.domain.model.SelectedPlaceDetail;
 import akuma.whiplash.domains.place.exception.PlaceErrorCode;
 import akuma.whiplash.global.exception.ApplicationException;
 import java.util.List;
@@ -59,6 +61,31 @@ class PlaceQueryServiceTest {
             // then
             assertThat(result).isEqualTo(expected);
             verify(googleClient).autocomplete(criteria);
+        }
+    }
+
+    @Nested
+    @DisplayName("getPlaceDetails - 선택 장소 상세 조회")
+    class GetPlaceDetailsTest {
+
+        @Test
+        @DisplayName("성공: 선택 장소 조건을 Google client에 전달한다")
+        void success() {
+            // given
+            PlaceDetailsCriteria criteria = new PlaceDetailsCriteria(
+                "ChIJ", "550e8400-e29b-41d4-a716-446655440000", "ko", "KR"
+            );
+            SelectedPlaceDetail expected = new SelectedPlaceDetail(
+                "경기도 구리시 아차산로 439", 37.5943, 127.1296, "KR", "ChIJ"
+            );
+            when(googleClient.getPlaceDetails(criteria)).thenReturn(expected);
+
+            // when
+            SelectedPlaceDetail result = placeQueryService.getPlaceDetails(criteria);
+
+            // then
+            assertThat(result).isEqualTo(expected);
+            verify(googleClient).getPlaceDetails(criteria);
         }
     }
 

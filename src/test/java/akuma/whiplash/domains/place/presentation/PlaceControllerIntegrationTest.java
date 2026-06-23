@@ -190,7 +190,36 @@ class PlaceControllerIntegrationTest {
                 .andExpect(jsonPath("$.result.roadAddress").value("Mock Google Address"))
                 .andExpect(jsonPath("$.result.latitude").value(37.4979))
                 .andExpect(jsonPath("$.result.longitude").value(127.0276))
-                .andExpect(jsonPath("$.result.countryCode").value("KR"));
+                .andExpect(jsonPath("$.result.countryCode").value("KR"))
+                .andExpect(jsonPath("$.result.providerPlaceId").value(nullValue()));
+        }
+
+        @Test
+        @DisplayName("성공: 선택한 Google place ID로 장소 상세를 조회한다")
+        void success_selectedPlace() throws Exception {
+            // given
+            MemberEntity member = memberRepository.save(MemberFixture.MEMBER_3.toEntity());
+            String token = jwtProvider.generateAccessToken(member.getId(), member.getRole(), "device");
+
+            // when
+            var resultActions = mockMvc.perform(get("/api/v1/places/detail")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                .param("providerPlaceId", "ChIJ")
+                .param("sessionToken", "550e8400-e29b-41d4-a716-446655440000")
+                .param("languageCode", "ko")
+                .param("regionCode", "KR"));
+
+            // then
+            resultActions
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.address").value("Mock Google Address"))
+                .andExpect(jsonPath("$.result.placeName").value(nullValue()))
+                .andExpect(jsonPath("$.result.roadAddress").value("Mock Google Address"))
+                .andExpect(jsonPath("$.result.latitude").value(37.5943))
+                .andExpect(jsonPath("$.result.longitude").value(127.1296))
+                .andExpect(jsonPath("$.result.countryCode").value("KR"))
+                .andExpect(jsonPath("$.result.providerPlaceId").value("ChIJ"))
+                .andExpect(jsonPath("$.result.provider").doesNotExist());
         }
 
         @Test
@@ -226,6 +255,25 @@ class PlaceControllerIntegrationTest {
             var resultActions = mockMvc.perform(get("/api/v1/places/detail")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
                 .param("latitude", "37.4979"));
+
+            // then
+            resultActions.andExpect(status().isBadRequest());
+        }
+
+        @Test
+        @DisplayName("실패: 좌표와 선택 장소 파라미터를 함께 전달하면 400을 반환한다")
+        void fail_mixedModes() throws Exception {
+            // given
+            MemberEntity member = memberRepository.save(MemberFixture.MEMBER_4.toEntity());
+            String token = jwtProvider.generateAccessToken(member.getId(), member.getRole(), "device");
+
+            // when
+            var resultActions = mockMvc.perform(get("/api/v1/places/detail")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                .param("latitude", "37.4979")
+                .param("longitude", "127.0276")
+                .param("providerPlaceId", "ChIJ")
+                .param("sessionToken", "550e8400-e29b-41d4-a716-446655440000"));
 
             // then
             resultActions.andExpect(status().isBadRequest());

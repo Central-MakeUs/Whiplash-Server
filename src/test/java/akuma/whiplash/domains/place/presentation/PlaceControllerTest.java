@@ -314,7 +314,9 @@ class PlaceControllerTest {
                 .longitude(-74.0060)
                 .countryCode("US")
                 .build();
-            when(placeUseCase.getPlaceDetail(eq(40.7128), eq(-74.0060), eq("en"))).thenReturn(response);
+            when(placeUseCase.getPlaceDetail(
+                eq(40.7128), eq(-74.0060), isNull(), isNull(), eq("en"), isNull()
+            )).thenReturn(response);
 
             // when
             var resultActions = mockMvc.perform(get(BASE + "/detail")
@@ -330,12 +332,55 @@ class PlaceControllerTest {
                 .andExpect(jsonPath("$.result.roadAddress").value("New York, NY, USA"))
                 .andExpect(jsonPath("$.result.latitude").value(40.7128))
                 .andExpect(jsonPath("$.result.longitude").value(-74.0060))
-                .andExpect(jsonPath("$.result.countryCode").value("US"));
+                .andExpect(jsonPath("$.result.countryCode").value("US"))
+                .andExpect(jsonPath("$.result.providerPlaceId").value(nullValue()));
+        }
+
+        @Test
+        @DisplayName("성공: 선택 장소는 장소명 없이 Google place ID를 반환한다")
+        void success_selectedPlace() throws Exception {
+            // given
+            PlaceDetailResponse response = PlaceDetailResponse.builder()
+                .address("경기도 구리시 아차산로 439")
+                .roadAddress("경기도 구리시 아차산로 439")
+                .latitude(37.5943)
+                .longitude(127.1296)
+                .countryCode("KR")
+                .providerPlaceId("ChIJ")
+                .build();
+            when(placeUseCase.getPlaceDetail(
+                isNull(), isNull(), eq("ChIJ"), eq("550e8400-e29b-41d4-a716-446655440000"),
+                eq("ko"), eq("KR")
+            )).thenReturn(response);
+
+            // when
+            var resultActions = mockMvc.perform(get(BASE + "/detail")
+                .param("providerPlaceId", "ChIJ")
+                .param("sessionToken", "550e8400-e29b-41d4-a716-446655440000")
+                .param("languageCode", "ko")
+                .param("regionCode", "KR"));
+
+            // then
+            resultActions
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.address").value("경기도 구리시 아차산로 439"))
+                .andExpect(jsonPath("$.result.placeName").value(nullValue()))
+                .andExpect(jsonPath("$.result.roadAddress").value("경기도 구리시 아차산로 439"))
+                .andExpect(jsonPath("$.result.latitude").value(37.5943))
+                .andExpect(jsonPath("$.result.longitude").value(127.1296))
+                .andExpect(jsonPath("$.result.countryCode").value("KR"))
+                .andExpect(jsonPath("$.result.providerPlaceId").value("ChIJ"))
+                .andExpect(jsonPath("$.result.provider").doesNotExist());
         }
 
         @Test
         @DisplayName("실패: 좌표 파라미터가 없으면 400과 에러 코드를 반환한다")
         void fail_coordinateMissing() throws Exception {
+            // given
+            when(placeUseCase.getPlaceDetail(
+                eq(37.4979), isNull(), isNull(), isNull(), isNull(), isNull()
+            )).thenThrow(ApplicationException.from(CommonErrorCode.BAD_REQUEST));
+
             // when
             var resultActions = mockMvc.perform(get(BASE + "/detail")
                 .param("latitude", "37.4979"));
@@ -351,7 +396,9 @@ class PlaceControllerTest {
         @DisplayName("실패: 서비스에서 예외가 발생하면 400과 에러 코드를 반환한다")
         void fail_serviceThrows() throws Exception {
             // given
-            when(placeUseCase.getPlaceDetail(eq(37.4979), eq(127.0276), isNull()))
+            when(placeUseCase.getPlaceDetail(
+                eq(37.4979), eq(127.0276), isNull(), isNull(), isNull(), isNull()
+            ))
                 .thenThrow(ApplicationException.from(CommonErrorCode.BAD_REQUEST));
 
             // when
@@ -370,7 +417,9 @@ class PlaceControllerTest {
         @DisplayName("실패: 지원하지 않는 응답 언어이면 400과 에러 코드를 반환한다")
         void fail_unsupportedLanguage() throws Exception {
             // given
-            when(placeUseCase.getPlaceDetail(eq(37.4979), eq(127.0276), eq("ja")))
+            when(placeUseCase.getPlaceDetail(
+                eq(37.4979), eq(127.0276), isNull(), isNull(), eq("ja"), isNull()
+            ))
                 .thenThrow(ApplicationException.from(PlaceErrorCode.UNSUPPORTED_LANGUAGE));
 
             // when

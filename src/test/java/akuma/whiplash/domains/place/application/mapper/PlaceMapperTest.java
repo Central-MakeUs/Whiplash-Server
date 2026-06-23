@@ -6,6 +6,7 @@ import akuma.whiplash.domains.place.domain.constant.PlaceProvider;
 import akuma.whiplash.domains.place.domain.model.PlaceDetail;
 import akuma.whiplash.domains.place.domain.model.PlaceAutocompleteSuggestion;
 import akuma.whiplash.domains.place.domain.model.PlaceSearchResult;
+import akuma.whiplash.domains.place.domain.model.SelectedPlaceDetail;
 import akuma.whiplash.domains.place.application.dto.response.PlaceInfoResponse;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
@@ -88,6 +89,28 @@ class PlaceMapperTest {
             assertThat(response.latitude()).isEqualTo(40.7128);
             assertThat(response.longitude()).isEqualTo(-74.0060);
             assertThat(response.countryCode()).isEqualTo("US");
+            assertThat(response.providerPlaceId()).isNull();
+        }
+
+        @Test
+        @DisplayName("성공: 선택 장소는 장소명 없이 Google place ID를 포함해 변환한다")
+        void success_selectedPlace() {
+            // given
+            SelectedPlaceDetail placeDetail = new SelectedPlaceDetail(
+                "경기도 구리시 아차산로 439", 37.5943, 127.1296, "KR", "ChIJ"
+            );
+
+            // when
+            var response = PlaceMapper.mapToPlaceDetailResponse(placeDetail);
+
+            // then
+            assertThat(response.address()).isEqualTo("경기도 구리시 아차산로 439");
+            assertThat(response.placeName()).isNull();
+            assertThat(response.roadAddress()).isEqualTo("경기도 구리시 아차산로 439");
+            assertThat(response.latitude()).isEqualTo(37.5943);
+            assertThat(response.longitude()).isEqualTo(127.1296);
+            assertThat(response.countryCode()).isEqualTo("KR");
+            assertThat(response.providerPlaceId()).isEqualTo("ChIJ");
         }
     }
 }

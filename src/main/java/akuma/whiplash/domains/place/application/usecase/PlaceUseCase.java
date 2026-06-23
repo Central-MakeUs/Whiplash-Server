@@ -7,6 +7,7 @@ import akuma.whiplash.domains.place.application.mapper.PlaceMapper;
 import akuma.whiplash.domains.place.domain.service.PlaceQueryService;
 import akuma.whiplash.domains.place.domain.model.PlaceSearchCriteria;
 import akuma.whiplash.domains.place.domain.model.PlaceAutocompleteCriteria;
+import akuma.whiplash.domains.place.domain.model.PlaceDetailsCriteria;
 import akuma.whiplash.domains.place.exception.PlaceErrorCode;
 import akuma.whiplash.global.annotation.architecture.UseCase;
 import akuma.whiplash.global.exception.ApplicationException;
@@ -58,11 +59,25 @@ public class PlaceUseCase {
         ));
     }
 
-    public PlaceDetailResponse getPlaceDetail(double latitude, double longitude, String languageCode) {
-        validateDetailRequest(latitude, longitude, languageCode);
-        return PlaceMapper.mapToPlaceDetailResponse(
-            placeQueryService.getPlaceDetailByCoord(latitude, longitude, languageCode)
+    public PlaceDetailResponse getPlaceDetail(
+        Double latitude,
+        Double longitude,
+        String providerPlaceId,
+        String sessionToken,
+        String languageCode,
+        String regionCode
+    ) {
+        validateDetailRequest(
+            latitude, longitude, providerPlaceId, sessionToken, languageCode, regionCode
         );
+        if (latitude != null) {
+            return PlaceMapper.mapToPlaceDetailResponse(
+                placeQueryService.getPlaceDetailByCoord(latitude, longitude, languageCode)
+            );
+        }
+        return PlaceMapper.mapToPlaceDetailResponse(placeQueryService.getPlaceDetails(
+            new PlaceDetailsCriteria(providerPlaceId, sessionToken, languageCode, regionCode)
+        ));
     }
 
     public List<String> searchPlaceKeywords(String query) {
@@ -135,11 +150,40 @@ public class PlaceUseCase {
         }
     }
 
-    private void validateDetailRequest(double latitude, double longitude, String languageCode) {
-        validateCoordinates(latitude, longitude);
+    private void validateDetailRequest(
+        Double latitude,
+        Double longitude,
+        String providerPlaceId,
+        String sessionToken,
+        String languageCode,
+        String regionCode
+    ) {
+        boolean hasAnyCoordinate = latitude != null || longitude != null;
+        boolean hasCompleteCoordinates = latitude != null && longitude != null;
+        boolean hasAnySelectedPlace = providerPlaceId != null || sessionToken != null;
+        boolean hasCompleteSelectedPlace = providerPlaceId != null && sessionToken != null;
+
+        if (hasCompleteCoordinates == hasCompleteSelectedPlace
+            || hasAnyCoordinate != hasCompleteCoordinates
+            || hasAnySelectedPlace != hasCompleteSelectedPlace) {
+            throw ApplicationException.from(CommonErrorCode.BAD_REQUEST);
+        }
+
+        if (hasCompleteCoordinates) {
+            if (regionCode != null) {
+                throw ApplicationException.from(CommonErrorCode.BAD_REQUEST);
+            }
+            validateCoordinates(latitude, longitude);
+        } else if (!StringUtils.hasText(providerPlaceId) || !isUuid(sessionToken)) {
+            throw ApplicationException.from(CommonErrorCode.BAD_REQUEST);
+        }
 
         if (languageCode != null && !SUPPORTED_LANGUAGES.contains(languageCode)) {
             throw ApplicationException.from(PlaceErrorCode.UNSUPPORTED_LANGUAGE);
+        }
+
+        if (regionCode != null && !SUPPORTED_REGIONS.contains(regionCode)) {
+            throw ApplicationException.from(PlaceErrorCode.UNSUPPORTED_REGION);
         }
     }
 

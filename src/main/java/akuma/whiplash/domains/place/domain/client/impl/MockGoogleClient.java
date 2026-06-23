@@ -5,8 +5,10 @@ import akuma.whiplash.domains.place.domain.constant.PlaceProvider;
 import akuma.whiplash.domains.place.domain.model.PlaceDetail;
 import akuma.whiplash.domains.place.domain.model.PlaceAutocompleteCriteria;
 import akuma.whiplash.domains.place.domain.model.PlaceAutocompleteSuggestion;
+import akuma.whiplash.domains.place.domain.model.PlaceDetailsCriteria;
 import akuma.whiplash.domains.place.domain.model.PlaceSearchCriteria;
 import akuma.whiplash.domains.place.domain.model.PlaceSearchResult;
+import akuma.whiplash.domains.place.domain.model.SelectedPlaceDetail;
 import java.util.List;
 import java.util.stream.IntStream;
 import org.springframework.context.annotation.Profile;
@@ -40,6 +42,17 @@ public class MockGoogleClient implements GoogleClient {
             "Mock Google Address",
             "mock-google-autocomplete"
         ));
+    }
+
+    @Override
+    public SelectedPlaceDetail getPlaceDetails(PlaceDetailsCriteria criteria) {
+        return new SelectedPlaceDetail(
+            "Mock Google Address",
+            37.5943,
+            127.1296,
+            criteria.regionCode(),
+            criteria.providerPlaceId()
+        );
     }
 
     @Override
