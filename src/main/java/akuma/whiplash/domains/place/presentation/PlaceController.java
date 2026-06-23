@@ -105,21 +105,42 @@ public class PlaceController {
             PROVIDER_ERROR
         }
     )
-    @Operation(
-        summary = "장소 상세 조회",
-        description = "좌표를 역지오코딩하거나 선택한 Google place ID의 상세 정보를 조회합니다."
+    @Operation(summary = "장소 역지오코딩", description = "좌표를 사람이 읽을 수 있는 주소로 변환합니다.")
+    @GetMapping("/reverse-geocode")
+    public ApplicationResponse<PlaceDetailResponse> getPlaceReverseGeocode(
+        @RequestParam Double latitude,
+        @RequestParam Double longitude,
+        @RequestParam(required = false) String languageCode
+    ) {
+        PlaceDetailResponse placeDetail = placeUseCase.getPlaceReverseGeocode(
+            latitude, longitude, languageCode
+        );
+        return ApplicationResponse.onSuccess(placeDetail);
+    }
+
+    @CustomErrorCodes(
+        commonErrorCodes = {BAD_REQUEST},
+        placeErrorCodes = {
+            UNSUPPORTED_LANGUAGE,
+            UNSUPPORTED_REGION,
+            PROVIDER_AUTHENTICATION_FAILED,
+            PROVIDER_PERMISSION_DENIED,
+            PLACE_NOT_FOUND,
+            PROVIDER_QUOTA_EXCEEDED,
+            PROVIDER_TIMEOUT,
+            PROVIDER_ERROR
+        }
     )
-    @GetMapping("/detail")
-    public ApplicationResponse<PlaceDetailResponse> getPlaceDetail(
-        @RequestParam(required = false) Double latitude,
-        @RequestParam(required = false) Double longitude,
-        @RequestParam(required = false) String providerPlaceId,
-        @RequestParam(required = false) String sessionToken,
+    @Operation(summary = "선택 장소 상세 조회", description = "선택한 Google place ID의 상세 정보를 조회합니다.")
+    @GetMapping("/details")
+    public ApplicationResponse<PlaceDetailResponse> getPlaceDetails(
+        @RequestParam String providerPlaceId,
+        @RequestParam String sessionToken,
         @RequestParam(required = false) String languageCode,
         @RequestParam(required = false) String regionCode
     ) {
-        PlaceDetailResponse placeDetail = placeUseCase.getPlaceDetail(
-            latitude, longitude, providerPlaceId, sessionToken, languageCode, regionCode
+        PlaceDetailResponse placeDetail = placeUseCase.getPlaceDetails(
+            providerPlaceId, sessionToken, languageCode, regionCode
         );
         return ApplicationResponse.onSuccess(placeDetail);
     }

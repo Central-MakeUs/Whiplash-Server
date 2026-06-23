@@ -36,7 +36,6 @@ public class PlaceMapper {
             .latitude(placeDetail.latitude())
             .longitude(placeDetail.longitude())
             .countryCode(placeDetail.countryCode())
-            .providerPlaceId(null)
             .build();
     }
 
@@ -48,7 +47,6 @@ public class PlaceMapper {
             .latitude(placeDetail.latitude())
             .longitude(placeDetail.longitude())
             .countryCode(placeDetail.countryCode())
-            .providerPlaceId(placeDetail.providerPlaceId())
             .build();
     }
 

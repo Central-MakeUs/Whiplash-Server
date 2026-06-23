@@ -223,8 +223,8 @@ class PlaceUseCaseTest {
     }
 
     @Nested
-    @DisplayName("getPlaceDetail - 장소 상세 조회")
-    class GetPlaceDetailTest {
+    @DisplayName("getPlaceReverseGeocode - 장소 역지오코딩")
+    class GetPlaceReverseGeocodeTest {
 
         @Test
         @DisplayName("성공: 좌표와 응답 언어를 서비스에 전달한다")
@@ -244,44 +244,18 @@ class PlaceUseCaseTest {
                 ));
 
             // when
-            var response = placeUseCase.getPlaceDetail(
-                latitude, longitude, null, null, languageCode, null
-            );
+            var response = placeUseCase.getPlaceReverseGeocode(latitude, longitude, languageCode);
 
             // then
-            assertThat(response.providerPlaceId()).isNull();
+            assertThat(response.address()).isEqualTo("New York, NY, USA");
             verify(placeQueryService).getPlaceDetailByCoord(latitude, longitude, languageCode);
-        }
-
-        @Test
-        @DisplayName("성공: Google place ID와 검색 세션을 서비스에 전달한다")
-        void success_selectedPlace() {
-            // given
-            PlaceDetailsCriteria criteria = new PlaceDetailsCriteria(
-                "ChIJ", "550e8400-e29b-41d4-a716-446655440000", "ko", "KR"
-            );
-            when(placeQueryService.getPlaceDetails(criteria)).thenReturn(new SelectedPlaceDetail(
-                "경기도 구리시 아차산로 439", 37.5943, 127.1296, "KR", "ChIJ"
-            ));
-
-            // when
-            var response = placeUseCase.getPlaceDetail(
-                null, null, "ChIJ", "550e8400-e29b-41d4-a716-446655440000", "ko", "KR"
-            );
-
-            // then
-            assertThat(response.placeName()).isNull();
-            assertThat(response.providerPlaceId()).isEqualTo("ChIJ");
-            verify(placeQueryService).getPlaceDetails(criteria);
         }
 
         @Test
         @DisplayName("실패: 위도가 범위를 벗어나면 예외가 발생한다")
         void fail_latitudeOutOfRange() {
             // when & then
-            assertThatThrownBy(() -> placeUseCase.getPlaceDetail(
-                90.1, 127.0, null, null, null, null
-            ))
+            assertThatThrownBy(() -> placeUseCase.getPlaceReverseGeocode(90.1, 127.0, null))
                 .isInstanceOfSatisfying(ApplicationException.class, e ->
                     assertThat(e.getCode()).isEqualTo(PlaceErrorCode.INVALID_COORDINATE)
                 );
@@ -292,8 +266,8 @@ class PlaceUseCaseTest {
         @DisplayName("실패: 좌표가 유한한 값이 아니면 예외가 발생한다")
         void fail_coordinateNotFinite() {
             // when & then
-            assertThatThrownBy(() -> placeUseCase.getPlaceDetail(
-                Double.NaN, Double.POSITIVE_INFINITY, null, null, null, null
+            assertThatThrownBy(() -> placeUseCase.getPlaceReverseGeocode(
+                Double.NaN, Double.POSITIVE_INFINITY, null
             ))
                 .isInstanceOfSatisfying(ApplicationException.class, e ->
                     assertThat(e.getCode()).isEqualTo(PlaceErrorCode.INVALID_COORDINATE)
@@ -305,9 +279,7 @@ class PlaceUseCaseTest {
         @DisplayName("실패: 지원하지 않는 응답 언어이면 예외가 발생한다")
         void fail_unsupportedLanguage() {
             // when & then
-            assertThatThrownBy(() -> placeUseCase.getPlaceDetail(
-                37.0, 127.0, null, null, "ja", null
-            ))
+            assertThatThrownBy(() -> placeUseCase.getPlaceReverseGeocode(37.0, 127.0, "ja"))
                 .isInstanceOfSatisfying(ApplicationException.class, e ->
                     assertThat(e.getCode()).isEqualTo(PlaceErrorCode.UNSUPPORTED_LANGUAGE)
                 );
@@ -318,44 +290,78 @@ class PlaceUseCaseTest {
         @DisplayName("실패: 좌표가 하나만 전달되면 예외가 발생한다")
         void fail_partialCoordinates() {
             // when & then
-            assertBadRequest(() -> placeUseCase.getPlaceDetail(
-                37.0, null, null, null, null, null
+            assertBadRequest(() -> placeUseCase.getPlaceReverseGeocode(37.0, null, null));
+        }
+
+        private void assertBadRequest(Runnable action) {
+            assertThatThrownBy(action::run)
+                .isInstanceOfSatisfying(ApplicationException.class, e ->
+                    assertThat(e.getCode()).isEqualTo(CommonErrorCode.BAD_REQUEST)
+                );
+            verifyNoInteractions(placeQueryService);
+        }
+    }
+
+    @Nested
+    @DisplayName("getPlaceDetails - 선택 장소 상세 조회")
+    class GetPlaceDetailsTest {
+
+        @Test
+        @DisplayName("성공: Google place ID와 검색 세션을 서비스에 전달한다")
+        void success() {
+            // given
+            PlaceDetailsCriteria criteria = new PlaceDetailsCriteria(
+                "ChIJ", "550e8400-e29b-41d4-a716-446655440000", "ko", "KR"
+            );
+            when(placeQueryService.getPlaceDetails(criteria)).thenReturn(new SelectedPlaceDetail(
+                "경기도 구리시 아차산로 439", 37.5943, 127.1296, "KR", "ChIJ"
+            ));
+
+            // when
+            var response = placeUseCase.getPlaceDetails(
+                "ChIJ", "550e8400-e29b-41d4-a716-446655440000", "ko", "KR"
+            );
+
+            // then
+            assertThat(response.placeName()).isNull();
+            verify(placeQueryService).getPlaceDetails(criteria);
+        }
+
+        @Test
+        @DisplayName("실패: 지원하지 않는 응답 언어이면 예외가 발생한다")
+        void fail_unsupportedLanguage() {
+            // when & then
+            assertThatThrownBy(() -> placeUseCase.getPlaceDetails(
+                "ChIJ", "550e8400-e29b-41d4-a716-446655440000", "ja", null
+            ))
+                .isInstanceOfSatisfying(ApplicationException.class, e ->
+                    assertThat(e.getCode()).isEqualTo(PlaceErrorCode.UNSUPPORTED_LANGUAGE)
+                );
+            verifyNoInteractions(placeQueryService);
+        }
+
+        @Test
+        @DisplayName("실패: providerPlaceId가 비어 있으면 예외가 발생한다")
+        void fail_providerPlaceIdBlank() {
+            // when & then
+            assertBadRequest(() -> placeUseCase.getPlaceDetails(
+                "", "550e8400-e29b-41d4-a716-446655440000", null, null
             ));
         }
 
         @Test
-        @DisplayName("실패: 선택 장소 파라미터가 하나만 전달되면 예외가 발생한다")
-        void fail_partialSelectedPlace() {
+        @DisplayName("실패: sessionToken이 없으면 예외가 발생한다")
+        void fail_sessionTokenMissing() {
             // when & then
-            assertBadRequest(() -> placeUseCase.getPlaceDetail(
-                null, null, "ChIJ", null, null, null
-            ));
-        }
-
-        @Test
-        @DisplayName("실패: 좌표와 선택 장소 파라미터를 함께 전달하면 예외가 발생한다")
-        void fail_mixedModes() {
-            // when & then
-            assertBadRequest(() -> placeUseCase.getPlaceDetail(
-                37.0, 127.0, "ChIJ", "550e8400-e29b-41d4-a716-446655440000", null, null
-            ));
+            assertBadRequest(() -> placeUseCase.getPlaceDetails("ChIJ", null, null, null));
         }
 
         @Test
         @DisplayName("실패: sessionToken이 UUID 형식이 아니면 예외가 발생한다")
         void fail_sessionTokenInvalid() {
             // when & then
-            assertBadRequest(() -> placeUseCase.getPlaceDetail(
-                null, null, "ChIJ", "invalid-token", null, null
-            ));
-        }
-
-        @Test
-        @DisplayName("실패: 좌표 모드에 지역 코드를 전달하면 예외가 발생한다")
-        void fail_regionCodeWithCoordinates() {
-            // when & then
-            assertBadRequest(() -> placeUseCase.getPlaceDetail(
-                37.0, 127.0, null, null, null, "KR"
+            assertBadRequest(() -> placeUseCase.getPlaceDetails(
+                "ChIJ", "invalid-token", null, null
             ));
         }
 
@@ -363,8 +369,8 @@ class PlaceUseCaseTest {
         @DisplayName("실패: 지원하지 않는 지역이면 예외가 발생한다")
         void fail_unsupportedRegion() {
             // when & then
-            assertThatThrownBy(() -> placeUseCase.getPlaceDetail(
-                null, null, "ChIJ", "550e8400-e29b-41d4-a716-446655440000", null, "JP"
+            assertThatThrownBy(() -> placeUseCase.getPlaceDetails(
+                "ChIJ", "550e8400-e29b-41d4-a716-446655440000", null, "JP"
             )).isInstanceOfSatisfying(ApplicationException.class, e ->
                 assertThat(e.getCode()).isEqualTo(PlaceErrorCode.UNSUPPORTED_REGION)
             );

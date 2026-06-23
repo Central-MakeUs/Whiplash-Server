@@ -166,18 +166,18 @@ class PlaceControllerIntegrationTest {
     }
 
     @Nested
-    @DisplayName("[GET] /api/v1/places/detail - 장소 상세 조회")
-    class GetPlaceDetailTest {
+    @DisplayName("[GET] /api/v1/places/reverse-geocode - 장소 역지오코딩")
+    class GetPlaceReverseGeocodeTest {
 
         @Test
-        @DisplayName("성공: 한국 좌표도 Google 장소 상세 정보로 반환된다")
+        @DisplayName("성공: 한국 좌표도 Google 주소 정보로 반환된다")
         void success() throws Exception {
             // given
             MemberEntity member = memberRepository.save(MemberFixture.MEMBER_1.toEntity());
             String token = jwtProvider.generateAccessToken(member.getId(), member.getRole(), "device");
 
             // when
-            var resultActions = mockMvc.perform(get("/api/v1/places/detail")
+            var resultActions = mockMvc.perform(get("/api/v1/places/reverse-geocode")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
                 .param("latitude", "37.4979")
                 .param("longitude", "127.0276"));
@@ -191,34 +191,7 @@ class PlaceControllerIntegrationTest {
                 .andExpect(jsonPath("$.result.latitude").value(37.4979))
                 .andExpect(jsonPath("$.result.longitude").value(127.0276))
                 .andExpect(jsonPath("$.result.countryCode").value("KR"))
-                .andExpect(jsonPath("$.result.providerPlaceId").value(nullValue()));
-        }
-
-        @Test
-        @DisplayName("성공: 선택한 Google place ID로 장소 상세를 조회한다")
-        void success_selectedPlace() throws Exception {
-            // given
-            MemberEntity member = memberRepository.save(MemberFixture.MEMBER_3.toEntity());
-            String token = jwtProvider.generateAccessToken(member.getId(), member.getRole(), "device");
-
-            // when
-            var resultActions = mockMvc.perform(get("/api/v1/places/detail")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
-                .param("providerPlaceId", "ChIJ")
-                .param("sessionToken", "550e8400-e29b-41d4-a716-446655440000")
-                .param("languageCode", "ko")
-                .param("regionCode", "KR"));
-
-            // then
-            resultActions
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.result.address").value("Mock Google Address"))
-                .andExpect(jsonPath("$.result.placeName").value(nullValue()))
-                .andExpect(jsonPath("$.result.roadAddress").value("Mock Google Address"))
-                .andExpect(jsonPath("$.result.latitude").value(37.5943))
-                .andExpect(jsonPath("$.result.longitude").value(127.1296))
-                .andExpect(jsonPath("$.result.countryCode").value("KR"))
-                .andExpect(jsonPath("$.result.providerPlaceId").value("ChIJ"))
+                .andExpect(jsonPath("$.result.providerPlaceId").doesNotExist())
                 .andExpect(jsonPath("$.result.provider").doesNotExist());
         }
 
@@ -230,7 +203,7 @@ class PlaceControllerIntegrationTest {
             String token = jwtProvider.generateAccessToken(member.getId(), member.getRole(), "device");
 
             // when
-            var resultActions = mockMvc.perform(get("/api/v1/places/detail")
+            var resultActions = mockMvc.perform(get("/api/v1/places/reverse-geocode")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
                 .param("latitude", "40.7128")
                 .param("longitude", "-74.0060")
@@ -252,28 +225,9 @@ class PlaceControllerIntegrationTest {
             String token = jwtProvider.generateAccessToken(member.getId(), member.getRole(), "device");
 
             // when
-            var resultActions = mockMvc.perform(get("/api/v1/places/detail")
+            var resultActions = mockMvc.perform(get("/api/v1/places/reverse-geocode")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
                 .param("latitude", "37.4979"));
-
-            // then
-            resultActions.andExpect(status().isBadRequest());
-        }
-
-        @Test
-        @DisplayName("실패: 좌표와 선택 장소 파라미터를 함께 전달하면 400을 반환한다")
-        void fail_mixedModes() throws Exception {
-            // given
-            MemberEntity member = memberRepository.save(MemberFixture.MEMBER_4.toEntity());
-            String token = jwtProvider.generateAccessToken(member.getId(), member.getRole(), "device");
-
-            // when
-            var resultActions = mockMvc.perform(get("/api/v1/places/detail")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
-                .param("latitude", "37.4979")
-                .param("longitude", "127.0276")
-                .param("providerPlaceId", "ChIJ")
-                .param("sessionToken", "550e8400-e29b-41d4-a716-446655440000"));
 
             // then
             resultActions.andExpect(status().isBadRequest());
@@ -283,12 +237,78 @@ class PlaceControllerIntegrationTest {
         @DisplayName("실패: 인증 토큰이 없으면 401과 에러 코드를 반환한다")
         void fail_tokenMissing() throws Exception {
             // when
-            var resultActions = mockMvc.perform(get("/api/v1/places/detail")
+            var resultActions = mockMvc.perform(get("/api/v1/places/reverse-geocode")
                 .param("latitude", "37.4979")
                 .param("longitude", "127.0276"));
 
             // then
             resultActions.andExpect(status().isUnauthorized());
+        }
+    }
+
+    @Nested
+    @DisplayName("[GET] /api/v1/places/details - 선택 장소 상세 조회")
+    class GetPlaceDetailsTest {
+
+        @Test
+        @DisplayName("성공: 선택한 Google place ID로 장소 상세를 조회한다")
+        void success() throws Exception {
+            // given
+            MemberEntity member = memberRepository.save(MemberFixture.MEMBER_3.toEntity());
+            String token = jwtProvider.generateAccessToken(member.getId(), member.getRole(), "device");
+
+            // when
+            var resultActions = mockMvc.perform(get("/api/v1/places/details")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                .param("providerPlaceId", "ChIJ")
+                .param("sessionToken", "550e8400-e29b-41d4-a716-446655440000")
+                .param("languageCode", "ko")
+                .param("regionCode", "KR"));
+
+            // then
+            resultActions
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.address").value("Mock Google Address"))
+                .andExpect(jsonPath("$.result.placeName").value(nullValue()))
+                .andExpect(jsonPath("$.result.roadAddress").value("Mock Google Address"))
+                .andExpect(jsonPath("$.result.latitude").value(37.5943))
+                .andExpect(jsonPath("$.result.longitude").value(127.1296))
+                .andExpect(jsonPath("$.result.countryCode").value("KR"))
+                .andExpect(jsonPath("$.result.providerPlaceId").doesNotExist())
+                .andExpect(jsonPath("$.result.provider").doesNotExist());
+        }
+
+        @Test
+        @DisplayName("실패: sessionToken이 없으면 400을 반환한다")
+        void fail_sessionTokenMissing() throws Exception {
+            // given
+            MemberEntity member = memberRepository.save(MemberFixture.MEMBER_4.toEntity());
+            String token = jwtProvider.generateAccessToken(member.getId(), member.getRole(), "device");
+
+            // when
+            var resultActions = mockMvc.perform(get("/api/v1/places/details")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                .param("providerPlaceId", "ChIJ"));
+
+            // then
+            resultActions.andExpect(status().isBadRequest());
+        }
+
+        @Test
+        @DisplayName("실패: 기존 상세 조회 URI는 404를 반환한다")
+        void fail_legacyDetailUri() throws Exception {
+            // given
+            MemberEntity member = memberRepository.save(MemberFixture.MEMBER_5.toEntity());
+            String token = jwtProvider.generateAccessToken(member.getId(), member.getRole(), "device");
+
+            // when
+            var resultActions = mockMvc.perform(get("/api/v1/places/detail")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                .param("latitude", "37.4979")
+                .param("longitude", "127.0276"));
+
+            // then
+            resultActions.andExpect(status().isNotFound());
         }
     }
 

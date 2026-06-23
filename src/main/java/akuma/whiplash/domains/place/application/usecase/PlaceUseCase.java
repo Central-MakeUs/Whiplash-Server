@@ -59,22 +59,24 @@ public class PlaceUseCase {
         ));
     }
 
-    public PlaceDetailResponse getPlaceDetail(
+    public PlaceDetailResponse getPlaceReverseGeocode(
         Double latitude,
         Double longitude,
+        String languageCode
+    ) {
+        validateReverseGeocodeRequest(latitude, longitude, languageCode);
+        return PlaceMapper.mapToPlaceDetailResponse(
+            placeQueryService.getPlaceDetailByCoord(latitude, longitude, languageCode)
+        );
+    }
+
+    public PlaceDetailResponse getPlaceDetails(
         String providerPlaceId,
         String sessionToken,
         String languageCode,
         String regionCode
     ) {
-        validateDetailRequest(
-            latitude, longitude, providerPlaceId, sessionToken, languageCode, regionCode
-        );
-        if (latitude != null) {
-            return PlaceMapper.mapToPlaceDetailResponse(
-                placeQueryService.getPlaceDetailByCoord(latitude, longitude, languageCode)
-            );
-        }
+        validatePlaceDetailsRequest(providerPlaceId, sessionToken, languageCode, regionCode);
         return PlaceMapper.mapToPlaceDetailResponse(placeQueryService.getPlaceDetails(
             new PlaceDetailsCriteria(providerPlaceId, sessionToken, languageCode, regionCode)
         ));
@@ -150,31 +152,29 @@ public class PlaceUseCase {
         }
     }
 
-    private void validateDetailRequest(
+    private void validateReverseGeocodeRequest(
         Double latitude,
         Double longitude,
+        String languageCode
+    ) {
+        if (latitude == null || longitude == null) {
+            throw ApplicationException.from(CommonErrorCode.BAD_REQUEST);
+        }
+
+        validateCoordinates(latitude, longitude);
+
+        if (languageCode != null && !SUPPORTED_LANGUAGES.contains(languageCode)) {
+            throw ApplicationException.from(PlaceErrorCode.UNSUPPORTED_LANGUAGE);
+        }
+    }
+
+    private void validatePlaceDetailsRequest(
         String providerPlaceId,
         String sessionToken,
         String languageCode,
         String regionCode
     ) {
-        boolean hasAnyCoordinate = latitude != null || longitude != null;
-        boolean hasCompleteCoordinates = latitude != null && longitude != null;
-        boolean hasAnySelectedPlace = providerPlaceId != null || sessionToken != null;
-        boolean hasCompleteSelectedPlace = providerPlaceId != null && sessionToken != null;
-
-        if (hasCompleteCoordinates == hasCompleteSelectedPlace
-            || hasAnyCoordinate != hasCompleteCoordinates
-            || hasAnySelectedPlace != hasCompleteSelectedPlace) {
-            throw ApplicationException.from(CommonErrorCode.BAD_REQUEST);
-        }
-
-        if (hasCompleteCoordinates) {
-            if (regionCode != null) {
-                throw ApplicationException.from(CommonErrorCode.BAD_REQUEST);
-            }
-            validateCoordinates(latitude, longitude);
-        } else if (!StringUtils.hasText(providerPlaceId) || !isUuid(sessionToken)) {
+        if (!StringUtils.hasText(providerPlaceId) || !isUuid(sessionToken)) {
             throw ApplicationException.from(CommonErrorCode.BAD_REQUEST);
         }
 

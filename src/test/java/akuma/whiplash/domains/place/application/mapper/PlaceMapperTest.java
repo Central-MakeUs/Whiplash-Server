@@ -89,11 +89,10 @@ class PlaceMapperTest {
             assertThat(response.latitude()).isEqualTo(40.7128);
             assertThat(response.longitude()).isEqualTo(-74.0060);
             assertThat(response.countryCode()).isEqualTo("US");
-            assertThat(response.providerPlaceId()).isNull();
         }
 
         @Test
-        @DisplayName("성공: 선택 장소는 장소명 없이 Google place ID를 포함해 변환한다")
+        @DisplayName("성공: 선택 장소는 장소명 없이 상세 응답으로 변환한다")
         void success_selectedPlace() {
             // given
             SelectedPlaceDetail placeDetail = new SelectedPlaceDetail(
@@ -110,7 +109,6 @@ class PlaceMapperTest {
             assertThat(response.latitude()).isEqualTo(37.5943);
             assertThat(response.longitude()).isEqualTo(127.1296);
             assertThat(response.countryCode()).isEqualTo("KR");
-            assertThat(response.providerPlaceId()).isEqualTo("ChIJ");
         }
     }
 }
