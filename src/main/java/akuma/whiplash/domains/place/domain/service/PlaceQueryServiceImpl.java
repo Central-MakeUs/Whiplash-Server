@@ -1,165 +1,71 @@
 package akuma.whiplash.domains.place.domain.service;
 
-import akuma.whiplash.domains.place.application.dto.response.NaverPlaceItem;
-import akuma.whiplash.domains.place.application.dto.response.PlaceSearchResponse;
-import akuma.whiplash.domains.place.application.dto.response.PlaceInfoResponse;
-import akuma.whiplash.domains.place.application.dto.response.ReverseGeocodeApiResponse;
-import akuma.whiplash.domains.place.application.dto.response.PlaceDetailResponse;
-import akuma.whiplash.global.exception.ApplicationException;
-import akuma.whiplash.global.response.code.CommonErrorCode;
+import akuma.whiplash.domains.place.domain.client.NaverClient;
+import akuma.whiplash.domains.place.domain.client.GoogleClient;
+import akuma.whiplash.domains.place.domain.client.dto.NaverLocalSearchResponse;
+import akuma.whiplash.domains.place.domain.client.dto.NaverLocalSearchResponse.Item;
+import akuma.whiplash.domains.place.domain.model.PlaceDetail;
+import akuma.whiplash.domains.place.domain.model.PlaceAutocompleteCriteria;
+import akuma.whiplash.domains.place.domain.model.PlaceAutocompleteSuggestion;
+import akuma.whiplash.domains.place.domain.model.PlaceDetailsCriteria;
+import akuma.whiplash.domains.place.domain.model.PlaceSearchCriteria;
+import akuma.whiplash.domains.place.domain.model.PlaceSearchResult;
+import akuma.whiplash.domains.place.domain.model.SelectedPlaceDetail;
 import akuma.whiplash.global.util.GeoUtils;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
-import org.springframework.web.reactive.function.client.WebClient;
-import org.springframework.web.util.UriComponentsBuilder;
 
 @Service
-@Profile("!local & !test")
 @RequiredArgsConstructor
-@Slf4j
 public class PlaceQueryServiceImpl implements PlaceQueryService {
 
-    private final WebClient webClient;
-
-    @Value("${naver.search.client-id}")
-    private String naverClientId;
-
-    @Value("${naver.search.client-secret}")
-    private String naverClientSecret;
-
-    @Value("${naver.map.client-id}")
-    private String ncpClientId;
-
-    @Value("${naver.map.client-secret}")
-    private String ncpClientSecret;
-
-    @Value("${naver.search.base-url:https://openapi.naver.com/v1/search/local.json}")
-    private String naverLocalSearchUrl;
-
-    @Value("${naver.map.reverse-geocode-url:https://maps.apigw.ntruss.com/map-reversegeocode/v2/gc}")
-    private String ncpReverseGeocodeUrl;
+    private final NaverClient naverClient;
+    private final GoogleClient googleClient;
 
     @Override
-    public List<PlaceInfoResponse> searchPlaces(String query, Double latitude, Double longitude) {
-        String uri = UriComponentsBuilder
-            .fromUriString(naverLocalSearchUrl)
-            .queryParam("query", query)
-            .queryParam("display", "5")
-            .build()
-            .toUriString();
+    public List<PlaceAutocompleteSuggestion> getPlaceAutocompleteSuggestions(
+        PlaceAutocompleteCriteria criteria
+    ) {
+        return googleClient.autocomplete(criteria);
+    }
 
-        PlaceSearchResponse response = webClient.get()
-            .uri(uri)
-            .header("X-Naver-Client-Id", naverClientId)
-            .header("X-Naver-Client-Secret", naverClientSecret)
-            .retrieve()
-            .bodyToMono(PlaceSearchResponse.class)
-            .block();
+    @Override
+    public SelectedPlaceDetail getPlaceDetails(PlaceDetailsCriteria criteria) {
+        return googleClient.getPlaceDetails(criteria);
+    }
 
-        if (response == null || response.getItems() == null) return List.of();
-
-        return response.getItems().stream()
-            .map(item -> mapToPlaceInfoResponse(item, latitude, longitude))
+    @Override
+    public List<PlaceSearchResult> searchPlaces(PlaceSearchCriteria criteria) {
+        return googleClient.searchPlaces(criteria).stream()
+            .map(place -> withDistance(place, criteria.latitude(), criteria.longitude()))
             .toList();
     }
 
     @Override
-    public PlaceDetailResponse getPlaceDetailByCoord(double latitude, double longitude) {
-        String uri = UriComponentsBuilder
-            .fromUriString(ncpReverseGeocodeUrl)
-            .queryParam("coords", longitude + "," + latitude)
-            .queryParam("output", "json")
-            .queryParam("orders", "roadaddr,addr")
-            .build()
-            .toUriString();
-
-        ReverseGeocodeApiResponse apiResponse = webClient.get()
-            .uri(uri)
-            .header("x-ncp-apigw-api-key-id", ncpClientId)
-            .header("x-ncp-apigw-api-key", ncpClientSecret)
-            .retrieve()
-            .bodyToMono(ReverseGeocodeApiResponse.class)
-            .block();
-
-        if (apiResponse == null || apiResponse.getResults().isEmpty()) {
-            log.warn("reverse geocode api result is empty, latitude: {}, longitude: {}", latitude, longitude);
-            throw ApplicationException.from(CommonErrorCode.BAD_REQUEST);
-        }
-
-        // roadaddr 우선 사용, 없으면 addr fallback
-        var result = apiResponse.getResults().stream()
-            .filter(r -> r.getName().equals("roadaddr"))
-            .findFirst()
-            .orElse(apiResponse.getResults().get(0));
-
-        var region = result.getRegion();
-        var land = result.getLand();
-
-        String fullAddress = Stream.of(
-                region.getArea1().getName(),
-                region.getArea2().getName(),
-                region.getArea3().getName(),
-                region.getArea4() != null ? region.getArea4().getName() : null,
-                land.getName(),
-                land.getNumber1(),
-                land.getNumber2() != null && !land.getNumber2().isBlank() ? "-" + land.getNumber2() : ""
-            ).filter(Objects::nonNull)
-            .filter(s -> !s.isBlank())
-            .collect(Collectors.joining(" "));
-
-        String buildingName = Optional.ofNullable(land.getAddition0())
-            .map(ReverseGeocodeApiResponse.Result.Land.Addition::getValue)
-            .filter(v -> !v.isBlank())
-            .orElse(null);
-
-        String placeName = buildingName != null ? buildingName : land.getName();
-
-        return PlaceDetailResponse.builder()
-            .address(fullAddress)
-            .placeName(placeName != null ? placeName : "장소 없음")
-            .roadAddress(fullAddress)
-            .build();
+    public PlaceDetail getPlaceDetailByCoord(double latitude, double longitude, String languageCode) {
+        return googleClient.reverseGeocode(latitude, longitude, languageCode);
     }
 
     @Override
     public List<String> searchPlaceKeywords(String query) {
-        String uri = UriComponentsBuilder
-            .fromUriString(naverLocalSearchUrl)
-            .queryParam("query", query)
-            .queryParam("display", "5")
-            .build()
-            .toUriString();
+        NaverLocalSearchResponse response = naverClient.searchLocal(query);
 
-        PlaceSearchResponse response = webClient.get()
-            .uri(uri)
-            .header("X-Naver-Client-Id", naverClientId)
-            .header("X-Naver-Client-Secret", naverClientSecret)
-            .retrieve()
-            .bodyToMono(PlaceSearchResponse.class)
-            .block();
-
-        if (response == null || response.getItems() == null) return List.of();
+        if (response == null || response.items() == null) return List.of();
 
         Pattern keywordPattern = Pattern.compile(".*?(동|로|길)");
 
         Set<String> keywordSuggestions = new LinkedHashSet<>();
 
-        for (NaverPlaceItem item : response.getItems()) {
-            extractKeyword(item.getAddress(), keywordPattern).ifPresent(keywordSuggestions::add);
-            extractKeyword(item.getRoadAddress(), keywordPattern).ifPresent(keywordSuggestions::add);
+        for (Item item : response.items()) {
+            extractKeyword(item.address(), keywordPattern).ifPresent(keywordSuggestions::add);
+            extractKeyword(item.roadAddress(), keywordPattern).ifPresent(keywordSuggestions::add);
         }
 
         return new ArrayList<>(keywordSuggestions);
@@ -171,42 +77,21 @@ public class PlaceQueryServiceImpl implements PlaceQueryService {
         return matcher.find() ? Optional.of(matcher.group()) : Optional.empty();
     }
 
-    private PlaceInfoResponse mapToPlaceInfoResponse(NaverPlaceItem item, Double requestLatitude, Double requestLongitude) {
-        double placeLatitude = parseDouble(item.getMapy()) / 1e7;
-        double placeLongitude = parseDouble(item.getMapx()) / 1e7;
-
-        return PlaceInfoResponse.builder()
-            .name(sanitize(item.getTitle()))
-            .address(resolveDisplayAddress(item))
-            .latitude(placeLatitude)
-            .longitude(placeLongitude)
-            .distanceMeters(calculateDistanceMeters(requestLatitude, requestLongitude, placeLatitude, placeLongitude))
-            .build();
-    }
-
-    private String resolveDisplayAddress(NaverPlaceItem item) {
-        if (item.getRoadAddress() != null && !item.getRoadAddress().isBlank()) {
-            return item.getRoadAddress();
-        }
-        return item.getAddress() != null ? item.getAddress() : "";
-    }
-
-    private Integer calculateDistanceMeters(Double requestLatitude, Double requestLongitude, double placeLatitude, double placeLongitude) {
+    private PlaceSearchResult withDistance(
+        PlaceSearchResult place,
+        Double requestLatitude,
+        Double requestLongitude
+    ) {
+        Integer distanceMeters = null;
         if (requestLatitude == null || requestLongitude == null) {
-            return null;
+            return place;
         }
-        return GeoUtils.calculateDistanceMeters(requestLatitude, requestLongitude, placeLatitude, placeLongitude);
-    }
-
-    private String sanitize(String html) {
-        return html == null ? "" : html.replaceAll("<.*?>", "");
-    }
-
-    private double parseDouble(String value) {
-        try {
-            return Double.parseDouble(value);
-        } catch (Exception e) {
-            return 0.0;
-        }
+        distanceMeters = GeoUtils.calculateDistanceMeters(
+            requestLatitude, requestLongitude, place.latitude(), place.longitude()
+        );
+        return new PlaceSearchResult(
+            place.name(), place.address(), place.latitude(), place.longitude(), place.provider(),
+            place.providerPlaceId(), place.countryCode(), distanceMeters
+        );
     }
 }

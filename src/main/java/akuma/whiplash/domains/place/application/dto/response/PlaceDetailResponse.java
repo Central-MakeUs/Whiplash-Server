@@ -6,5 +6,8 @@ import lombok.Builder;
 public record PlaceDetailResponse(
     String address,
     String placeName,
-    String roadAddress
+    String roadAddress,
+    double latitude,
+    double longitude,
+    String countryCode
 ) {}

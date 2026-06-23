@@ -5,6 +5,7 @@ import akuma.whiplash.domains.auth.exception.AuthErrorCode;
 import akuma.whiplash.domains.device.exception.DeviceErrorCode;
 import akuma.whiplash.domains.member.exception.MemberErrorCode;
 import akuma.whiplash.domains.payment.exception.PaymentErrorCode;
+import akuma.whiplash.domains.place.exception.PlaceErrorCode;
 import akuma.whiplash.global.response.code.CommonErrorCode;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
@@ -21,4 +22,5 @@ public @interface CustomErrorCodes {
     AlarmErrorCode[] alarmErrorCodes() default {};
     DeviceErrorCode[] deviceErrorCodes() default {};
     PaymentErrorCode[] paymentErrorCodes() default {};
+    PlaceErrorCode[] placeErrorCodes() default {};
 }

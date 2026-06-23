@@ -1,4 +1,4 @@
-package akuma.whiplash.domains.place.domain.service;
+package akuma.whiplash.domains.place.domain.client;
 
 import akuma.whiplash.domains.place.domain.model.PlaceDetail;
 import akuma.whiplash.domains.place.domain.model.PlaceAutocompleteCriteria;
@@ -9,11 +9,10 @@ import akuma.whiplash.domains.place.domain.model.PlaceSearchResult;
 import akuma.whiplash.domains.place.domain.model.SelectedPlaceDetail;
 import java.util.List;
 
-public interface PlaceQueryService {
+public interface GoogleClient {
 
-    List<PlaceAutocompleteSuggestion> getPlaceAutocompleteSuggestions(PlaceAutocompleteCriteria criteria);
+    PlaceDetail reverseGeocode(double latitude, double longitude, String languageCode);
+    List<PlaceAutocompleteSuggestion> autocomplete(PlaceAutocompleteCriteria criteria);
     SelectedPlaceDetail getPlaceDetails(PlaceDetailsCriteria criteria);
     List<PlaceSearchResult> searchPlaces(PlaceSearchCriteria criteria);
-    PlaceDetail getPlaceDetailByCoord(double latitude, double longitude, String languageCode);
-    List<String> searchPlaceKeywords(String query);
 }

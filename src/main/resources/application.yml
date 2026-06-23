@@ -13,6 +13,7 @@ spring:
       - redis.yml
       - oauth.yml
       - naver.yml
+      - google.yml
       - sentry.yml
 
 server:

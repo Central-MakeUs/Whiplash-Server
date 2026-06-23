@@ -10,5 +10,10 @@ public record PlaceInfoResponse(
     double latitude,
     double longitude,
     @JsonInclude(JsonInclude.Include.ALWAYS)
-    Integer distanceMeters
+    Integer distanceMeters,
+    String provider,
+    @JsonInclude(JsonInclude.Include.ALWAYS)
+    String providerPlaceId,
+    @JsonInclude(JsonInclude.Include.ALWAYS)
+    String countryCode
 ) {}
