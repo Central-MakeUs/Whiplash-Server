@@ -2,8 +2,8 @@ package akuma.whiplash.domains.device.domain.service;
 
 import static akuma.whiplash.domains.device.exception.DeviceErrorCode.DEVICE_NOT_FOUND;
 
-import akuma.whiplash.domains.device.application.dto.request.FcmTokenUpdateRequest;
-import akuma.whiplash.domains.device.application.dto.response.FcmTokenUpdateResponse;
+import akuma.whiplash.domains.device.application.dto.request.DeviceUpdateRequest;
+import akuma.whiplash.domains.device.application.dto.response.DeviceUpdateResponse;
 import akuma.whiplash.domains.device.application.mapper.DeviceMapper;
 import akuma.whiplash.domains.member.persistence.entity.MemberDeviceEntity;
 import akuma.whiplash.domains.member.persistence.repository.MemberDeviceRepository;
@@ -24,14 +24,21 @@ public class DeviceCommandServiceImpl implements DeviceCommandService {
     private final TimeProvider timeProvider;
 
     @Override
-    public FcmTokenUpdateResponse modifyFcmToken(Long memberId, FcmTokenUpdateRequest request) {
+    public DeviceUpdateResponse modifyDevice(Long memberId, DeviceUpdateRequest request) {
         MemberDeviceEntity device = memberDeviceRepository
             .findByMember_IdAndDeviceId(memberId, request.deviceId())
             .orElseThrow(() -> ApplicationException.from(DEVICE_NOT_FOUND));
 
-        device.updateFcmToken(request.fcmToken(), timeProvider.now());
+        device.updateDevice(
+            request.fcmToken(),
+            request.platform(),
+            request.appVersion(),
+            request.osVersion(),
+            request.timeZone(),
+            timeProvider.now()
+        );
         redisService.upsertFcmToken(memberId, request.deviceId(), request.fcmToken());
 
-        return DeviceMapper.mapToFcmTokenUpdateResponse(device);
+        return DeviceMapper.mapToDeviceUpdateResponse(device);
     }
 }

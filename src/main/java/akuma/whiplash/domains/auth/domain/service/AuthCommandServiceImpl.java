@@ -105,7 +105,14 @@ public class AuthCommandServiceImpl implements AuthCommandService {
     private void upsertMemberDevice(MemberEntity member, SocialLoginRequest request) {
         memberDeviceRepository.findByMember_IdAndDeviceId(member.getId(), request.deviceId())
             .ifPresentOrElse(
-                device -> device.updateOnLogin(request.fcmToken(), request.platform(), request.appVersion(), request.osVersion(), timeProvider.now()),
+                device -> device.updateDevice(
+                    request.fcmToken(),
+                    request.platform(),
+                    request.appVersion(),
+                    request.osVersion(),
+                    request.timeZone(),
+                    timeProvider.now()
+                ),
                 () -> memberDeviceRepository.save(AuthMapper.mapToMemberDeviceEntity(member, request))
             );
     }

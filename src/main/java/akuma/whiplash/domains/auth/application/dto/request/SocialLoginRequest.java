@@ -1,6 +1,7 @@
 package akuma.whiplash.domains.auth.application.dto.request;
 
 import akuma.whiplash.domains.auth.presentation.util.annotation.SocialTypeFormat;
+import akuma.whiplash.global.validation.annotation.IanaTimeZoneFormat;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 
@@ -31,5 +32,10 @@ public record SocialLoginRequest(
     String appVersion,
 
     @Schema(description = "OS 버전", example = "14")
-    String osVersion
+    String osVersion,
+
+    @Schema(description = "IANA time zone", example = "Asia/Seoul")
+    @NotBlank(message = "timeZone을 입력해주세요.")
+    @IanaTimeZoneFormat
+    String timeZone
 ) {}

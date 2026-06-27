@@ -8,7 +8,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import akuma.whiplash.common.config.IntegrationTest;
 import akuma.whiplash.common.fixture.MemberFixture;
 import akuma.whiplash.domains.auth.application.dto.etc.MemberContext;
-import akuma.whiplash.domains.device.application.dto.request.FcmTokenUpdateRequest;
+import akuma.whiplash.domains.device.application.dto.request.DeviceUpdateRequest;
 import akuma.whiplash.domains.device.exception.DeviceErrorCode;
 import akuma.whiplash.domains.member.persistence.entity.MemberDeviceEntity;
 import akuma.whiplash.domains.member.persistence.entity.MemberEntity;
@@ -87,15 +87,15 @@ class DeviceControllerIntegrationTest {
     }
 
     @Nested
-    @DisplayName("[PUT] /api/v1/devices/me/fcm-token - FCM 토큰 갱신")
-    class ModifyFcmTokenTest {
+    @DisplayName("[PUT] /api/v1/devices/me - 기기 정보 갱신")
+    class ModifyDeviceTest {
 
         @Test
-        @DisplayName("성공: FCM 토큰이 DB와 Redis에 갱신되고 응답 필드가 반환된다")
+        @DisplayName("성공: 기기 정보가 DB에 갱신되고 FCM 토큰이 Redis에 반영된다")
         void success() throws Exception {
             // given
             MemberEntity member = memberRepository.save(MemberFixture.MEMBER_1.toEntity());
-            String deviceId = "device-integration-fcm";
+            String deviceId = "device-integration-update";
             String oldFcmToken = "old-fcm-token";
             String newFcmToken = "new-fcm-token";
 
@@ -107,20 +107,32 @@ class DeviceControllerIntegrationTest {
                 .isLoggedIn(true)
                 .appVersion("1.0.0")
                 .osVersion("14")
+                .timeZone("Asia/Seoul")
                 .build());
             redisService.upsertFcmToken(member.getId(), deviceId, oldFcmToken);
             setSecurityContext(member, deviceId);
 
-            FcmTokenUpdateRequest request = new FcmTokenUpdateRequest(deviceId, newFcmToken);
+            DeviceUpdateRequest request = new DeviceUpdateRequest(
+                deviceId,
+                "IOS",
+                newFcmToken,
+                "2.0.0",
+                "18",
+                "America/New_York"
+            );
 
             // when
-            mockMvc.perform(put(BASE + "/me/fcm-token")
+            mockMvc.perform(put(BASE + "/me")
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + buildAccessToken(member, deviceId))
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.result.deviceId").value(deviceId))
+                .andExpect(jsonPath("$.result.platform").value("IOS"))
                 .andExpect(jsonPath("$.result.fcmToken").value(newFcmToken))
+                .andExpect(jsonPath("$.result.appVersion").value("2.0.0"))
+                .andExpect(jsonPath("$.result.osVersion").value("18"))
+                .andExpect(jsonPath("$.result.timeZone").value("America/New_York"))
                 .andExpect(jsonPath("$.result.updatedAt").isNotEmpty());
 
             // then
@@ -128,6 +140,10 @@ class DeviceControllerIntegrationTest {
                 .findByMember_IdAndDeviceId(member.getId(), deviceId)
                 .orElseThrow();
             assertThat(updated.getFcmToken()).isEqualTo(newFcmToken);
+            assertThat(updated.getPlatform()).isEqualTo("IOS");
+            assertThat(updated.getAppVersion()).isEqualTo("2.0.0");
+            assertThat(updated.getOsVersion()).isEqualTo("18");
+            assertThat(updated.getTimeZone()).isEqualTo("America/New_York");
             assertThat(redisService.getFcmTokenByDevice(deviceId)).isEqualTo(newFcmToken);
         }
 
@@ -139,10 +155,17 @@ class DeviceControllerIntegrationTest {
             String unknownDeviceId = "device-not-registered";
             setSecurityContext(member, unknownDeviceId);
 
-            FcmTokenUpdateRequest request = new FcmTokenUpdateRequest(unknownDeviceId, "any-fcm-token");
+            DeviceUpdateRequest request = new DeviceUpdateRequest(
+                unknownDeviceId,
+                "ANDROID",
+                "any-fcm-token",
+                "1.0.0",
+                "14",
+                "Asia/Seoul"
+            );
 
             // when & then
-            mockMvc.perform(put(BASE + "/me/fcm-token")
+            mockMvc.perform(put(BASE + "/me")
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + buildAccessToken(member, unknownDeviceId))
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
@@ -154,10 +177,17 @@ class DeviceControllerIntegrationTest {
         @DisplayName("실패: 인증 정보가 없으면 401을 반환한다")
         void fail_unauthenticated() throws Exception {
             // given
-            FcmTokenUpdateRequest request = new FcmTokenUpdateRequest("device-id", "fcm-token");
+            DeviceUpdateRequest request = new DeviceUpdateRequest(
+                "device-id",
+                "ANDROID",
+                "fcm-token",
+                "1.0.0",
+                "14",
+                "Asia/Seoul"
+            );
 
             // when & then
-            mockMvc.perform(put(BASE + "/me/fcm-token")
+            mockMvc.perform(put(BASE + "/me")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isUnauthorized());

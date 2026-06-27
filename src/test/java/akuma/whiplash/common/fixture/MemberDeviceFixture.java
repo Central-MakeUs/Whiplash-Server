@@ -29,6 +29,7 @@ public enum MemberDeviceFixture {
             .isLoggedIn(true)
             .appVersion("1.0.0")
             .osVersion("17")
+            .timeZone("Asia/Seoul")
             .build();
     }
 }

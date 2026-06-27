@@ -65,7 +65,8 @@ class AuthControllerTest {
             "ANDROID",
             "fcm-social-login",
             "1.0.0",
-            "14"
+            "14",
+            "Asia/Seoul"
         );
     }
 
