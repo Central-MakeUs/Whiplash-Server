@@ -17,6 +17,7 @@ import akuma.whiplash.domains.alarm.application.service.AuditLogRecorder;
 import akuma.whiplash.domains.alarm.domain.constant.OccurrenceStatus;
 import akuma.whiplash.domains.alarm.domain.constant.DeactivationResult;
 import akuma.whiplash.domains.alarm.domain.constant.Weekday;
+import akuma.whiplash.domains.alarm.domain.util.AlarmScheduleCalculator;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmEntity;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmOccurrenceEntity;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmRingingLogEntity;
@@ -39,7 +40,6 @@ import akuma.whiplash.domains.payment.exception.PaymentErrorCode;
 import akuma.whiplash.domains.payment.persistence.repository.PaymentRepository;
 import akuma.whiplash.global.exception.ApplicationException;
 import akuma.whiplash.global.response.code.CommonErrorCode;
-import akuma.whiplash.global.util.date.DateUtil;
 import akuma.whiplash.global.util.date.TimeProvider;
 import akuma.whiplash.infrastructure.payment.PaymentVerificationPort;
 import akuma.whiplash.infrastructure.redis.RingingAlarmRedisRepository;
@@ -47,6 +47,7 @@ import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
@@ -96,16 +97,28 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
         alarmRepository.save(alarm);
 
         // 2. 다음 알람 발생 날짜 계산
+        ZoneId memberZone = resolveMemberZone(memberId);
         Set<DayOfWeek> repeatDays = alarm.getRepeatDays().stream()
             .map(Weekday::getDayOfWeek)
             .collect(Collectors.toSet());
-        
-        // 현재 시각 기준으로 가장 가까운 발생일 계산 (오늘 포함 여부는 getNextOccurrenceDate 내부 로직 따름)
-        LocalDate nextDate = DateUtil.getNextOccurrenceDate(repeatDays, timeProvider.now(), alarm.getTime());
-        LocalDateTime nextScheduledTime = LocalDateTime.of(nextDate, alarm.getTime());
+        LocalDate nextDate = AlarmScheduleCalculator.getNextOccurrenceDate(
+            repeatDays,
+            ZonedDateTime.of(timeProvider.now(memberZone), memberZone),
+            alarm.getTime()
+        );
+        LocalDateTime nextScheduledTime = AlarmScheduleCalculator.toDefaultZoneLocalDateTime(
+            nextDate,
+            alarm.getTime(),
+            memberZone
+        );
 
         // 3. 첫 알람 발생 내역 생성 및 저장
-        AlarmOccurrenceEntity occurrence = AlarmMapper.mapToFirstAlarmOccurrenceEntity(alarm, nextDate, alarm.getTime());
+        AlarmOccurrenceEntity occurrence = AlarmMapper.mapToFirstAlarmOccurrenceEntity(
+            alarm,
+            nextDate,
+            alarm.getTime(),
+            nextScheduledTime
+        );
         alarmOccurrenceRepository.save(occurrence);
 
         // 4. 알람의 다음 예정 시각 업데이트
@@ -148,9 +161,9 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
                 }
             });
 
-        // 3. 오늘 회차가 없거나 이미 비활성화된 상태라면 알람을 소프트 삭제하고 revision을 증가시킨다.
+        // 3. 오늘 회차가 없거나 이미 비활성화된 상태라면 알람을 소프트 삭제한다.
         LocalDateTime deletedAt = timeProvider.now();
-        alarm.softDeleteWithRevision(deletedAt);
+        alarm.softDelete(deletedAt);
         ringingAlarmRedisRepository.remove(alarmId, memberId);
 
         // 4. 광고 증빙 토큰을 포함한 삭제 이력을 저장한다.
@@ -231,9 +244,9 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
             throw ApplicationException.from(PaymentErrorCode.PAYMENT_VERIFICATION_FAILED);
         }
 
-        // 7. 검증 성공 시 결제를 성공으로 기록하고 알람을 소프트 삭제하며 revision을 증가시킨다.
+        // 7. 검증 성공 시 결제를 성공으로 기록하고 알람을 소프트 삭제한다.
         savePaymentOrThrowDuplicate(member, alarm, request.paymentId(), PaymentType.DELETE_ALARM);
-        alarm.softDeleteWithRevision(processedAt);
+        alarm.softDelete(processedAt);
         ringingAlarmRedisRepository.remove(alarmId, memberId);
 
         alarmDeleteLogRepository.save(AlarmMapper.mapToPaymentDeleteLogEntity(
@@ -287,10 +300,8 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
         // 5. 체크인 완료 시각을 기록하고 회차 상태를 CHECKIN으로 전환한다.
         occurrence.checkin(processedAt);
 
-        // 6. 더 이상 울리는 알람이 아니므로 캐시에서 제거하고 알람 revision을 증가시킨다.
+        // 6. 더 이상 울리는 알람이 아니므로 캐시에서 제거한다.
         ringingAlarmRedisRepository.remove(alarmId, memberId);
-
-        alarm.incrementRevision();
 
         // 7. 클라이언트 동기화를 위해 다음 예정 회차를 함께 조회한다.
         AlarmOccurrenceEntity nextOccurrence = alarmOccurrenceRepository
@@ -310,7 +321,7 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
             processedAt
         ));
 
-        // 9. revision과 다음 회차 정보를 포함한 응답을 반환한다.
+        // 9. 다음 회차 정보를 포함한 응답을 반환한다.
         return AlarmMapper.mapToAlarmCheckinResponse(alarm, nextOccurrence);
     }
 
@@ -391,7 +402,6 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
         // 8. 검증 성공 시 결제를 성공으로 기록하고 알람 회차를 PAYMENT 상태로 비활성화한다.
         savePaymentOrThrowDuplicate(member, alarm, request.paymentId(), PaymentType.STOP_ALARM);
         occurrence.deactivateByPayment(processedAt);
-        alarm.incrementRevision();
         ringingAlarmRedisRepository.remove(alarmId, memberId);
 
         // 9. 클라이언트 동기화와 운영 추적을 위해 성공 로그를 남긴다.
@@ -409,7 +419,7 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
         // 10. consume은 외부 플랫폼 후처리이므로 DB 커밋이 성공한 뒤 실행한다.
         consumePaymentAfterCommit(paymentClient, request.paymentId());
 
-        // 11. 변경된 revision과 다음 예약 회차를 함께 내려 클라이언트가 로컬 알람을 재동기화하게 한다.
+        // 11. 다음 예약 회차를 함께 내려 클라이언트가 로컬 알람을 재동기화하게 한다.
         AlarmOccurrenceEntity nextOccurrence = alarmOccurrenceRepository
             .findNextScheduledByAlarmIds(List.of(alarmId), OccurrenceStatus.SCHEDULED, processedAt)
             .stream()
@@ -433,9 +443,14 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
             .orElseThrow(() -> ApplicationException.from(ALARM_OCCURRENCE_NOT_FOUND));
 
         // 아직 알람이 울릴 시간이 아니라면 예외 발생
+        ZoneId memberZone = resolveMemberZone(memberId);
         LocalDateTime now = timeProvider.now();
-        LocalDateTime scheduledDateTime = LocalDateTime.of(occurrence.getOccurrenceDate(), occurrence.getOccurrenceTime());
-        if (now.isBefore(scheduledDateTime)) {
+        if (!AlarmScheduleCalculator.isDue(
+            occurrence.getOccurrenceDate(),
+            occurrence.getOccurrenceTime(),
+            memberZone,
+            timeProvider.instant()
+        )) {
             throw ApplicationException.from(NOT_ALARM_TIME);
         }
 
@@ -450,10 +465,11 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
 
         // Redis Sorted Set 적재: score = 알람 예정 시각 epoch millis
         // 동일 member로 재호출 시 score만 갱신되므로 멱등하다.
-        long score = scheduledDateTime
-            .atZone(ZoneId.of("Asia/Seoul"))
-            .toInstant()
-            .toEpochMilli();
+        long score = AlarmScheduleCalculator.toEpochMillis(
+            occurrence.getOccurrenceDate(),
+            occurrence.getOccurrenceTime(),
+            memberZone
+        );
         ringingAlarmRedisRepository.add(alarmId, memberId, score);
     }
 
@@ -511,6 +527,13 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
             .filter(port -> port.supportedPlatform().equals(platform))
             .findFirst()
             .orElseThrow(() -> ApplicationException.from(CommonErrorCode.BAD_REQUEST));
+    }
+
+    private ZoneId resolveMemberZone(Long memberId) {
+        return memberDeviceRepository.findFirstByMember_IdAndIsLoggedInTrueOrderByLastActiveAtDesc(memberId)
+            .map(MemberDeviceEntity::getTimeZone)
+            .map(AlarmScheduleCalculator::resolveZone)
+            .orElse(AlarmScheduleCalculator.DEFAULT_ZONE);
     }
 
     private String buildPaymentVerificationFailReason(

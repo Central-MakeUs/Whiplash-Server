@@ -7,10 +7,12 @@ import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 
 import akuma.whiplash.common.fixture.AlarmFixture;
 import akuma.whiplash.common.fixture.MemberFixture;
+import akuma.whiplash.domains.alarm.application.dto.etc.OccurrencePushInfo;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmDeleteMethodResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmSyncResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.GetAlarmsResponse;
@@ -27,14 +29,17 @@ import akuma.whiplash.domains.alarm.persistence.repository.AlarmRepository;
 import akuma.whiplash.domains.auth.exception.AuthErrorCode;
 import akuma.whiplash.domains.member.exception.MemberErrorCode;
 import akuma.whiplash.domains.member.persistence.entity.MemberEntity;
+import akuma.whiplash.domains.member.persistence.repository.MemberDeviceRepository;
 import akuma.whiplash.domains.member.persistence.repository.MemberRepository;
 import akuma.whiplash.global.exception.ApplicationException;
 import akuma.whiplash.global.util.date.TimeProvider;
+import java.time.ZoneId;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.Optional;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -50,9 +55,20 @@ class AlarmQueryServiceTest {
     @Mock private AlarmRepository alarmRepository;
     @Mock private AlarmOccurrenceRepository alarmOccurrenceRepository;
     @Mock private MemberRepository memberRepository;
+    @Mock private MemberDeviceRepository memberDeviceRepository;
     @Mock private TimeProvider timeProvider;
 
     @InjectMocks private AlarmQueryServiceImpl alarmQueryService;
+
+    private static final LocalDateTime FIXED_NOW = LocalDateTime.of(2026, 5, 2, 14, 30);
+
+    @BeforeEach
+    void setUp() {
+        lenient().when(timeProvider.now()).thenReturn(FIXED_NOW);
+        lenient().when(timeProvider.today()).thenReturn(FIXED_NOW.toLocalDate());
+        lenient().when(timeProvider.now(any(ZoneId.class))).thenReturn(FIXED_NOW);
+        lenient().when(timeProvider.today(any(ZoneId.class))).thenReturn(FIXED_NOW.toLocalDate());
+    }
 
     @Nested
     @DisplayName("getAlarms - 알람 목록 조회")
@@ -109,9 +125,9 @@ class AlarmQueryServiceTest {
             AlarmEntity alarm = AlarmFixture.ALARM_11.toMockEntity();
             AlarmOccurrenceEntity processed = AlarmOccurrenceEntity.builder()
                 .alarm(alarm)
-                .occurrenceDate(LocalDate.now())
+                .occurrenceDate(FIXED_NOW.toLocalDate())
                 .occurrenceTime(alarm.getTime())
-                .scheduledAt(LocalDate.now().atTime(alarm.getTime()))
+                .scheduledAt(FIXED_NOW.toLocalDate().atTime(alarm.getTime()))
                 .status(OccurrenceStatus.CHECKIN)
                 .alarmRinging(false)
                 .ringingCount(0)
@@ -133,7 +149,7 @@ class AlarmQueryServiceTest {
             assertThat(result.alarms()).hasSize(1);
             assertThat(result.alarms().get(0).status()).isEqualTo("활성화");
             assertThat(result.alarms().get(0).nextOccurrence().scheduledDate())
-                .isAfter(LocalDate.now());
+                .isAfter(FIXED_NOW.toLocalDate());
         }
 
         @Test
@@ -189,7 +205,6 @@ class AlarmQueryServiceTest {
                 .latitude(37.0)
                 .longitude(127.0)
                 .address("서울")
-                .revision(3)
                 .status(AlarmStatus.INACTIVE)
                 .build();
             AlarmOccurrenceEntity nextOccurrence = AlarmOccurrenceEntity.builder()
@@ -261,6 +276,31 @@ class AlarmQueryServiceTest {
             thrown
                 .isInstanceOf(ApplicationException.class)
                 .hasFieldOrPropertyWithValue("code", MemberErrorCode.MEMBER_NOT_FOUND);
+        }
+    }
+
+    @Nested
+    @DisplayName("getPreNotificationTargets - 사전 알림 대상 조회")
+    class GetPreNotificationTargetsTest {
+
+        @Test
+        @DisplayName("성공: scheduledAt 기준 윈도우로 사전 알림 대상을 조회한다")
+        void success() {
+            // given
+            LocalDateTime start = FIXED_NOW.plusMinutes(59);
+            LocalDateTime end = FIXED_NOW.plusMinutes(61);
+            OccurrencePushInfo info = new OccurrencePushInfo(1L, 2L, "서울");
+            given(alarmOccurrenceRepository.findPreNotificationTargetsByScheduledAtBetween(
+                start,
+                end,
+                OccurrenceStatus.SCHEDULED
+            )).willReturn(List.of(info));
+
+            // when
+            List<OccurrencePushInfo> result = alarmQueryService.getPreNotificationTargets(start, end);
+
+            // then
+            assertThat(result).containsExactly(info);
         }
     }
 

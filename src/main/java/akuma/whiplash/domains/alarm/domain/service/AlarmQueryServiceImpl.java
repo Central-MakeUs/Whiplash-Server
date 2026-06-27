@@ -12,12 +12,15 @@ import akuma.whiplash.domains.alarm.domain.constant.AlarmDeleteMethod;
 import akuma.whiplash.domains.alarm.domain.constant.AlarmStatus;
 import akuma.whiplash.domains.alarm.domain.constant.OccurrenceStatus;
 import akuma.whiplash.domains.alarm.domain.constant.Weekday;
+import akuma.whiplash.domains.alarm.domain.util.AlarmScheduleCalculator;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmEntity;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmOccurrenceEntity;
 import akuma.whiplash.domains.alarm.persistence.repository.AlarmOccurrenceRepository;
 import akuma.whiplash.domains.alarm.persistence.repository.AlarmRepository;
 import akuma.whiplash.domains.auth.exception.AuthErrorCode;
 import akuma.whiplash.domains.member.exception.MemberErrorCode;
+import akuma.whiplash.domains.member.persistence.entity.MemberDeviceEntity;
+import akuma.whiplash.domains.member.persistence.repository.MemberDeviceRepository;
 import akuma.whiplash.domains.member.persistence.repository.MemberRepository;
 import akuma.whiplash.global.exception.ApplicationException;
 import akuma.whiplash.global.util.date.DateUtil;
@@ -25,8 +28,7 @@ import akuma.whiplash.global.util.date.TimeProvider;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.LocalTime;
-import java.util.ArrayList;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -54,6 +56,7 @@ public class AlarmQueryServiceImpl implements AlarmQueryService {
     private final AlarmRepository alarmRepository;
     private final AlarmOccurrenceRepository alarmOccurrenceRepository;
     private final MemberRepository memberRepository;
+    private final MemberDeviceRepository memberDeviceRepository;
     private final TimeProvider timeProvider;
 
     @Override
@@ -67,8 +70,9 @@ public class AlarmQueryServiceImpl implements AlarmQueryService {
             return GetAlarmsResponse.builder().alarms(List.of()).build();
         }
 
-        LocalDate today = LocalDate.now();
-        LocalDateTime now = LocalDateTime.now();
+        ZoneId memberZone = resolveMemberZone(memberId);
+        LocalDate today = timeProvider.today(memberZone);
+        LocalDateTime now = timeProvider.now(memberZone);
         List<Long> alarmIds = alarms.stream().map(AlarmEntity::getId).toList();
 
         // 1. 최근 처리 완료 회차 벌크 조회 (N+1 제거)
@@ -184,29 +188,11 @@ public class AlarmQueryServiceImpl implements AlarmQueryService {
 
     @Override
     public List<OccurrencePushInfo> getPreNotificationTargets(LocalDateTime startInclusive, LocalDateTime endInclusive) {
-        LocalDate startDate = startInclusive.toLocalDate();
-        LocalTime startTime = startInclusive.toLocalTime();
-        LocalDate endDate   = endInclusive.toLocalDate();
-        LocalTime endTime   = endInclusive.toLocalTime();
-
-        if (startDate.equals(endDate)) {
-            return alarmOccurrenceRepository.findPreNotificationTargetsSameDay(
-                startDate, startTime, endTime, OccurrenceStatus.SCHEDULED
-            );
-        }
-
-        List<OccurrencePushInfo> part1 = alarmOccurrenceRepository.findPreNotificationTargetsFromTime(
-            startDate, startTime, OccurrenceStatus.SCHEDULED
+        return alarmOccurrenceRepository.findPreNotificationTargetsByScheduledAtBetween(
+            startInclusive,
+            endInclusive,
+            OccurrenceStatus.SCHEDULED
         );
-        List<OccurrencePushInfo> part2 = alarmOccurrenceRepository.findPreNotificationTargetsUntilTime(
-            endDate, endTime, OccurrenceStatus.SCHEDULED
-        );
-
-        return Stream.concat(part1.stream(), part2.stream())
-            .collect(Collectors.collectingAndThen(
-                Collectors.toMap(OccurrencePushInfo::occurrenceId, x -> x, (a, b) -> a),
-                m -> new ArrayList<>(m.values())
-            ));
     }
 
     @Override
@@ -227,5 +213,12 @@ public class AlarmQueryServiceImpl implements AlarmQueryService {
         if (!reqMemberId.equals(alarmMemberId)) {
             throw ApplicationException.from(AuthErrorCode.PERMISSION_DENIED);
         }
+    }
+
+    private ZoneId resolveMemberZone(Long memberId) {
+        return memberDeviceRepository.findFirstByMember_IdAndIsLoggedInTrueOrderByLastActiveAtDesc(memberId)
+            .map(MemberDeviceEntity::getTimeZone)
+            .map(AlarmScheduleCalculator::resolveZone)
+            .orElse(AlarmScheduleCalculator.DEFAULT_ZONE);
     }
 }

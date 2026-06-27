@@ -741,7 +741,6 @@ class AlarmControllerTest {
             LocalDateTime scheduledAt = LocalDateTime.now().plusDays(1);
             AlarmSyncItemDto dto = AlarmSyncItemDto.builder()
                 .alarmId(1L)
-                .alarmRevision(2)
                 .status("활성화")
                 .nextOccurrence(AlarmSyncItemDto.NextOccurrenceInfo.builder()
                     .occurrenceId(10L)
@@ -759,7 +758,6 @@ class AlarmControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.result.serverTime").exists())
                 .andExpect(jsonPath("$.result.alarms[0].alarmId").value(1L))
-                .andExpect(jsonPath("$.result.alarms[0].alarmRevision").value(2))
                 .andExpect(jsonPath("$.result.alarms[0].status").value("활성화"))
                 .andExpect(jsonPath("$.result.alarms[0].nextOccurrence.occurrenceId").value(10L));
 

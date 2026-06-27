@@ -53,16 +53,24 @@ public class AlarmMapper {
             .longitude(request.place().longitude())
             .address(request.place().address())
             .status(AlarmStatus.ACTIVE)
-            .revision(1)
             .build();
     }
 
     public static AlarmOccurrenceEntity mapToFirstAlarmOccurrenceEntity(AlarmEntity alarm, LocalDate nextDate, LocalTime alarmTime) {
+        return mapToFirstAlarmOccurrenceEntity(alarm, nextDate, alarmTime, LocalDateTime.of(nextDate, alarmTime));
+    }
+
+    public static AlarmOccurrenceEntity mapToFirstAlarmOccurrenceEntity(
+        AlarmEntity alarm,
+        LocalDate nextDate,
+        LocalTime alarmTime,
+        LocalDateTime scheduledAt
+    ) {
         return AlarmOccurrenceEntity.builder()
             .alarm(alarm)
             .occurrenceDate(nextDate)
             .occurrenceTime(alarmTime)
-            .scheduledAt(LocalDateTime.of(nextDate, alarmTime))
+            .scheduledAt(scheduledAt)
             .status(OccurrenceStatus.SCHEDULED)
             .alarmRinging(false)
             .ringingCount(0)
@@ -73,7 +81,6 @@ public class AlarmMapper {
     public static CreateAlarmResponse mapToCreateAlarmResponse(AlarmEntity alarm, AlarmOccurrenceEntity occurrence) {
         return CreateAlarmResponse.builder()
             .alarmId(alarm.getId())
-            .alarmRevision(alarm.getRevision())
             .nextOccurrence(NextOccurrenceResponse.builder()
                 .occurrenceId(occurrence.getId())
                 .scheduledAt(occurrence.getScheduledAt())
@@ -111,11 +118,20 @@ public class AlarmMapper {
     }
 
     public static AlarmOccurrenceEntity mapToAlarmOccurrenceForDate(AlarmEntity alarm, LocalTime alarmTime, LocalDate date) {
+        return mapToAlarmOccurrenceForDate(alarm, alarmTime, date, LocalDateTime.of(date, alarmTime));
+    }
+
+    public static AlarmOccurrenceEntity mapToAlarmOccurrenceForDate(
+        AlarmEntity alarm,
+        LocalTime alarmTime,
+        LocalDate date,
+        LocalDateTime scheduledAt
+    ) {
         return AlarmOccurrenceEntity.builder()
             .alarm(alarm)
             .occurrenceDate(date)
             .occurrenceTime(alarmTime)
-            .scheduledAt(LocalDateTime.of(date, alarmTime))
+            .scheduledAt(scheduledAt)
             .status(OccurrenceStatus.SCHEDULED)
             .deactivatedAt(null)
             .checkinTime(null)
@@ -173,7 +189,6 @@ public class AlarmMapper {
     ) {
         return AlarmCheckinResponse.builder()
             .alarmId(alarm.getId())
-            .alarmRevision(alarm.getRevision())
             .nextOccurrence(nextOccurrence == null ? null : AlarmCheckinResponse.NextOccurrenceInfo.builder()
                 .occurrenceId(nextOccurrence.getId())
                 .scheduledAt(nextOccurrence.getScheduledAt())
@@ -189,7 +204,6 @@ public class AlarmMapper {
         return AlarmPaymentResponse.builder()
             .alarmId(alarm.getId())
             .deactivatedAt(deactivatedAt)
-            .alarmRevision(alarm.getRevision())
             .nextOccurrence(nextOccurrence == null ? null : AlarmPaymentResponse.NextOccurrenceInfo.builder()
                 .occurrenceId(nextOccurrence.getId())
                 .scheduledAt(nextOccurrence.getScheduledAt())
@@ -324,7 +338,6 @@ public class AlarmMapper {
     public static AlarmSyncItemDto mapToSyncItem(AlarmEntity alarm, AlarmOccurrenceEntity nextOccurrence) {
         return AlarmSyncItemDto.builder()
             .alarmId(alarm.getId())
-            .alarmRevision(alarm.getRevision())
             .status(mapToStatusLabel(alarm.getStatus()))
             .nextOccurrence(nextOccurrence == null ? null : AlarmSyncItemDto.NextOccurrenceInfo.builder()
                 .occurrenceId(nextOccurrence.getId())

@@ -71,10 +71,6 @@ public class AlarmEntity extends BaseTimeEntity {
     private String address;
 
     @Builder.Default
-    @Column(name = "revision", nullable = false)
-    private int revision = 1;
-
-    @Builder.Default
     @Enumerated(EnumType.STRING)
     @Column(name = "status", length = 20, nullable = false)
     private AlarmStatus status = AlarmStatus.ACTIVE;
@@ -89,17 +85,8 @@ public class AlarmEntity extends BaseTimeEntity {
         this.nextScheduledTime = nextScheduledTime;
     }
 
-    public void incrementRevision() {
-        this.revision++;
-    }
-
     public void softDelete(LocalDateTime now) {
         this.status = AlarmStatus.DELETED;
         this.deletedAt = now;
-    }
-
-    public void softDeleteWithRevision(LocalDateTime now) {
-        softDelete(now);
-        incrementRevision();
     }
 }

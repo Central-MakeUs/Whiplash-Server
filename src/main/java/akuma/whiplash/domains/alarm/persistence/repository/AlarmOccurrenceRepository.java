@@ -138,6 +138,21 @@ public interface AlarmOccurrenceRepository extends JpaRepository<AlarmOccurrence
         @Param("status") OccurrenceStatus status
     );
 
+    @Query("""
+    SELECT new akuma.whiplash.domains.alarm.application.dto.etc.OccurrencePushInfo(o.id, m.id, a.address)
+    FROM AlarmOccurrenceEntity o
+    JOIN o.alarm a
+    JOIN a.member m
+    WHERE o.scheduledAt BETWEEN :startInclusive AND :endInclusive
+      AND o.status = :status
+      AND o.reminderSent = false
+""")
+    List<OccurrencePushInfo> findPreNotificationTargetsByScheduledAtBetween(
+        @Param("startInclusive") LocalDateTime startInclusive,
+        @Param("endInclusive") LocalDateTime endInclusive,
+        @Param("status") OccurrenceStatus status
+    );
+
     @Modifying
     @Query("""
         UPDATE AlarmOccurrenceEntity o

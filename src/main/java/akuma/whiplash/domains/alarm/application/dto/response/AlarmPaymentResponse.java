@@ -7,7 +7,6 @@ import lombok.Builder;
 public record AlarmPaymentResponse(
     Long alarmId,
     LocalDateTime deactivatedAt,
-    int alarmRevision,
     NextOccurrenceInfo nextOccurrence
 ) {
     @Builder

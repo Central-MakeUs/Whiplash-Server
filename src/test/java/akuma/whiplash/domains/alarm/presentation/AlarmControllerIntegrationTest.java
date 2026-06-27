@@ -2,6 +2,7 @@ package akuma.whiplash.domains.alarm.presentation;
 
 import static akuma.whiplash.domains.alarm.exception.AlarmErrorCode.ALARM_DELETE_REQUIRES_PAYMENT;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -43,6 +44,7 @@ import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.ZoneId;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -96,6 +98,9 @@ class AlarmControllerIntegrationTest {
     void setUpTimeProvider() {
         given(timeProvider.now()).willReturn(FIXED_NOW);
         given(timeProvider.today()).willReturn(FIXED_NOW.toLocalDate());
+        given(timeProvider.now(any(ZoneId.class))).willReturn(FIXED_NOW);
+        given(timeProvider.today(any(ZoneId.class))).willReturn(FIXED_NOW.toLocalDate());
+        given(timeProvider.instant()).willReturn(FIXED_NOW.atZone(ZoneId.of("Asia/Seoul")).toInstant());
     }
 
     private AlarmEntity saveAlarmForToday(MemberEntity member) {
@@ -494,8 +499,7 @@ class AlarmControllerIntegrationTest {
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.result.alarmId").value(alarm.getId()))
-                .andExpect(jsonPath("$.result.alarmRevision").value(2));
+                .andExpect(jsonPath("$.result.alarmId").value(alarm.getId()));
 
             // then
             AlarmOccurrenceEntity savedOccurrence = alarmOccurrenceRepository.findById(occurrence.getId()).orElseThrow();
@@ -829,7 +833,6 @@ class AlarmControllerIntegrationTest {
             AlarmEntity deletedAlarm = alarmRepository.findById(alarm.getId()).orElseThrow();
             assertThat(deletedAlarm.getStatus()).isEqualTo(AlarmStatus.DELETED);
             assertThat(deletedAlarm.getDeletedAt()).isEqualTo(FIXED_NOW);
-            assertThat(deletedAlarm.getRevision()).isEqualTo(2);
             assertThat(alarmDeleteLogRepository.findAll())
                 .anySatisfy(log -> {
                     assertThat(log.getDeleteType()).isEqualTo(DeleteType.AD);
