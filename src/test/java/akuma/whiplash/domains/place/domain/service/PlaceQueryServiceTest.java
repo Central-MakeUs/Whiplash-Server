@@ -6,10 +6,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import akuma.whiplash.domains.place.domain.client.NaverClient;
 import akuma.whiplash.domains.place.domain.client.GoogleClient;
-import akuma.whiplash.domains.place.domain.client.dto.NaverLocalSearchResponse;
-import akuma.whiplash.domains.place.domain.client.dto.NaverLocalSearchResponse.Item;
 import akuma.whiplash.domains.place.domain.constant.PlaceProvider;
 import akuma.whiplash.domains.place.domain.model.PlaceDetail;
 import akuma.whiplash.domains.place.domain.model.PlaceAutocompleteCriteria;
@@ -29,14 +26,12 @@ import org.junit.jupiter.api.Test;
 class PlaceQueryServiceTest {
 
     private PlaceQueryServiceImpl placeQueryService;
-    private NaverClient naverClient;
     private GoogleClient googleClient;
 
     @BeforeEach
     void setUp() {
-        naverClient = mock(NaverClient.class);
         googleClient = mock(GoogleClient.class);
-        placeQueryService = new PlaceQueryServiceImpl(naverClient, googleClient);
+        placeQueryService = new PlaceQueryServiceImpl(googleClient);
     }
 
     @Nested
@@ -146,27 +141,6 @@ class PlaceQueryServiceTest {
                 .isInstanceOfSatisfying(ApplicationException.class, exception ->
                     assertThat(exception.getCode()).isEqualTo(PlaceErrorCode.PROVIDER_ERROR)
                 );
-        }
-    }
-
-    @Nested
-    @DisplayName("searchPlaceKeywords - 연관 장소 키워드 조회")
-    class SearchPlaceKeywordsTest {
-
-        @Test
-        @DisplayName("성공: Naver 검색 결과에서 주소 키워드를 추출한다")
-        void success() {
-            // given
-            when(naverClient.searchLocal("강남")).thenReturn(new NaverLocalSearchResponse(List.of(
-                new Item("강남역", "서울시 강남구 역삼동", "서울시 강남구 강남대로", "1270000000", "370000000")
-            )));
-
-            // when
-            List<String> result = placeQueryService.searchPlaceKeywords("강남");
-
-            // then
-            assertThat(result).containsExactly("서울시 강남구 역삼동", "서울시 강남구 강남대로");
-            verify(naverClient).searchLocal("강남");
         }
     }
 

@@ -15,5 +15,4 @@ public interface PlaceQueryService {
     SelectedPlaceDetail getPlaceDetails(PlaceDetailsCriteria criteria);
     List<PlaceSearchResult> searchPlaces(PlaceSearchCriteria criteria);
     PlaceDetail getPlaceDetailByCoord(double latitude, double longitude, String languageCode);
-    List<String> searchPlaceKeywords(String query);
 }

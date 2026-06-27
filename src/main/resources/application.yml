@@ -12,7 +12,6 @@ spring:
       - jwt.yml
       - redis.yml
       - oauth.yml
-      - naver.yml
       - google.yml
       - sentry.yml
 

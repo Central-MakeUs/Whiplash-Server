@@ -4,7 +4,6 @@ spring:
       - jwt.yml
       - swagger.yml
       - oauth.yml
-      - naver.yml
       - sentry.yml
       - redis.yml
       - optional:classpath:env-test.properties
