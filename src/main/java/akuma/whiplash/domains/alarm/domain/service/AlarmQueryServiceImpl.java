@@ -197,7 +197,7 @@ public class AlarmQueryServiceImpl implements AlarmQueryService {
 
     @Override
     public List<RingingPushInfo> getRingingNotificationTargets() {
-        return alarmOccurrenceRepository.findRingingNotificationTargets();
+        return alarmOccurrenceRepository.findRingingNotificationTargets(OccurrenceStatus.RINGING);
     }
 
     private AlarmEntity findAlarmById(Long alarmId) {

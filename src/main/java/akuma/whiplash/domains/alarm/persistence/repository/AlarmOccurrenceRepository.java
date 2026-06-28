@@ -167,9 +167,9 @@ public interface AlarmOccurrenceRepository extends JpaRepository<AlarmOccurrence
     JOIN o.alarm a
     JOIN a.member m
     WHERE o.alarmRinging = true
-      AND o.status = 'RINGING'
+      AND o.status = :status
     """)
-    List<RingingPushInfo> findRingingNotificationTargets();
+    List<RingingPushInfo> findRingingNotificationTargets(@Param("status") OccurrenceStatus status);
 
     @Query("""
     SELECT ao FROM AlarmOccurrenceEntity ao

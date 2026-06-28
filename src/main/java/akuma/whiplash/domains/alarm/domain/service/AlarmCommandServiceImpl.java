@@ -42,7 +42,6 @@ import akuma.whiplash.global.exception.ApplicationException;
 import akuma.whiplash.global.response.code.CommonErrorCode;
 import akuma.whiplash.global.util.date.TimeProvider;
 import akuma.whiplash.infrastructure.payment.PaymentVerificationPort;
-import akuma.whiplash.infrastructure.redis.RingingAlarmRedisRepository;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -77,7 +76,6 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
     private final MemberRepository memberRepository;
     private final MemberDeviceRepository memberDeviceRepository;
     private final PaymentRepository paymentRepository;
-    private final RingingAlarmRedisRepository ringingAlarmRedisRepository;
     private final ApplicationEventPublisher eventPublisher;
     private final TimeProvider timeProvider;
 
@@ -164,7 +162,6 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
         // 3. 오늘 회차가 없거나 이미 비활성화된 상태라면 알람을 소프트 삭제한다.
         LocalDateTime deletedAt = timeProvider.now();
         alarm.softDelete(deletedAt);
-        ringingAlarmRedisRepository.remove(alarmId, memberId);
 
         // 4. 광고 증빙 토큰을 포함한 삭제 이력을 저장한다.
         alarmDeleteLogRepository.save(AlarmMapper.mapToAdDeleteLogEntity(
@@ -247,7 +244,6 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
         // 7. 검증 성공 시 결제를 성공으로 기록하고 알람을 소프트 삭제한다.
         savePaymentOrThrowDuplicate(member, alarm, request.paymentId(), PaymentType.DELETE_ALARM);
         alarm.softDelete(processedAt);
-        ringingAlarmRedisRepository.remove(alarmId, memberId);
 
         alarmDeleteLogRepository.save(AlarmMapper.mapToPaymentDeleteLogEntity(
             alarm,
@@ -300,17 +296,14 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
         // 5. 체크인 완료 시각을 기록하고 회차 상태를 CHECKIN으로 전환한다.
         occurrence.checkin(processedAt);
 
-        // 6. 더 이상 울리는 알람이 아니므로 캐시에서 제거한다.
-        ringingAlarmRedisRepository.remove(alarmId, memberId);
-
-        // 7. 클라이언트 동기화를 위해 다음 예정 회차를 함께 조회한다.
+        // 6. 클라이언트 동기화를 위해 다음 예정 회차를 함께 조회한다.
         AlarmOccurrenceEntity nextOccurrence = alarmOccurrenceRepository
             .findNextScheduledByAlarmIds(List.of(alarmId), OccurrenceStatus.SCHEDULED, processedAt)
             .stream()
             .findFirst()
             .orElse(null);
 
-        // 8. 체크인 로그는 본 처리와 분리해 커밋 후 별도 트랜잭션에서 best-effort로 저장한다.
+        // 7. 체크인 로그는 본 처리와 분리해 커밋 후 별도 트랜잭션에서 best-effort로 저장한다.
         eventPublisher.publishEvent(new AlarmCheckinCompletedEvent(
             occurrence.getId(),
             member.getId(),
@@ -321,7 +314,7 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
             processedAt
         ));
 
-        // 9. 다음 회차 정보를 포함한 응답을 반환한다.
+        // 8. 다음 회차 정보를 포함한 응답을 반환한다.
         return AlarmMapper.mapToAlarmCheckinResponse(alarm, nextOccurrence);
     }
 
@@ -402,7 +395,6 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
         // 8. 검증 성공 시 결제를 성공으로 기록하고 알람 회차를 PAYMENT 상태로 비활성화한다.
         savePaymentOrThrowDuplicate(member, alarm, request.paymentId(), PaymentType.STOP_ALARM);
         occurrence.deactivateByPayment(processedAt);
-        ringingAlarmRedisRepository.remove(alarmId, memberId);
 
         // 9. 클라이언트 동기화와 운영 추적을 위해 성공 로그를 남긴다.
         alarmDeactivationLogRepository.save(AlarmMapper.mapToPaymentDeactivationLogEntity(
@@ -462,15 +454,6 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
             now
         );
         alarmRingingLogRepository.save(log);
-
-        // Redis Sorted Set 적재: score = 알람 예정 시각 epoch millis
-        // 동일 member로 재호출 시 score만 갱신되므로 멱등하다.
-        long score = AlarmScheduleCalculator.toEpochMillis(
-            occurrence.getOccurrenceDate(),
-            occurrence.getOccurrenceTime(),
-            memberZone
-        );
-        ringingAlarmRedisRepository.add(alarmId, memberId, score);
     }
 
     @Override

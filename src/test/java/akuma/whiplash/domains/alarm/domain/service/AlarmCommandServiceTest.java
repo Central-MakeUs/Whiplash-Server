@@ -50,8 +50,6 @@ import akuma.whiplash.domains.payment.persistence.repository.PaymentRepository;
 import akuma.whiplash.global.exception.ApplicationException;
 import akuma.whiplash.global.util.date.TimeProvider;
 import akuma.whiplash.infrastructure.payment.PaymentVerificationPort;
-import akuma.whiplash.infrastructure.redis.RingingAlarmRedisRepository;
-import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
@@ -93,8 +91,6 @@ class AlarmCommandServiceTest {
     private List<PaymentVerificationPort> paymentVerificationPorts;
     @Mock
     private PaymentVerificationPort paymentVerificationPort;
-    @Mock
-    private RingingAlarmRedisRepository ringingAlarmRedisRepository;
     @Mock
     private ApplicationEventPublisher eventPublisher;
     @Mock
@@ -407,7 +403,6 @@ class AlarmCommandServiceTest {
             assertThat(response.nextOccurrence().occurrenceId()).isEqualTo(nextOccurrence.getId());
             verify(paymentRepository).saveAndFlush(any(PaymentEntity.class));
             verify(alarmDeactivationLogRepository).save(any(AlarmDeactivationLogEntity.class));
-            verify(ringingAlarmRedisRepository).remove(alarm.getId(), member.getId());
             verify(paymentVerificationPort).consume(request.paymentId());
         }
 
@@ -542,7 +537,6 @@ class AlarmCommandServiceTest {
             assertThat(alarm.getDeletedAt()).isEqualTo(FIXED_NOW);
             verify(paymentRepository).saveAndFlush(any(PaymentEntity.class));
             verify(alarmDeleteLogRepository).save(any(AlarmDeleteLogEntity.class));
-            verify(ringingAlarmRedisRepository).remove(alarm.getId(), member.getId());
             verify(paymentVerificationPort).consume(request.paymentId());
         }
 
@@ -747,7 +741,6 @@ class AlarmCommandServiceTest {
             verify(alarmDeleteLogRepository).save(logCaptor.capture());
             assertThat(logCaptor.getValue().getDeleteType()).isEqualTo(DeleteType.AD);
             assertThat(logCaptor.getValue().getAdProofToken()).isEqualTo(request.adProofToken());
-            verify(ringingAlarmRedisRepository).remove(alarm.getId(), member.getId());
         }
 
         @Test
@@ -769,7 +762,6 @@ class AlarmCommandServiceTest {
             assertThat(alarm.getStatus()).isEqualTo(AlarmStatus.DELETED);
             assertThat(alarm.getDeletedAt()).isEqualTo(FIXED_NOW);
             verify(alarmDeleteLogRepository).save(any(AlarmDeleteLogEntity.class));
-            verify(ringingAlarmRedisRepository).remove(alarm.getId(), member.getId());
         }
 
         @Test
@@ -850,7 +842,7 @@ class AlarmCommandServiceTest {
     class RingAlarmTest {
 
         @Test
-        @DisplayName("성공: 알람이 울리면 alarmRinging=true, 로그 저장, Redis 적재가 모두 수행된다")
+        @DisplayName("성공: 알람이 울리면 alarmRinging=true로 바꾸고 로그를 저장한다")
         void success() {
             // given
             MemberEntity member = MemberFixture.MEMBER_5.toMockEntity();
@@ -873,52 +865,6 @@ class AlarmCommandServiceTest {
             assertThat(occurrence.isAlarmRinging()).isTrue();          // DB 컬럼 변경
             assertThat(occurrence.getRingingCount()).isEqualTo(1);
             verify(alarmRingingLogRepository).save(any());             // 로그 저장
-            verify(ringingAlarmRedisRepository).add(                   // Redis ZADD
-                    eq(alarm.getId()), eq(member.getId()), anyLong());
-        }
-
-        @Test
-        @DisplayName("성공: 사용자 timeZone 기준 예정 시각을 Redis score로 적재한다")
-        void success_addRedisScoreByMemberTimeZone() {
-            // given
-            MemberEntity member = MemberFixture.MEMBER_5.toMockEntity();
-            AlarmEntity alarm = AlarmFixture.ALARM_05.toMockEntity(member);
-            MemberDeviceEntity device = MemberDeviceEntity.builder()
-                .member(member)
-                .deviceId("new-york-device")
-                .platform("IOS")
-                .fcmToken("fcm-token")
-                .isLoggedIn(true)
-                .appVersion("1.0.0")
-                .osVersion("17")
-                .timeZone("America/New_York")
-                .lastActiveAt(FIXED_NOW)
-                .build();
-            LocalDateTime userLocalScheduledAt = LocalDateTime.of(2026, 5, 1, 7, 0);
-            AlarmOccurrenceEntity occurrence = AlarmOccurrenceFixture.ALARM_OCCURRENCE_PAST_TIME
-                .toMockEntity(alarm, 1L, userLocalScheduledAt, OccurrenceStatus.SCHEDULED);
-            Instant now = userLocalScheduledAt
-                .atZone(ZoneId.of("America/New_York"))
-                .plusMinutes(1)
-                .toInstant();
-            long expectedScore = userLocalScheduledAt
-                .atZone(ZoneId.of("America/New_York"))
-                .toInstant()
-                .toEpochMilli();
-
-            given(timeProvider.instant()).willReturn(now);
-            given(alarmRepository.findById(alarm.getId())).willReturn(Optional.of(alarm));
-            given(alarmOccurrenceRepository
-                .findTopByAlarmIdAndStatusInOrderByOccurrenceDateDescOccurrenceTimeDesc(eq(alarm.getId()), anyList()))
-                .willReturn(Optional.of(occurrence));
-            given(memberDeviceRepository.findFirstByMember_IdAndIsLoggedInTrueOrderByLastActiveAtDesc(member.getId()))
-                .willReturn(Optional.of(device));
-
-            // when
-            alarmCommandService.ringAlarm(member.getId(), alarm.getId());
-
-            // then
-            verify(ringingAlarmRedisRepository).add(alarm.getId(), member.getId(), expectedScore);
         }
 
         @Test
