@@ -110,6 +110,8 @@ class AlarmCommandServiceTest {
         lenient().when(timeProvider.now(any(ZoneId.class))).thenReturn(FIXED_NOW);
         lenient().when(timeProvider.today(any(ZoneId.class))).thenReturn(FIXED_NOW.toLocalDate());
         lenient().when(timeProvider.instant()).thenReturn(FIXED_NOW.atZone(ZoneId.of("Asia/Seoul")).toInstant());
+        lenient().when(memberDeviceRepository.findByMember_IdAndDeviceId(anyLong(), any()))
+            .thenReturn(Optional.empty());
     }
 
     @Nested
@@ -136,11 +138,51 @@ class AlarmCommandServiceTest {
             given(memberRepository.findById(member.getId())).willReturn(Optional.of(member));
 
             // when
-            alarmCommandService.createAlarm(request, member.getId());
+            alarmCommandService.createAlarm(request, member.getId(), "device-uuid");
 
             // then
             verify(alarmRepository).save(any(AlarmEntity.class));
             verify(alarmOccurrenceRepository).save(any(AlarmOccurrenceEntity.class));
+        }
+
+        @Test
+        @DisplayName("성공: 요청 기기 timeZone 기준으로 첫 발생 내역의 예정 시각을 저장한다")
+        void success_createFirstOccurrenceByRequestDeviceTimeZone() {
+            // given
+            MemberEntity member = MemberFixture.MEMBER_11.toMockEntity();
+            AlarmFixture fixture = AlarmFixture.ALARM_11;
+            AlarmRegisterRequest request = new AlarmRegisterRequest(
+                new akuma.whiplash.domains.alarm.application.dto.request.PlaceRequest(
+                    fixture.getAddress(),
+                    fixture.getLatitude(),
+                    fixture.getLongitude()
+                ),
+                fixture.getAlarmPurpose(),
+                fixture.getTime(),
+                fixture.getRepeatDays().stream().map(Weekday::name).toList(),
+                fixture.getSoundType().name()
+            );
+            MemberDeviceEntity device = MemberDeviceEntity.builder()
+                .member(member)
+                .deviceId("device-new-york")
+                .platform("IOS")
+                .fcmToken("fcm-token")
+                .isLoggedIn(true)
+                .timeZone("America/New_York")
+                .build();
+            given(memberRepository.findById(member.getId())).willReturn(Optional.of(member));
+            given(memberDeviceRepository.findByMember_IdAndDeviceId(member.getId(), "device-new-york"))
+                .willReturn(Optional.of(device));
+
+            // when
+            alarmCommandService.createAlarm(request, member.getId(), "device-new-york");
+
+            // then
+            ArgumentCaptor<AlarmOccurrenceEntity> captor = ArgumentCaptor.forClass(AlarmOccurrenceEntity.class);
+            verify(alarmOccurrenceRepository).save(captor.capture());
+            assertThat(captor.getValue().getOccurrenceDate()).isEqualTo(FIXED_NOW.toLocalDate().plusDays(2));
+            assertThat(captor.getValue().getOccurrenceTime()).isEqualTo(fixture.getTime());
+            assertThat(captor.getValue().getScheduledAt()).isEqualTo(LocalDateTime.of(2026, 5, 4, 19, 40));
         }
 
         @Test
@@ -163,7 +205,7 @@ class AlarmCommandServiceTest {
             given(memberRepository.findById(MemberFixture.MEMBER_6.getId())).willReturn(Optional.empty());
 
             // when & then
-            assertThatThrownBy(() -> alarmCommandService.createAlarm(request, MemberFixture.MEMBER_6.getId()))
+            assertThatThrownBy(() -> alarmCommandService.createAlarm(request, MemberFixture.MEMBER_6.getId(), "device-uuid"))
                 .isInstanceOfSatisfying(ApplicationException.class, e ->
                     assertThat(e.getCode()).isEqualTo(MEMBER_NOT_FOUND)
                 );
@@ -190,7 +232,7 @@ class AlarmCommandServiceTest {
             given(alarmRepository.existsByMemberIdAndAlarmPurpose(member.getId(), request.alarmPurpose())).willReturn(true);
 
             // when & then
-            assertThatThrownBy(() -> alarmCommandService.createAlarm(request, member.getId()))
+            assertThatThrownBy(() -> alarmCommandService.createAlarm(request, member.getId(), "device-uuid"))
                 .isInstanceOfSatisfying(ApplicationException.class, e ->
                     assertThat(e.getCode()).isEqualTo(DUPLICATE_ALARM_PURPOSE)
                 );
@@ -855,11 +897,11 @@ class AlarmCommandServiceTest {
             given(alarmOccurrenceRepository
                     .findTopByAlarmIdAndStatusInOrderByOccurrenceDateDescOccurrenceTimeDesc(eq(alarm.getId()), anyList()))
                     .willReturn(Optional.of(occurrence));
-            given(memberDeviceRepository.findFirstByMember_IdAndIsLoggedInTrueOrderByLastActiveAtDesc(member.getId()))
+            given(memberDeviceRepository.findByMember_IdAndDeviceId(member.getId(), "device-uuid"))
                 .willReturn(Optional.empty());
 
             // when
-            alarmCommandService.ringAlarm(member.getId(), alarm.getId());
+            alarmCommandService.ringAlarm(member.getId(), alarm.getId(), "device-uuid");
 
             // then
             assertThat(occurrence.isAlarmRinging()).isTrue();          // DB 컬럼 변경
@@ -883,11 +925,11 @@ class AlarmCommandServiceTest {
                 alarmOccurrenceRepository
                     .findTopByAlarmIdAndStatusInOrderByOccurrenceDateDescOccurrenceTimeDesc(eq(alarm.getId()), anyList())
             ).willReturn(Optional.of(occurrence));
-            given(memberDeviceRepository.findFirstByMember_IdAndIsLoggedInTrueOrderByLastActiveAtDesc(member.getId()))
+            given(memberDeviceRepository.findByMember_IdAndDeviceId(member.getId(), "device-uuid"))
                 .willReturn(Optional.empty());
 
             // when & then
-            assertThatThrownBy(() -> alarmCommandService.ringAlarm(member.getId(), alarm.getId()))
+            assertThatThrownBy(() -> alarmCommandService.ringAlarm(member.getId(), alarm.getId(), "device-uuid"))
                 .isInstanceOfSatisfying(ApplicationException.class, e ->
                     assertThat(e.getCode()).isEqualTo(NOT_ALARM_TIME)
                 );

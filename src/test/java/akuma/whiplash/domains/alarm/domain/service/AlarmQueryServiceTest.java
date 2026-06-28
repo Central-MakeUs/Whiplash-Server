@@ -28,6 +28,7 @@ import akuma.whiplash.domains.alarm.persistence.repository.AlarmOccurrenceReposi
 import akuma.whiplash.domains.alarm.persistence.repository.AlarmRepository;
 import akuma.whiplash.domains.auth.exception.AuthErrorCode;
 import akuma.whiplash.domains.member.exception.MemberErrorCode;
+import akuma.whiplash.domains.member.persistence.entity.MemberDeviceEntity;
 import akuma.whiplash.domains.member.persistence.entity.MemberEntity;
 import akuma.whiplash.domains.member.persistence.repository.MemberDeviceRepository;
 import akuma.whiplash.domains.member.persistence.repository.MemberRepository;
@@ -61,6 +62,7 @@ class AlarmQueryServiceTest {
     @InjectMocks private AlarmQueryServiceImpl alarmQueryService;
 
     private static final LocalDateTime FIXED_NOW = LocalDateTime.of(2026, 5, 2, 14, 30);
+    private static final String REQUEST_DEVICE_ID = "device-seoul";
 
     @BeforeEach
     void setUp() {
@@ -68,6 +70,8 @@ class AlarmQueryServiceTest {
         lenient().when(timeProvider.today()).thenReturn(FIXED_NOW.toLocalDate());
         lenient().when(timeProvider.now(any(ZoneId.class))).thenReturn(FIXED_NOW);
         lenient().when(timeProvider.today(any(ZoneId.class))).thenReturn(FIXED_NOW.toLocalDate());
+        lenient().when(memberDeviceRepository.findByMember_IdAndDeviceId(anyLong(), any()))
+            .thenReturn(Optional.empty());
     }
 
     @Nested
@@ -75,7 +79,7 @@ class AlarmQueryServiceTest {
     class GetAlarmsTest {
 
         @Test
-        @DisplayName("성공: result.alarms 래퍼로 알람 목록을 반환한다")
+        @DisplayName("성공: result.timeZone과 result.alarms 래퍼로 알람 목록을 반환한다")
         void success() {
             // given
             MemberEntity member = MemberFixture.MEMBER_11.toMockEntity();
@@ -89,11 +93,85 @@ class AlarmQueryServiceTest {
                 .willReturn(List.of());
 
             // when
-            GetAlarmsResponse result = alarmQueryService.getAlarms(member.getId());
+            GetAlarmsResponse result = alarmQueryService.getAlarms(member.getId(), REQUEST_DEVICE_ID);
 
             // then
+            assertThat(result.timeZone()).isEqualTo("Asia/Seoul");
             assertThat(result.alarms()).hasSize(1);
             assertThat(result.alarms().get(0).alarmId()).isEqualTo(alarm.getId());
+            assertThat(result.alarms().get(0).nextOccurrence().scheduledDate())
+                .isEqualTo(LocalDate.of(2026, 5, 4));
+            assertThat(result.alarms().get(0).nextOccurrence().scheduledTime()).isEqualTo("06:40");
+            assertThat(result.alarms().get(0).nextOccurrence().scheduledAtUtc()).isEqualTo("2026-05-03T21:40:00Z");
+        }
+
+        @Test
+        @DisplayName("성공: 요청 기기 timeZone 기준 nextOccurrence의 UTC 실행 시각을 반환한다")
+        void success_returnUtcExecutionTimeByCurrentTimeZone() {
+            // given
+            MemberEntity member = MemberFixture.MEMBER_11.toMockEntity();
+            AlarmEntity alarm = AlarmFixture.ALARM_11.toMockEntity();
+            MemberDeviceEntity device = MemberDeviceEntity.builder()
+                .member(member)
+                .deviceId("device-new-york")
+                .platform("IOS")
+                .fcmToken("fcm-token")
+                .isLoggedIn(true)
+                .timeZone("America/New_York")
+                .build();
+            given(memberRepository.findById(member.getId())).willReturn(Optional.of(member));
+            given(memberDeviceRepository.findByMember_IdAndDeviceId(member.getId(), "device-new-york"))
+                .willReturn(Optional.of(device));
+            given(alarmRepository.findAllByMemberIdAndStatusNot(member.getId(), AlarmStatus.DELETED))
+                .willReturn(List.of(alarm));
+            given(alarmOccurrenceRepository.findLatestProcessedByAlarmIds(anyList(), anyList()))
+                .willReturn(List.of());
+            given(alarmOccurrenceRepository.findByAlarmIdsAndOccurrenceDates(anyList(), anyList()))
+                .willReturn(List.of());
+
+            // when
+            GetAlarmsResponse result = alarmQueryService.getAlarms(member.getId(), "device-new-york");
+
+            // then
+            assertThat(result.timeZone()).isEqualTo("America/New_York");
+            assertThat(result.alarms().get(0).nextOccurrence().scheduledDate())
+                .isEqualTo(LocalDate.of(2026, 5, 4));
+            assertThat(result.alarms().get(0).nextOccurrence().scheduledTime()).isEqualTo("06:40");
+            assertThat(result.alarms().get(0).nextOccurrence().scheduledAtUtc()).isEqualTo("2026-05-04T10:40:00Z");
+        }
+
+        @Test
+        @DisplayName("성공: 최신 로그인 기기가 달라도 요청 기기 timeZone으로 알람 목록을 계산한다")
+        void success_useRequestDeviceTimeZoneEvenWhenAnotherDeviceLoggedInLater() {
+            // given
+            MemberEntity member = MemberFixture.MEMBER_11.toMockEntity();
+            AlarmEntity alarm = AlarmFixture.ALARM_11.toMockEntity();
+            MemberDeviceEntity requestDevice = MemberDeviceEntity.builder()
+                .member(member)
+                .deviceId(REQUEST_DEVICE_ID)
+                .platform("ANDROID")
+                .fcmToken("fcm-token-seoul")
+                .isLoggedIn(true)
+                .timeZone("Asia/Seoul")
+                .build();
+            given(memberRepository.findById(member.getId())).willReturn(Optional.of(member));
+            given(memberDeviceRepository.findByMember_IdAndDeviceId(member.getId(), REQUEST_DEVICE_ID))
+                .willReturn(Optional.of(requestDevice));
+            given(alarmRepository.findAllByMemberIdAndStatusNot(member.getId(), AlarmStatus.DELETED))
+                .willReturn(List.of(alarm));
+            given(alarmOccurrenceRepository.findLatestProcessedByAlarmIds(anyList(), anyList()))
+                .willReturn(List.of());
+            given(alarmOccurrenceRepository.findByAlarmIdsAndOccurrenceDates(anyList(), anyList()))
+                .willReturn(List.of());
+
+            // when
+            GetAlarmsResponse result = alarmQueryService.getAlarms(member.getId(), REQUEST_DEVICE_ID);
+
+            // then
+            assertThat(result.timeZone()).isEqualTo("Asia/Seoul");
+            assertThat(result.alarms().get(0).nextOccurrence().scheduledAtUtc()).isEqualTo("2026-05-03T21:40:00Z");
+            then(memberDeviceRepository).should(never())
+                .findFirstByMember_IdAndIsLoggedInTrueOrderByLastActiveAtDesc(anyLong());
         }
 
         @Test
@@ -111,7 +189,7 @@ class AlarmQueryServiceTest {
                 .willReturn(List.of());
 
             // when
-            GetAlarmsResponse result = alarmQueryService.getAlarms(member.getId());
+            GetAlarmsResponse result = alarmQueryService.getAlarms(member.getId(), REQUEST_DEVICE_ID);
 
             // then
             assertThat(result.alarms()).hasSize(1);
@@ -143,7 +221,7 @@ class AlarmQueryServiceTest {
                 .willReturn(List.of());
 
             // when
-            GetAlarmsResponse result = alarmQueryService.getAlarms(member.getId());
+            GetAlarmsResponse result = alarmQueryService.getAlarms(member.getId(), REQUEST_DEVICE_ID);
 
             // then
             assertThat(result.alarms()).hasSize(1);
@@ -162,9 +240,10 @@ class AlarmQueryServiceTest {
                 .willReturn(List.of());
 
             // when
-            GetAlarmsResponse result = alarmQueryService.getAlarms(member.getId());
+            GetAlarmsResponse result = alarmQueryService.getAlarms(member.getId(), REQUEST_DEVICE_ID);
 
             // then
+            assertThat(result.timeZone()).isEqualTo("Asia/Seoul");
             assertThat(result.alarms()).isEmpty();
         }
 
@@ -176,7 +255,7 @@ class AlarmQueryServiceTest {
             given(memberRepository.findById(memberId)).willReturn(Optional.empty());
 
             // when
-            var thrown = assertThatThrownBy(() -> alarmQueryService.getAlarms(memberId));
+            var thrown = assertThatThrownBy(() -> alarmQueryService.getAlarms(memberId, REQUEST_DEVICE_ID));
 
             // then
             thrown

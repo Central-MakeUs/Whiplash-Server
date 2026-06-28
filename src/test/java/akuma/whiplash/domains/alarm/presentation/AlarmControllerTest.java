@@ -4,6 +4,7 @@ import static akuma.whiplash.common.fixture.MemberFixture.*;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
@@ -144,7 +145,7 @@ class AlarmControllerTest {
             CreateAlarmResponse response = CreateAlarmResponse.builder().alarmId(123L).build();
 
             // when
-            when(alarmUseCase.createAlarm(any(AlarmRegisterRequest.class), anyLong())).thenReturn(response);
+            when(alarmUseCase.createAlarm(any(AlarmRegisterRequest.class), anyLong(), anyString())).thenReturn(response);
 
             mockMvc.perform(post(BASE)
                     .contentType(MediaType.APPLICATION_JSON)
@@ -152,7 +153,8 @@ class AlarmControllerTest {
                 .andExpect(status().isOk());
 
             // then
-            verify(alarmUseCase, times(1)).createAlarm(any(AlarmRegisterRequest.class), eq(MEMBER_3.getId()));
+            verify(alarmUseCase, times(1))
+                .createAlarm(any(AlarmRegisterRequest.class), eq(MEMBER_3.getId()), eq("mock_device_id"));
         }
 
         @Test
@@ -177,7 +179,7 @@ class AlarmControllerTest {
             CreateAlarmResponse response = CreateAlarmResponse.builder().alarmId(1L).build();
 
             // when
-            when(alarmUseCase.createAlarm(any(AlarmRegisterRequest.class), anyLong())).thenReturn(response);
+            when(alarmUseCase.createAlarm(any(AlarmRegisterRequest.class), anyLong(), anyString())).thenReturn(response);
 
             mockMvc.perform(post(BASE)
                     .contentType(MediaType.APPLICATION_JSON)
@@ -186,7 +188,7 @@ class AlarmControllerTest {
 
             // then
             ArgumentCaptor<AlarmRegisterRequest> captor = ArgumentCaptor.forClass(AlarmRegisterRequest.class);
-            verify(alarmUseCase, times(1)).createAlarm(captor.capture(), eq(MEMBER_3.getId()));
+            verify(alarmUseCase, times(1)).createAlarm(captor.capture(), eq(MEMBER_3.getId()), eq("mock_device_id"));
             assertThat(captor.getValue().alarmTime()).isEqualTo(LocalTime.of(0, 30));
         }
 
@@ -210,7 +212,7 @@ class AlarmControllerTest {
             setSecurityContext(buildContext(MEMBER_4));
 
             // when
-            when(alarmUseCase.createAlarm(any(AlarmRegisterRequest.class), anyLong()))
+            when(alarmUseCase.createAlarm(any(AlarmRegisterRequest.class), anyLong(), anyString()))
                 .thenThrow(ApplicationException.from(MemberErrorCode.MEMBER_NOT_FOUND));
 
             // then
@@ -241,7 +243,7 @@ class AlarmControllerTest {
         setSecurityContext(buildContext(MEMBER_3));
 
         // when & then
-        when(alarmUseCase.createAlarm(any(AlarmRegisterRequest.class), anyLong()))
+        when(alarmUseCase.createAlarm(any(AlarmRegisterRequest.class), anyLong(), anyString()))
             .thenThrow(ApplicationException.from(AlarmErrorCode.DUPLICATE_ALARM_PURPOSE));
 
         mockMvc.perform(post(BASE)
@@ -266,7 +268,7 @@ class AlarmControllerTest {
                 .andExpect(status().isOk());
 
             // then
-            verify(alarmUseCase, times(1)).ringAlarm(eq(MEMBER_3.getId()), eq(1L));
+            verify(alarmUseCase, times(1)).ringAlarm(eq(MEMBER_3.getId()), eq(1L), eq("mock_device_id"));
         }
 
         @Test
@@ -279,7 +281,7 @@ class AlarmControllerTest {
             // when
             doThrow(ApplicationException.from(AlarmErrorCode.NOT_ALARM_TIME))
                 .when(alarmUseCase)
-                .ringAlarm(eq(MEMBER_3.getId()), eq(1L));
+                .ringAlarm(eq(MEMBER_3.getId()), eq(1L), eq("mock_device_id"));
 
             // then
             mockMvc.perform(post(BASE + "/{alarmId}/ring", 1L))
@@ -694,23 +696,35 @@ class AlarmControllerTest {
                 .nextOccurrence(AlarmPreviewDto.OccurrenceInfo.builder()
                     .occurrenceId(null)
                     .scheduledDate(LocalDate.now())
+                    .scheduledTime("07:00")
                     .dayOfWeek("월")
+                    .scheduledAtUtc("2026-06-30T22:00:00Z")
                     .build())
                 .nextNextOccurrence(AlarmPreviewDto.OccurrenceInfo.builder()
                     .occurrenceId(null)
                     .scheduledDate(LocalDate.now().plusDays(7))
+                    .scheduledTime("07:00")
                     .dayOfWeek("월")
+                    .scheduledAtUtc("2026-07-07T22:00:00Z")
                     .build())
                 .build();
 
-            when(alarmUseCase.getAlarms(anyLong()))
-                .thenReturn(GetAlarmsResponse.builder().alarms(List.of(dto)).build());
+            when(alarmUseCase.getAlarms(anyLong(), anyString()))
+                .thenReturn(GetAlarmsResponse.builder()
+                    .timeZone("Asia/Seoul")
+                    .alarms(List.of(dto))
+                    .build());
 
             // when & then
             mockMvc.perform(get(BASE))
-                .andExpect(status().isOk());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.timeZone").value("Asia/Seoul"))
+                .andExpect(jsonPath("$.result.alarms[0].nextOccurrence.scheduledTime").value("07:00"))
+                .andExpect(jsonPath("$.result.alarms[0].nextOccurrence.scheduledAtUtc").value("2026-06-30T22:00:00Z"))
+                .andExpect(jsonPath("$.result.alarms[0].nextNextOccurrence.scheduledTime").value("07:00"))
+                .andExpect(jsonPath("$.result.alarms[0].nextNextOccurrence.scheduledAtUtc").value("2026-07-07T22:00:00Z"));
 
-            verify(alarmUseCase, times(1)).getAlarms(eq(MEMBER_3.getId()));
+            verify(alarmUseCase, times(1)).getAlarms(eq(MEMBER_3.getId()), eq("mock_device_id"));
         }
 
         @Test
@@ -719,7 +733,7 @@ class AlarmControllerTest {
             // given
             setSecurityContext(buildContext(MEMBER_4));
 
-            when(alarmUseCase.getAlarms(anyLong()))
+            when(alarmUseCase.getAlarms(anyLong(), anyString()))
                 .thenThrow(ApplicationException.from(MemberErrorCode.MEMBER_NOT_FOUND));
 
             // when & then

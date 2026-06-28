@@ -60,17 +60,20 @@ public class AlarmQueryServiceImpl implements AlarmQueryService {
     private final TimeProvider timeProvider;
 
     @Override
-    public GetAlarmsResponse getAlarms(Long memberId) {
+    public GetAlarmsResponse getAlarms(Long memberId, String deviceId) {
         memberRepository.findById(memberId)
             .orElseThrow(() -> ApplicationException.from(MemberErrorCode.MEMBER_NOT_FOUND));
 
+        ZoneId memberZone = resolveMemberZone(memberId, deviceId);
         List<AlarmEntity> alarms = alarmRepository.findAllByMemberIdAndStatusNot(memberId, AlarmStatus.DELETED);
 
         if (alarms.isEmpty()) {
-            return GetAlarmsResponse.builder().alarms(List.of()).build();
+            return GetAlarmsResponse.builder()
+                .timeZone(memberZone.getId())
+                .alarms(List.of())
+                .build();
         }
 
-        ZoneId memberZone = resolveMemberZone(memberId);
         LocalDate today = timeProvider.today(memberZone);
         LocalDateTime now = timeProvider.now(memberZone);
         List<Long> alarmIds = alarms.stream().map(AlarmEntity::getId).toList();
@@ -131,9 +134,11 @@ public class AlarmQueryServiceImpl implements AlarmQueryService {
                     alarmDatesMap.get(alarm.getId()).first(),
                     alarmDatesMap.get(alarm.getId()).second(),
                     alarmDatesMap.get(alarm.getId()).third(),
-                    occurrenceIdMap.getOrDefault(alarm.getId(), Map.of())
+                    occurrenceIdMap.getOrDefault(alarm.getId(), Map.of()),
+                    memberZone
                 ))
                 .toList())
+            .timeZone(memberZone.getId())
             .build();
     }
 
@@ -215,8 +220,8 @@ public class AlarmQueryServiceImpl implements AlarmQueryService {
         }
     }
 
-    private ZoneId resolveMemberZone(Long memberId) {
-        return memberDeviceRepository.findFirstByMember_IdAndIsLoggedInTrueOrderByLastActiveAtDesc(memberId)
+    private ZoneId resolveMemberZone(Long memberId, String deviceId) {
+        return memberDeviceRepository.findByMember_IdAndDeviceId(memberId, deviceId)
             .map(MemberDeviceEntity::getTimeZone)
             .map(AlarmScheduleCalculator::resolveZone)
             .orElse(AlarmScheduleCalculator.DEFAULT_ZONE);

@@ -32,6 +32,7 @@ import akuma.whiplash.domains.alarm.persistence.repository.AlarmRingingLogReposi
 import akuma.whiplash.domains.alarm.persistence.repository.AlarmOccurrenceRepository;
 import akuma.whiplash.domains.alarm.persistence.repository.AlarmRepository;
 import akuma.whiplash.domains.auth.exception.AuthErrorCode;
+import akuma.whiplash.domains.member.persistence.entity.MemberDeviceEntity;
 import akuma.whiplash.domains.member.persistence.entity.MemberEntity;
 import akuma.whiplash.domains.member.persistence.repository.MemberDeviceRepository;
 import akuma.whiplash.domains.member.persistence.repository.MemberRepository;
@@ -900,13 +901,27 @@ class AlarmControllerIntegrationTest {
             MemberEntity member = memberRepository.save(MemberFixture.MEMBER_3.toEntity());
             AlarmFixture fixture = AlarmFixture.ALARM_03;
             alarmRepository.save(fixture.toEntity(member));
+            memberDeviceRepository.save(MemberDeviceEntity.builder()
+                .member(member)
+                .deviceId("mock_device_id")
+                .platform("IOS")
+                .fcmToken("fcm-token")
+                .isLoggedIn(true)
+                .appVersion("1.0.0")
+                .osVersion("17")
+                .timeZone("America/New_York")
+                .build());
             String accessToken = jwtProvider.generateAccessToken(member.getId(), member.getRole(), "mock_device_id");
 
             // when & then
             mockMvc.perform(get(BASE)
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.result.alarms[0].alarmPurpose").value(fixture.getAlarmPurpose()));
+                .andExpect(jsonPath("$.result.timeZone").value("America/New_York"))
+                .andExpect(jsonPath("$.result.alarms[0].alarmPurpose").value(fixture.getAlarmPurpose()))
+                .andExpect(jsonPath("$.result.alarms[0].nextOccurrence.scheduledDate").value("2026-05-04"))
+                .andExpect(jsonPath("$.result.alarms[0].nextOccurrence.scheduledTime").value("06:50"))
+                .andExpect(jsonPath("$.result.alarms[0].nextOccurrence.scheduledAtUtc").value("2026-05-04T10:50:00Z"));
         }
 
 /*        @Test

@@ -44,7 +44,13 @@ public record AlarmPreviewDto(
         @Schema(description = "예정 날짜", example = "2026-04-22")
         LocalDate scheduledDate,
 
+        @Schema(description = "예정 시간 (HH:mm)", example = "07:00")
+        String scheduledTime,
+
         @Schema(description = "요일 단축형", example = "월")
-        String dayOfWeek
+        String dayOfWeek,
+
+        @Schema(description = "UTC 기준 실제 알림 실행 시각", example = "2026-06-30T22:00:00Z")
+        String scheduledAtUtc
     ) {}
 }

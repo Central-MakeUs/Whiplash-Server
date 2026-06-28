@@ -82,7 +82,7 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
     private static final double CHECKIN_RADIUS_METERS = 50.0;
 
     @Override
-    public CreateAlarmResponse createAlarm(AlarmRegisterRequest request, Long memberId) {
+    public CreateAlarmResponse createAlarm(AlarmRegisterRequest request, Long memberId, String deviceId) {
         MemberEntity memberEntity = findMemberById(memberId);
 
         boolean exists = alarmRepository.existsByMemberIdAndAlarmPurpose(memberId, request.alarmPurpose());
@@ -95,7 +95,7 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
         alarmRepository.save(alarm);
 
         // 2. 다음 알람 발생 날짜 계산
-        ZoneId memberZone = resolveMemberZone(memberId);
+        ZoneId memberZone = resolveMemberZone(memberId, deviceId);
         Set<DayOfWeek> repeatDays = alarm.getRepeatDays().stream()
             .map(Weekday::getDayOfWeek)
             .collect(Collectors.toSet());
@@ -422,7 +422,7 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
     }
 
     @Override
-    public void ringAlarm(Long memberId, Long alarmId) {
+    public void ringAlarm(Long memberId, Long alarmId, String deviceId) {
         AlarmEntity alarm = findAlarmById(alarmId);
         validAlarmOwner(memberId, alarm.getMember().getId());
 
@@ -435,7 +435,7 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
             .orElseThrow(() -> ApplicationException.from(ALARM_OCCURRENCE_NOT_FOUND));
 
         // 아직 알람이 울릴 시간이 아니라면 예외 발생
-        ZoneId memberZone = resolveMemberZone(memberId);
+        ZoneId memberZone = resolveMemberZone(memberId, deviceId);
         LocalDateTime now = timeProvider.now();
         if (!AlarmScheduleCalculator.isDue(
             occurrence.getOccurrenceDate(),
@@ -512,8 +512,8 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
             .orElseThrow(() -> ApplicationException.from(CommonErrorCode.BAD_REQUEST));
     }
 
-    private ZoneId resolveMemberZone(Long memberId) {
-        return memberDeviceRepository.findFirstByMember_IdAndIsLoggedInTrueOrderByLastActiveAtDesc(memberId)
+    private ZoneId resolveMemberZone(Long memberId, String deviceId) {
+        return memberDeviceRepository.findByMember_IdAndDeviceId(memberId, deviceId)
             .map(MemberDeviceEntity::getTimeZone)
             .map(AlarmScheduleCalculator::resolveZone)
             .orElse(AlarmScheduleCalculator.DEFAULT_ZONE);

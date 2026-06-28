@@ -80,7 +80,7 @@ public class AlarmScheduleCalculator {
         return ZoneId.of(timeZone);
     }
 
-    private static Instant toInstant(
+    public static Instant toInstant(
         LocalDate occurrenceDate,
         LocalTime occurrenceTime,
         ZoneId memberZone

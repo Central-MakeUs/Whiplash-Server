@@ -52,7 +52,7 @@ public class AlarmController {
     @Operation(summary = "알람 등록", description = "사용자가 알람을 등록합니다.")
     @PostMapping
     public ApplicationResponse<CreateAlarmResponse> createAlarm(@AuthenticationPrincipal MemberContext memberContext, @RequestBody @Valid AlarmRegisterRequest request) {
-        CreateAlarmResponse response = alarmUseCase.createAlarm(request, memberContext.memberId());
+        CreateAlarmResponse response = alarmUseCase.createAlarm(request, memberContext.memberId(), memberContext.deviceId());
         return ApplicationResponse.onSuccess(response);
     }
 
@@ -92,7 +92,7 @@ public class AlarmController {
     @Operation(summary = "알람 목록 조회", description = "사용자가 등록한 알람 목록을 조회합니다.")
     @GetMapping
     public ApplicationResponse<GetAlarmsResponse> getAlarms(@AuthenticationPrincipal MemberContext memberContext) {
-        return ApplicationResponse.onSuccess(alarmUseCase.getAlarms(memberContext.memberId()));
+        return ApplicationResponse.onSuccess(alarmUseCase.getAlarms(memberContext.memberId(), memberContext.deviceId()));
     }
 
     @CustomErrorCodes(memberErrorCodes = {MEMBER_NOT_FOUND})
@@ -173,7 +173,7 @@ public class AlarmController {
         @AuthenticationPrincipal MemberContext memberContext,
         @PathVariable Long alarmId
     ) {
-        alarmUseCase.ringAlarm(memberContext.memberId(), alarmId);
+        alarmUseCase.ringAlarm(memberContext.memberId(), alarmId, memberContext.deviceId());
         return ApplicationResponse.onSuccess();
     }
 }

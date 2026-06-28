@@ -18,6 +18,7 @@ import akuma.whiplash.domains.alarm.domain.constant.DeleteType;
 import akuma.whiplash.domains.alarm.domain.constant.OccurrenceStatus;
 import akuma.whiplash.domains.alarm.domain.constant.SoundType;
 import akuma.whiplash.domains.alarm.domain.constant.Weekday;
+import akuma.whiplash.domains.alarm.domain.util.AlarmScheduleCalculator;
 import akuma.whiplash.domains.alarm.exception.AlarmErrorCode;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmDeleteLogEntity;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmEntity;
@@ -31,6 +32,7 @@ import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
@@ -298,7 +300,8 @@ public class AlarmMapper {
         LocalDate firstDate,
         LocalDate secondDate,
         LocalDate thirdDate,
-        Map<LocalDate, Long> occurrenceIdsByDate
+        Map<LocalDate, Long> occurrenceIdsByDate,
+        ZoneId memberZone
     ) {
         boolean isCurrentOccurrenceProcessed = latestProcessedOccurrence != null
             && latestProcessedOccurrence.getOccurrenceDate().isEqual(firstDate);
@@ -322,16 +325,27 @@ public class AlarmMapper {
             .address(alarm.getAddress())
             .status(status)
             .arrivalCheckEnabled(arrivalCheckEnabled)
-            .nextOccurrence(AlarmPreviewDto.OccurrenceInfo.builder()
-                .occurrenceId(occurrenceIdsByDate.get(resolvedNext))
-                .scheduledDate(resolvedNext)
-                .dayOfWeek(Weekday.getDescriptionOfDayOfWeek(resolvedNext.getDayOfWeek()))
-                .build())
-            .nextNextOccurrence(AlarmPreviewDto.OccurrenceInfo.builder()
-                .occurrenceId(occurrenceIdsByDate.get(resolvedNextNext))
-                .scheduledDate(resolvedNextNext)
-                .dayOfWeek(Weekday.getDescriptionOfDayOfWeek(resolvedNextNext.getDayOfWeek()))
-                .build())
+            .nextOccurrence(mapToOccurrenceInfo(alarm, resolvedNext, occurrenceIdsByDate, memberZone))
+            .nextNextOccurrence(mapToOccurrenceInfo(alarm, resolvedNextNext, occurrenceIdsByDate, memberZone))
+            .build();
+    }
+
+    private static AlarmPreviewDto.OccurrenceInfo mapToOccurrenceInfo(
+        AlarmEntity alarm,
+        LocalDate occurrenceDate,
+        Map<LocalDate, Long> occurrenceIdsByDate,
+        ZoneId memberZone
+    ) {
+        return AlarmPreviewDto.OccurrenceInfo.builder()
+            .occurrenceId(occurrenceIdsByDate.get(occurrenceDate))
+            .scheduledDate(occurrenceDate)
+            .scheduledTime(alarm.getTime().format(DateTimeFormatter.ofPattern("HH:mm")))
+            .dayOfWeek(Weekday.getDescriptionOfDayOfWeek(occurrenceDate.getDayOfWeek()))
+            .scheduledAtUtc(AlarmScheduleCalculator.toInstant(
+                occurrenceDate,
+                alarm.getTime(),
+                memberZone
+            ).toString())
             .build();
     }
 
