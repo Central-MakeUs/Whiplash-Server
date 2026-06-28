@@ -51,7 +51,7 @@ public class AlarmScheduleCalculator {
         LocalTime occurrenceTime,
         ZoneId memberZone
     ) {
-        return toZonedDateTime(occurrenceDate, occurrenceTime, memberZone)
+        return toScheduledZonedDateTime(occurrenceDate, occurrenceTime, memberZone)
             .withZoneSameInstant(DEFAULT_ZONE)
             .toLocalDateTime();
     }
@@ -85,10 +85,10 @@ public class AlarmScheduleCalculator {
         LocalTime occurrenceTime,
         ZoneId memberZone
     ) {
-        return toZonedDateTime(occurrenceDate, occurrenceTime, memberZone).toInstant();
+        return toScheduledZonedDateTime(occurrenceDate, occurrenceTime, memberZone).toInstant();
     }
 
-    private static ZonedDateTime toZonedDateTime(
+    public static ZonedDateTime toScheduledZonedDateTime(
         LocalDate occurrenceDate,
         LocalTime occurrenceTime,
         ZoneId memberZone

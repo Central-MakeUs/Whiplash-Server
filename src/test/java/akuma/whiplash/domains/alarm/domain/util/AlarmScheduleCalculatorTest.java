@@ -89,4 +89,47 @@ class AlarmScheduleCalculatorTest {
             assertThat(result).isEqualTo(expected.toEpochMilli());
         }
     }
+
+    @Nested
+    @DisplayName("toScheduledZonedDateTime - DST 전환 시각 변환")
+    class ToScheduledZonedDateTimeTest {
+
+        @Test
+        @DisplayName("성공: DST 시작으로 존재하지 않는 현지 시각이면 다음 유효 시각으로 예약한다")
+        void success_gap() {
+            // given
+            ZoneId memberZone = ZoneId.of("America/New_York");
+
+            // when
+            ZonedDateTime result = AlarmScheduleCalculator.toScheduledZonedDateTime(
+                LocalDate.of(2026, 3, 8),
+                LocalTime.of(2, 30),
+                memberZone
+            );
+
+            // then
+            assertThat(result.toLocalDate()).isEqualTo(LocalDate.of(2026, 3, 8));
+            assertThat(result.toLocalTime()).isEqualTo(LocalTime.of(3, 30));
+            assertThat(result.getOffset().getId()).isEqualTo("-04:00");
+        }
+
+        @Test
+        @DisplayName("성공: DST 종료로 중복되는 현지 시각이면 더 이른 offset의 첫 발생으로 예약한다")
+        void success_overlap() {
+            // given
+            ZoneId memberZone = ZoneId.of("America/New_York");
+
+            // when
+            ZonedDateTime result = AlarmScheduleCalculator.toScheduledZonedDateTime(
+                LocalDate.of(2026, 11, 1),
+                LocalTime.of(1, 30),
+                memberZone
+            );
+
+            // then
+            assertThat(result.toLocalDate()).isEqualTo(LocalDate.of(2026, 11, 1));
+            assertThat(result.toLocalTime()).isEqualTo(LocalTime.of(1, 30));
+            assertThat(result.getOffset().getId()).isEqualTo("-04:00");
+        }
+    }
 }
