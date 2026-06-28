@@ -27,7 +27,6 @@ import akuma.whiplash.domains.alarm.persistence.entity.AlarmOccurrenceEntity;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmRingingLogEntity;
 import akuma.whiplash.domains.member.persistence.entity.MemberEntity;
 import akuma.whiplash.global.exception.ApplicationException;
-import akuma.whiplash.global.util.date.DateUtil;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -80,13 +79,24 @@ public class AlarmMapper {
             .build();
     }
 
-    public static CreateAlarmResponse mapToCreateAlarmResponse(AlarmEntity alarm, AlarmOccurrenceEntity occurrence) {
+    public static CreateAlarmResponse mapToCreateAlarmResponse(
+        AlarmEntity alarm,
+        AlarmOccurrenceEntity occurrence,
+        ZoneId memberZone
+    ) {
         return CreateAlarmResponse.builder()
             .alarmId(alarm.getId())
+            .timeZone(memberZone.getId())
             .nextOccurrence(NextOccurrenceResponse.builder()
                 .occurrenceId(occurrence.getId())
-                .scheduledAt(occurrence.getScheduledAt())
-                .dayOfWeek(DateUtil.getKoreanDayOfWeek(occurrence.getOccurrenceDate()))
+                .scheduledDate(occurrence.getOccurrenceDate())
+                .scheduledTime(occurrence.getOccurrenceTime().format(DateTimeFormatter.ofPattern("HH:mm")))
+                .dayOfWeek(Weekday.getDescriptionOfDayOfWeek(occurrence.getOccurrenceDate().getDayOfWeek()))
+                .scheduledAtUtc(AlarmScheduleCalculator.toInstant(
+                    occurrence.getOccurrenceDate(),
+                    occurrence.getOccurrenceTime(),
+                    memberZone
+                ).toString())
                 .build())
             .build();
     }

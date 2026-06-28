@@ -122,7 +122,7 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
         // 4. 알람의 다음 예정 시각 업데이트
         alarm.updateNextScheduledTime(nextScheduledTime);
 
-        return AlarmMapper.mapToCreateAlarmResponse(alarm, occurrence);
+        return AlarmMapper.mapToCreateAlarmResponse(alarm, occurrence, memberZone);
     }
 
     @Override

@@ -159,21 +159,28 @@ class AlarmControllerIntegrationTest {
     class CreateAlarmTest {
 
         @Test
-        @DisplayName("성공: 알람 등록 요청이 성공하면 알람이 저장된다")
+        @DisplayName("성공: 알람 등록 요청이 성공하면 알람과 요청 기기 timeZone 기준 다음 발생 정보가 응답된다")
         void success() throws Exception {
             // given
             MemberEntity member = memberRepository.save(MemberFixture.MEMBER_1.toEntity());
-            AlarmFixture fixture = AlarmFixture.ALARM_01;
+            memberDeviceRepository.save(MemberDeviceEntity.builder()
+                .member(member)
+                .deviceId("mock_device_id")
+                .platform("IOS")
+                .fcmToken("fcm-token")
+                .isLoggedIn(true)
+                .timeZone("Asia/Seoul")
+                .build());
             AlarmRegisterRequest request = new AlarmRegisterRequest(
                 new akuma.whiplash.domains.alarm.application.dto.request.PlaceRequest(
-                    fixture.getAddress(),
-                    fixture.getLatitude(),
-                    fixture.getLongitude()
+                    "서울특별시 중구 퇴계로 24",
+                    37.564213,
+                    127.001698
                 ),
-                fixture.getAlarmPurpose(),
-                fixture.getTime(),
-                fixture.getRepeatDays().stream().map(Weekday::name).toList(),
-                fixture.getSoundType().name()
+                "월요일 점심 알람",
+                LocalTime.of(12, 0),
+                List.of("MONDAY"),
+                SoundType.KARINA_SCOLDING.name()
             );
             String accessToken = jwtProvider.generateAccessToken(member.getId(), member.getRole(), "mock_device_id");
 
@@ -182,7 +189,13 @@ class AlarmControllerIntegrationTest {
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isOk());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.timeZone").value("Asia/Seoul"))
+                .andExpect(jsonPath("$.result.nextOccurrence.scheduledDate").value("2026-05-04"))
+                .andExpect(jsonPath("$.result.nextOccurrence.scheduledTime").value("12:00"))
+                .andExpect(jsonPath("$.result.nextOccurrence.dayOfWeek").value("월"))
+                .andExpect(jsonPath("$.result.nextOccurrence.scheduledAtUtc").value("2026-05-04T03:00:00Z"))
+                .andExpect(jsonPath("$.result.nextOccurrence.scheduledAt").doesNotExist());
 
             // then
             assertThat(alarmRepository.findAllByMemberId(member.getId())).hasSize(1);

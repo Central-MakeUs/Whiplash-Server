@@ -27,6 +27,7 @@ import akuma.whiplash.domains.alarm.application.dto.request.AlarmPaymentRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmRegisterRequest;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmCheckinResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmPaymentResponse;
+import akuma.whiplash.domains.alarm.application.dto.response.CreateAlarmResponse;
 import akuma.whiplash.domains.alarm.application.service.AuditLogRecorder;
 import akuma.whiplash.domains.alarm.domain.constant.AlarmStatus;
 import akuma.whiplash.domains.alarm.domain.constant.DeleteType;
@@ -50,6 +51,7 @@ import akuma.whiplash.domains.payment.persistence.repository.PaymentRepository;
 import akuma.whiplash.global.exception.ApplicationException;
 import akuma.whiplash.global.util.date.TimeProvider;
 import akuma.whiplash.infrastructure.payment.PaymentVerificationPort;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
@@ -175,7 +177,7 @@ class AlarmCommandServiceTest {
                 .willReturn(Optional.of(device));
 
             // when
-            alarmCommandService.createAlarm(request, member.getId(), "device-new-york");
+            CreateAlarmResponse response = alarmCommandService.createAlarm(request, member.getId(), "device-new-york");
 
             // then
             ArgumentCaptor<AlarmOccurrenceEntity> captor = ArgumentCaptor.forClass(AlarmOccurrenceEntity.class);
@@ -183,6 +185,11 @@ class AlarmCommandServiceTest {
             assertThat(captor.getValue().getOccurrenceDate()).isEqualTo(FIXED_NOW.toLocalDate().plusDays(2));
             assertThat(captor.getValue().getOccurrenceTime()).isEqualTo(fixture.getTime());
             assertThat(captor.getValue().getScheduledAt()).isEqualTo(LocalDateTime.of(2026, 5, 4, 19, 40));
+            assertThat(response.timeZone()).isEqualTo("America/New_York");
+            assertThat(response.nextOccurrence().scheduledDate()).isEqualTo(LocalDate.of(2026, 5, 4));
+            assertThat(response.nextOccurrence().scheduledTime()).isEqualTo("06:40");
+            assertThat(response.nextOccurrence().dayOfWeek()).isEqualTo("월");
+            assertThat(response.nextOccurrence().scheduledAtUtc()).isEqualTo("2026-05-04T10:40:00Z");
         }
 
         @Test
