@@ -56,8 +56,8 @@ public class AlarmUseCase {
         return alarmQueryService.getAlarms(memberId, deviceId);
     }
 
-    public AlarmSyncResponse getSyncAlarms(Long memberId) {
-        return alarmQueryService.getSyncAlarms(memberId);
+    public AlarmSyncResponse getSyncAlarms(Long memberId, String deviceId) {
+        return alarmQueryService.getSyncAlarms(memberId, deviceId);
     }
 
     public AlarmDeleteMethodResponse getAlarmDeleteMethod(Long memberId, Long alarmId) {

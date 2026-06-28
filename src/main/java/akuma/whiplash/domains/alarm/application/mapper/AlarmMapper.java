@@ -349,20 +349,36 @@ public class AlarmMapper {
             .build();
     }
 
-    public static AlarmSyncItemDto mapToSyncItem(AlarmEntity alarm, AlarmOccurrenceEntity nextOccurrence) {
+    public static AlarmSyncItemDto mapToSyncItem(
+        AlarmEntity alarm,
+        AlarmOccurrenceEntity nextOccurrence,
+        ZoneId memberZone
+    ) {
         return AlarmSyncItemDto.builder()
             .alarmId(alarm.getId())
             .status(mapToStatusLabel(alarm.getStatus()))
             .nextOccurrence(nextOccurrence == null ? null : AlarmSyncItemDto.NextOccurrenceInfo.builder()
                 .occurrenceId(nextOccurrence.getId())
-                .scheduledAt(nextOccurrence.getScheduledAt())
+                .scheduledDate(nextOccurrence.getOccurrenceDate())
+                .scheduledTime(nextOccurrence.getOccurrenceTime().format(DateTimeFormatter.ofPattern("HH:mm")))
+                .dayOfWeek(Weekday.getDescriptionOfDayOfWeek(nextOccurrence.getOccurrenceDate().getDayOfWeek()))
+                .scheduledAtUtc(AlarmScheduleCalculator.toInstant(
+                    nextOccurrence.getOccurrenceDate(),
+                    nextOccurrence.getOccurrenceTime(),
+                    memberZone
+                ).toString())
                 .build())
             .build();
     }
 
-    public static AlarmSyncResponse mapToSyncResponse(LocalDateTime serverTime, List<AlarmSyncItemDto> alarms) {
+    public static AlarmSyncResponse mapToSyncResponse(
+        LocalDateTime serverTime,
+        String timeZone,
+        List<AlarmSyncItemDto> alarms
+    ) {
         return AlarmSyncResponse.builder()
             .serverTime(serverTime)
+            .timeZone(timeZone)
             .alarms(alarms)
             .build();
     }

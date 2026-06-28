@@ -289,30 +289,44 @@ class AlarmQueryServiceTest {
             AlarmOccurrenceEntity nextOccurrence = AlarmOccurrenceEntity.builder()
                 .id(100L)
                 .alarm(activeAlarm)
-                .occurrenceDate(LocalDate.now().plusDays(1))
+                .occurrenceDate(LocalDate.of(2026, 5, 4))
                 .occurrenceTime(activeAlarm.getTime())
-                .scheduledAt(LocalDateTime.now().plusDays(1))
+                .scheduledAt(LocalDateTime.of(2026, 5, 4, 19, 40))
                 .status(OccurrenceStatus.SCHEDULED)
                 .alarmRinging(false)
                 .ringingCount(0)
                 .reminderSent(false)
                 .build();
+            MemberDeviceEntity device = MemberDeviceEntity.builder()
+                .member(member)
+                .deviceId("device-new-york")
+                .platform("IOS")
+                .fcmToken("fcm-token")
+                .isLoggedIn(true)
+                .timeZone("America/New_York")
+                .build();
 
             given(memberRepository.findById(member.getId())).willReturn(Optional.of(member));
+            given(memberDeviceRepository.findByMember_IdAndDeviceId(member.getId(), "device-new-york"))
+                .willReturn(Optional.of(device));
             given(alarmRepository.findAllByMemberIdAndStatusNot(member.getId(), AlarmStatus.DELETED))
                 .willReturn(List.of(activeAlarm, inactiveAlarm));
             given(alarmOccurrenceRepository.findNextScheduledByAlarmIds(anyList(), any(), any(LocalDateTime.class)))
                 .willReturn(List.of(nextOccurrence));
 
             // when
-            AlarmSyncResponse result = alarmQueryService.getSyncAlarms(member.getId());
+            AlarmSyncResponse result = alarmQueryService.getSyncAlarms(member.getId(), "device-new-york");
 
             // then
             assertThat(result.serverTime()).isNotNull();
+            assertThat(result.timeZone()).isEqualTo("America/New_York");
             assertThat(result.alarms()).hasSize(2);
             assertThat(result.alarms().get(0).alarmId()).isEqualTo(activeAlarm.getId());
             assertThat(result.alarms().get(0).status()).isEqualTo("활성화");
             assertThat(result.alarms().get(0).nextOccurrence().occurrenceId()).isEqualTo(nextOccurrence.getId());
+            assertThat(result.alarms().get(0).nextOccurrence().scheduledDate()).isEqualTo(LocalDate.of(2026, 5, 4));
+            assertThat(result.alarms().get(0).nextOccurrence().scheduledTime()).isEqualTo("06:40");
+            assertThat(result.alarms().get(0).nextOccurrence().scheduledAtUtc()).isEqualTo("2026-05-04T10:40:00Z");
             assertThat(result.alarms().get(1).status()).isEqualTo("비활성화");
             assertThat(result.alarms().get(1).nextOccurrence()).isNull();
         }
@@ -331,10 +345,11 @@ class AlarmQueryServiceTest {
                     .willReturn(List.of());
 
                 // when
-                AlarmSyncResponse result = alarmQueryService.getSyncAlarms(member.getId());
+                AlarmSyncResponse result = alarmQueryService.getSyncAlarms(member.getId(), REQUEST_DEVICE_ID);
 
                 // then
                 assertThat(result.serverTime()).isNotNull();
+                assertThat(result.timeZone()).isEqualTo("Asia/Seoul");
                 assertThat(result.alarms()).isEmpty();
                 then(alarmOccurrenceRepository).should(never())
                     .findNextScheduledByAlarmIds(anyList(), any(), any(LocalDateTime.class));
@@ -349,7 +364,7 @@ class AlarmQueryServiceTest {
             given(memberRepository.findById(memberId)).willReturn(Optional.empty());
 
             // when
-            var thrown = assertThatThrownBy(() -> alarmQueryService.getSyncAlarms(memberId));
+            var thrown = assertThatThrownBy(() -> alarmQueryService.getSyncAlarms(memberId, REQUEST_DEVICE_ID));
 
             // then
             thrown

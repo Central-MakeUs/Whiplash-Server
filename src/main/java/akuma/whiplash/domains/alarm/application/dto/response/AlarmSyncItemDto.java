@@ -1,6 +1,6 @@
 package akuma.whiplash.domains.alarm.application.dto.response;
 
-import java.time.LocalDateTime;
+import java.time.LocalDate;
 import lombok.Builder;
 
 @Builder
@@ -13,7 +13,10 @@ public record AlarmSyncItemDto(
     @Builder
     public record NextOccurrenceInfo(
         Long occurrenceId,
-        LocalDateTime scheduledAt
+        LocalDate scheduledDate,
+        String scheduledTime,
+        String dayOfWeek,
+        String scheduledAtUtc
     ) {
     }
 }

@@ -7,6 +7,7 @@ import lombok.Builder;
 @Builder
 public record AlarmSyncResponse(
     LocalDateTime serverTime,
+    String timeZone,
     List<AlarmSyncItemDto> alarms
 ) {
 }

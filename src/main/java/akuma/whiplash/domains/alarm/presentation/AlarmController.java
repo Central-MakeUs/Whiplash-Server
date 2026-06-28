@@ -99,7 +99,9 @@ public class AlarmController {
     @Operation(summary = "알람 전체 동기화 조회", description = "서버 기준 알람 상태를 조회하여 로컬 알람과 동기화합니다.")
     @GetMapping("/sync")
     public ApplicationResponse<AlarmSyncResponse> syncAlarms(@AuthenticationPrincipal MemberContext memberContext) {
-        return ApplicationResponse.onSuccess(alarmUseCase.getSyncAlarms(memberContext.memberId()));
+        return ApplicationResponse.onSuccess(
+            alarmUseCase.getSyncAlarms(memberContext.memberId(), memberContext.deviceId())
+        );
     }
 
     @CustomErrorCodes(

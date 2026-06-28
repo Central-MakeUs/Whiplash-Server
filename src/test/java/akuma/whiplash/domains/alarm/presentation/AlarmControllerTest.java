@@ -758,12 +758,16 @@ class AlarmControllerTest {
                 .status("활성화")
                 .nextOccurrence(AlarmSyncItemDto.NextOccurrenceInfo.builder()
                     .occurrenceId(10L)
-                    .scheduledAt(scheduledAt)
+                    .scheduledDate(scheduledAt.toLocalDate())
+                    .scheduledTime("07:00")
+                    .dayOfWeek("월")
+                    .scheduledAtUtc("2026-06-30T22:00:00Z")
                     .build())
                 .build();
-            when(alarmUseCase.getSyncAlarms(anyLong()))
+            when(alarmUseCase.getSyncAlarms(anyLong(), any()))
                 .thenReturn(AlarmSyncResponse.builder()
                     .serverTime(LocalDateTime.now())
+                    .timeZone("Asia/Seoul")
                     .alarms(List.of(dto))
                     .build());
 
@@ -771,12 +775,15 @@ class AlarmControllerTest {
             mockMvc.perform(get(BASE + "/sync"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.result.serverTime").exists())
+                .andExpect(jsonPath("$.result.timeZone").value("Asia/Seoul"))
                 .andExpect(jsonPath("$.result.alarms[0].alarmId").value(1L))
                 .andExpect(jsonPath("$.result.alarms[0].status").value("활성화"))
-                .andExpect(jsonPath("$.result.alarms[0].nextOccurrence.occurrenceId").value(10L));
+                .andExpect(jsonPath("$.result.alarms[0].nextOccurrence.occurrenceId").value(10L))
+                .andExpect(jsonPath("$.result.alarms[0].nextOccurrence.scheduledTime").value("07:00"))
+                .andExpect(jsonPath("$.result.alarms[0].nextOccurrence.scheduledAtUtc").value("2026-06-30T22:00:00Z"));
 
             // then
-            verify(alarmUseCase, times(1)).getSyncAlarms(eq(MEMBER_3.getId()));
+            verify(alarmUseCase, times(1)).getSyncAlarms(eq(MEMBER_3.getId()), eq("mock_device_id"));
         }
 
         @Test
@@ -784,7 +791,7 @@ class AlarmControllerTest {
         void fail_memberNotFound() throws Exception {
             // given
             setSecurityContext(buildContext(MEMBER_4));
-            when(alarmUseCase.getSyncAlarms(anyLong()))
+            when(alarmUseCase.getSyncAlarms(anyLong(), any()))
                 .thenThrow(ApplicationException.from(MemberErrorCode.MEMBER_NOT_FOUND));
 
             // when & then
