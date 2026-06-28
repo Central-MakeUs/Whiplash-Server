@@ -13,6 +13,7 @@ import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import java.time.LocalDateTime;
 import lombok.AccessLevel;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.experimental.SuperBuilder;
@@ -56,20 +57,27 @@ public class MemberDeviceEntity extends BaseTimeEntity {
     @Column(name = "os_version", length = 30)
     private String osVersion;
 
+    @Builder.Default
+    @Column(name = "time_zone", nullable = false, length = 50, columnDefinition = "VARCHAR(50) DEFAULT 'Asia/Seoul'")
+    private String timeZone = "Asia/Seoul";
+
     @Column(name = "last_active_at")
     private LocalDateTime lastActiveAt;
 
-    public void updateOnLogin(String fcmToken, String platform, String appVersion, String osVersion, LocalDateTime now) {
+    public void updateDevice(
+        String fcmToken,
+        String platform,
+        String appVersion,
+        String osVersion,
+        String timeZone,
+        LocalDateTime now
+    ) {
         this.fcmToken = fcmToken;
         this.platform = platform;
         this.appVersion = appVersion;
         this.osVersion = osVersion;
+        this.timeZone = timeZone;
         this.isLoggedIn = true;
-        this.lastActiveAt = now;
-    }
-
-    public void updateFcmToken(String fcmToken, LocalDateTime now) {
-        this.fcmToken = fcmToken;
         this.lastActiveAt = now;
     }
 

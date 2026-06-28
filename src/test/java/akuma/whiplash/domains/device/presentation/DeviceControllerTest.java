@@ -8,8 +8,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import akuma.whiplash.domains.auth.application.dto.etc.MemberContext;
-import akuma.whiplash.domains.device.application.dto.request.FcmTokenUpdateRequest;
-import akuma.whiplash.domains.device.application.dto.response.FcmTokenUpdateResponse;
+import akuma.whiplash.domains.device.application.dto.request.DeviceUpdateRequest;
+import akuma.whiplash.domains.device.application.dto.response.DeviceUpdateResponse;
 import akuma.whiplash.domains.device.application.usecase.DeviceUseCase;
 import akuma.whiplash.domains.device.exception.DeviceErrorCode;
 import akuma.whiplash.global.config.security.SecurityConfig;
@@ -79,31 +79,46 @@ class DeviceControllerTest {
     }
 
     @Nested
-    @DisplayName("[PUT] /api/v1/devices/me/fcm-token - FCM 토큰 갱신")
-    class ModifyFcmTokenTest {
+    @DisplayName("[PUT] /api/v1/devices/me - 기기 정보 갱신")
+    class ModifyDeviceTest {
 
         @Test
-        @DisplayName("성공: 200과 deviceId, fcmToken, updatedAt 필드를 반환한다")
+        @DisplayName("성공: 200과 갱신된 기기 정보 필드를 반환한다")
         void success() throws Exception {
             // given
             setSecurityContext(buildContext());
-            FcmTokenUpdateRequest request = new FcmTokenUpdateRequest("device-slice", "new-fcm-token");
-            FcmTokenUpdateResponse response = FcmTokenUpdateResponse.builder()
+            DeviceUpdateRequest request = new DeviceUpdateRequest(
+                "device-slice",
+                "ANDROID",
+                "new-fcm-token",
+                "1.1.0",
+                "15",
+                "Asia/Seoul"
+            );
+            DeviceUpdateResponse response = DeviceUpdateResponse.builder()
                 .deviceId("device-slice")
+                .platform("ANDROID")
                 .fcmToken("new-fcm-token")
+                .appVersion("1.1.0")
+                .osVersion("15")
+                .timeZone("Asia/Seoul")
                 .updatedAt(LocalDateTime.of(2026, 4, 19, 12, 0, 0))
                 .build();
 
-            when(deviceUseCase.modifyFcmToken(any(MemberContext.class), any(FcmTokenUpdateRequest.class)))
+            when(deviceUseCase.modifyDevice(any(MemberContext.class), any(DeviceUpdateRequest.class)))
                 .thenReturn(response);
 
             // when & then
-            mockMvc.perform(put(BASE + "/me/fcm-token")
+            mockMvc.perform(put(BASE + "/me")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.result.deviceId").value("device-slice"))
+                .andExpect(jsonPath("$.result.platform").value("ANDROID"))
                 .andExpect(jsonPath("$.result.fcmToken").value("new-fcm-token"))
+                .andExpect(jsonPath("$.result.appVersion").value("1.1.0"))
+                .andExpect(jsonPath("$.result.osVersion").value("15"))
+                .andExpect(jsonPath("$.result.timeZone").value("Asia/Seoul"))
                 .andExpect(jsonPath("$.result.updatedAt").isNotEmpty());
         }
 
@@ -112,10 +127,38 @@ class DeviceControllerTest {
         void fail_deviceIdBlank() throws Exception {
             // given
             setSecurityContext(buildContext());
-            FcmTokenUpdateRequest request = new FcmTokenUpdateRequest("", "new-fcm-token");
+            DeviceUpdateRequest request = new DeviceUpdateRequest(
+                "",
+                "ANDROID",
+                "new-fcm-token",
+                "1.1.0",
+                "15",
+                "Asia/Seoul"
+            );
 
             // when & then
-            mockMvc.perform(put(BASE + "/me/fcm-token")
+            mockMvc.perform(put(BASE + "/me")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest());
+        }
+
+        @Test
+        @DisplayName("실패: platform이 공백이면 400을 반환한다")
+        void fail_platformBlank() throws Exception {
+            // given
+            setSecurityContext(buildContext());
+            DeviceUpdateRequest request = new DeviceUpdateRequest(
+                "device-slice",
+                "",
+                "new-fcm-token",
+                "1.1.0",
+                "15",
+                "Asia/Seoul"
+            );
+
+            // when & then
+            mockMvc.perform(put(BASE + "/me")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest());
@@ -126,10 +169,59 @@ class DeviceControllerTest {
         void fail_fcmTokenBlank() throws Exception {
             // given
             setSecurityContext(buildContext());
-            FcmTokenUpdateRequest request = new FcmTokenUpdateRequest("device-slice", "");
+            DeviceUpdateRequest request = new DeviceUpdateRequest(
+                "device-slice",
+                "ANDROID",
+                "",
+                "1.1.0",
+                "15",
+                "Asia/Seoul"
+            );
 
             // when & then
-            mockMvc.perform(put(BASE + "/me/fcm-token")
+            mockMvc.perform(put(BASE + "/me")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest());
+        }
+
+        @Test
+        @DisplayName("실패: timeZone이 공백이면 400을 반환한다")
+        void fail_timeZoneBlank() throws Exception {
+            // given
+            setSecurityContext(buildContext());
+            DeviceUpdateRequest request = new DeviceUpdateRequest(
+                "device-slice",
+                "ANDROID",
+                "new-fcm-token",
+                "1.1.0",
+                "15",
+                ""
+            );
+
+            // when & then
+            mockMvc.perform(put(BASE + "/me")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest());
+        }
+
+        @Test
+        @DisplayName("실패: timeZone이 IANA Zone ID가 아니면 400을 반환한다")
+        void fail_invalidTimeZone() throws Exception {
+            // given
+            setSecurityContext(buildContext());
+            DeviceUpdateRequest request = new DeviceUpdateRequest(
+                "device-slice",
+                "ANDROID",
+                "new-fcm-token",
+                "1.1.0",
+                "15",
+                "UTC+9"
+            );
+
+            // when & then
+            mockMvc.perform(put(BASE + "/me")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest());
@@ -140,13 +232,20 @@ class DeviceControllerTest {
         void fail_deviceNotFound() throws Exception {
             // given
             setSecurityContext(buildContext());
-            FcmTokenUpdateRequest request = new FcmTokenUpdateRequest("unknown-device", "any-fcm");
+            DeviceUpdateRequest request = new DeviceUpdateRequest(
+                "unknown-device",
+                "ANDROID",
+                "any-fcm",
+                "1.1.0",
+                "15",
+                "Asia/Seoul"
+            );
 
-            when(deviceUseCase.modifyFcmToken(any(MemberContext.class), any(FcmTokenUpdateRequest.class)))
+            when(deviceUseCase.modifyDevice(any(MemberContext.class), any(DeviceUpdateRequest.class)))
                 .thenThrow(ApplicationException.from(DeviceErrorCode.DEVICE_NOT_FOUND));
 
             // when & then
-            mockMvc.perform(put(BASE + "/me/fcm-token")
+            mockMvc.perform(put(BASE + "/me")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isNotFound())

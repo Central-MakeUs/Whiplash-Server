@@ -39,6 +39,25 @@ public interface AlarmRepository extends JpaRepository<AlarmEntity, Long> {
         @Param("status") String status
     );
 
+    @Query(value = """
+        SELECT
+            a.id AS alarmId,
+            a.member_id AS memberId,
+            a.alarm_time AS alarmTime,
+            a.repeat_days AS repeatDays,
+            COALESCE((
+                SELECT md.time_zone
+                FROM member_device md
+                WHERE md.member_id = a.member_id
+                  AND md.is_logged_in = true
+                ORDER BY md.last_active_at DESC
+                LIMIT 1
+            ), 'Asia/Seoul') AS timeZone
+        FROM alarm a
+        WHERE a.status = :status
+    """, nativeQuery = true)
+    List<AlarmOccurrenceBatchTarget> findBatchTargetsByStatus(@Param("status") String status);
+
     @Modifying
     @Query("""
         DELETE FROM AlarmEntity a
@@ -49,6 +68,12 @@ public interface AlarmRepository extends JpaRepository<AlarmEntity, Long> {
     interface AlarmOccurrenceBatchTarget {
         Long getAlarmId();
 
+        Long getMemberId();
+
         LocalTime getAlarmTime();
+
+        String getRepeatDays();
+
+        String getTimeZone();
     }
 }

@@ -82,10 +82,6 @@ public class PlaceUseCase {
         ));
     }
 
-    public List<String> searchPlaceKeywords(String query) {
-        return placeQueryService.searchPlaceKeywords(query);
-    }
-
     private void validateSearchRequest(
         String query,
         Double latitude,

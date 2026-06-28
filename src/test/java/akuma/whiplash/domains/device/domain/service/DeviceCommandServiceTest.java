@@ -10,8 +10,8 @@ import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import akuma.whiplash.domains.device.application.dto.request.FcmTokenUpdateRequest;
-import akuma.whiplash.domains.device.application.dto.response.FcmTokenUpdateResponse;
+import akuma.whiplash.domains.device.application.dto.request.DeviceUpdateRequest;
+import akuma.whiplash.domains.device.application.dto.response.DeviceUpdateResponse;
 import akuma.whiplash.domains.member.domain.contants.MemberStatus;
 import akuma.whiplash.domains.member.domain.contants.Role;
 import akuma.whiplash.domains.member.domain.contants.SocialType;
@@ -65,21 +65,29 @@ class DeviceCommandServiceTest {
             .isLoggedIn(true)
             .appVersion("1.0.0")
             .osVersion("14")
+            .timeZone("Asia/Seoul")
             .build();
     }
 
     @Nested
-    @DisplayName("modifyFcmToken - FCM 토큰 갱신")
-    class ModifyFcmTokenTest {
+    @DisplayName("modifyDevice - 기기 정보 갱신")
+    class ModifyDeviceTest {
 
         @Test
-        @DisplayName("성공: FCM 토큰이 DB와 Redis에 갱신되고 응답을 반환한다")
+        @DisplayName("성공: 기기 정보가 DB에 갱신되고 FCM 토큰이 Redis에 반영된다")
         void success() {
             // given
             Long memberId = 1L;
             String deviceId = "device-success";
             String newFcmToken = "new-fcm-token";
-            FcmTokenUpdateRequest request = new FcmTokenUpdateRequest(deviceId, newFcmToken);
+            DeviceUpdateRequest request = new DeviceUpdateRequest(
+                deviceId,
+                "IOS",
+                newFcmToken,
+                "2.0.0",
+                "18",
+                "America/New_York"
+            );
 
             MemberDeviceEntity device = spy(
                 buildDevice(buildMember(memberId), deviceId, "ANDROID", "old-fcm-token")
@@ -90,13 +98,17 @@ class DeviceCommandServiceTest {
             when(timeProvider.now()).thenReturn(FIXED_NOW);
 
             // when
-            FcmTokenUpdateResponse response = deviceCommandService.modifyFcmToken(memberId, request);
+            DeviceUpdateResponse response = deviceCommandService.modifyDevice(memberId, request);
 
             // then
-            verify(device).updateFcmToken(eq(newFcmToken), eq(FIXED_NOW));
+            verify(device).updateDevice(eq(newFcmToken), eq("IOS"), eq("2.0.0"), eq("18"), eq("America/New_York"), eq(FIXED_NOW));
             verify(redisService).upsertFcmToken(memberId, deviceId, newFcmToken);
             assertThat(response.deviceId()).isEqualTo(deviceId);
+            assertThat(response.platform()).isEqualTo("IOS");
             assertThat(response.fcmToken()).isEqualTo(newFcmToken);
+            assertThat(response.appVersion()).isEqualTo("2.0.0");
+            assertThat(response.osVersion()).isEqualTo("18");
+            assertThat(response.timeZone()).isEqualTo("America/New_York");
             assertThat(response.updatedAt()).isNotNull();
         }
 
@@ -105,42 +117,25 @@ class DeviceCommandServiceTest {
         void fail_deviceNotFound() {
             // given
             Long memberId = 1L;
-            FcmTokenUpdateRequest request = new FcmTokenUpdateRequest("unknown-device", "new-fcm-token");
+            DeviceUpdateRequest request = new DeviceUpdateRequest(
+                "unknown-device",
+                "ANDROID",
+                "new-fcm-token",
+                "1.0.0",
+                "14",
+                "Asia/Seoul"
+            );
 
             when(memberDeviceRepository.findByMember_IdAndDeviceId(memberId, "unknown-device"))
                 .thenReturn(Optional.empty());
 
             // when & then
-            assertThatThrownBy(() -> deviceCommandService.modifyFcmToken(memberId, request))
+            assertThatThrownBy(() -> deviceCommandService.modifyDevice(memberId, request))
                 .isInstanceOfSatisfying(ApplicationException.class, e ->
                     assertThat(e.getCode()).isEqualTo(DEVICE_NOT_FOUND)
                 );
 
             verify(redisService, never()).upsertFcmToken(any(), any(), any());
-        }
-
-        @Test
-        @DisplayName("성공: FCM 토큰만 갱신되고 platform 등 다른 필드는 변경되지 않는다")
-        void success_doesNotOverwriteOtherFields() {
-            // given
-            Long memberId = 1L;
-            String deviceId = "device-ios";
-            FcmTokenUpdateRequest request = new FcmTokenUpdateRequest(deviceId, "updated-fcm");
-
-            MemberDeviceEntity device = spy(
-                buildDevice(buildMember(memberId), deviceId, "IOS", "old-ios-fcm")
-            );
-
-            when(memberDeviceRepository.findByMember_IdAndDeviceId(memberId, deviceId))
-                .thenReturn(Optional.of(device));
-            when(timeProvider.now()).thenReturn(FIXED_NOW);
-
-            // when
-            deviceCommandService.modifyFcmToken(memberId, request);
-
-            // then: updateFcmToken만 호출되고, updateOnLogin(platform 덮어쓰기)은 호출되지 않는다
-            verify(device).updateFcmToken(eq("updated-fcm"), eq(FIXED_NOW));
-            verify(device, never()).updateOnLogin(any(), any(), any(), any(), any());
         }
     }
 }

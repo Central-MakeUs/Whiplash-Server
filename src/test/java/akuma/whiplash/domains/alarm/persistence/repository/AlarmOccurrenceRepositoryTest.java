@@ -128,10 +128,55 @@ class AlarmOccurrenceRepositoryTest {
         }
     }
 
+    @Nested
+    @DisplayName("findRingingNotificationTargets - 울림 푸시 대상 조회")
+    class FindRingingNotificationTargetsTest {
+
+        @Test
+        @DisplayName("성공: RINGING 상태이고 alarmRinging=true인 회차만 조회한다")
+        void success() {
+            // given
+            MemberEntity ringingMember = memberRepository.save(MemberFixture.MEMBER_11.toEntity());
+            MemberEntity notRingingMember = memberRepository.save(MemberFixture.MEMBER_12.toEntity());
+            MemberEntity scheduledMember = memberRepository.save(MemberFixture.MEMBER_13.toEntity());
+            AlarmEntity ringingAlarm = alarmRepository.save(AlarmFixture.ALARM_11.toEntity(ringingMember));
+            AlarmEntity notRingingAlarm = alarmRepository.save(AlarmFixture.ALARM_12.toEntity(notRingingMember));
+            AlarmEntity scheduledAlarm = alarmRepository.save(AlarmFixture.ALARM_13.toEntity(scheduledMember));
+            LocalDateTime now = LocalDateTime.now();
+
+            AlarmOccurrenceEntity ringingOccurrence = buildOccurrence(ringingAlarm, now, OccurrenceStatus.RINGING, true);
+            AlarmOccurrenceEntity notRingingOccurrence = buildOccurrence(notRingingAlarm, now, OccurrenceStatus.RINGING, false);
+            AlarmOccurrenceEntity scheduledOccurrence = buildOccurrence(scheduledAlarm, now, OccurrenceStatus.SCHEDULED, true);
+            alarmOccurrenceRepository.saveAll(List.of(
+                ringingOccurrence,
+                notRingingOccurrence,
+                scheduledOccurrence
+            ));
+
+            // when
+            List<akuma.whiplash.domains.alarm.application.dto.etc.RingingPushInfo> result =
+                alarmOccurrenceRepository.findRingingNotificationTargets(OccurrenceStatus.RINGING);
+
+            // then
+            assertThat(result).hasSize(1);
+            assertThat(result.get(0).alarmId()).isEqualTo(ringingAlarm.getId());
+            assertThat(result.get(0).memberId()).isEqualTo(ringingMember.getId());
+        }
+    }
+
     private AlarmOccurrenceEntity buildOccurrence(
         AlarmEntity alarm,
         LocalDateTime scheduledAt,
         OccurrenceStatus status
+    ) {
+        return buildOccurrence(alarm, scheduledAt, status, false);
+    }
+
+    private AlarmOccurrenceEntity buildOccurrence(
+        AlarmEntity alarm,
+        LocalDateTime scheduledAt,
+        OccurrenceStatus status,
+        boolean alarmRinging
     ) {
         return AlarmOccurrenceEntity.builder()
             .alarm(alarm)
@@ -139,8 +184,8 @@ class AlarmOccurrenceRepositoryTest {
             .occurrenceTime(scheduledAt.toLocalTime())
             .scheduledAt(scheduledAt)
             .status(status)
-            .alarmRinging(false)
-            .ringingCount(0)
+            .alarmRinging(alarmRinging)
+            .ringingCount(alarmRinging ? 1 : 0)
             .reminderSent(false)
             .build();
     }

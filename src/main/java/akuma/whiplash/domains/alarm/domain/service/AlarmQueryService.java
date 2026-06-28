@@ -9,8 +9,8 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 public interface AlarmQueryService {
-    GetAlarmsResponse getAlarms(Long memberId);
-    AlarmSyncResponse getSyncAlarms(Long memberId);
+    GetAlarmsResponse getAlarms(Long memberId, String deviceId);
+    AlarmSyncResponse getSyncAlarms(Long memberId, String deviceId);
     AlarmDeleteMethodResponse getAlarmDeleteMethod(Long memberId, Long alarmId);
     List<OccurrencePushInfo> getPreNotificationTargets(LocalDateTime startInclusive, LocalDateTime endInclusive);
     List<RingingPushInfo> getRingingNotificationTargets();

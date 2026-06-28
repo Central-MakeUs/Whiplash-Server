@@ -24,8 +24,8 @@ public class AlarmUseCase {
     private final AlarmCommandService alarmCommandService;
     private final AlarmQueryService alarmQueryService;
 
-    public CreateAlarmResponse createAlarm(AlarmRegisterRequest request, Long memberId) {
-        return alarmCommandService.createAlarm(request, memberId);
+    public CreateAlarmResponse createAlarm(AlarmRegisterRequest request, Long memberId, String deviceId) {
+        return alarmCommandService.createAlarm(request, memberId, deviceId);
     }
 
     public CreateAlarmOccurrenceResponse createAlarmOccurrence(Long memberId, Long alarmId) {
@@ -48,16 +48,16 @@ public class AlarmUseCase {
         return alarmCommandService.deactivateByPayment(memberId, alarmId, request);
     }
 
-    public void ringAlarm(Long memberId, Long alarmId) {
-        alarmCommandService.ringAlarm(memberId, alarmId);
+    public void ringAlarm(Long memberId, Long alarmId, String deviceId) {
+        alarmCommandService.ringAlarm(memberId, alarmId, deviceId);
     }
 
-    public GetAlarmsResponse getAlarms(Long memberId) {
-        return alarmQueryService.getAlarms(memberId);
+    public GetAlarmsResponse getAlarms(Long memberId, String deviceId) {
+        return alarmQueryService.getAlarms(memberId, deviceId);
     }
 
-    public AlarmSyncResponse getSyncAlarms(Long memberId) {
-        return alarmQueryService.getSyncAlarms(memberId);
+    public AlarmSyncResponse getSyncAlarms(Long memberId, String deviceId) {
+        return alarmQueryService.getSyncAlarms(memberId, deviceId);
     }
 
     public AlarmDeleteMethodResponse getAlarmDeleteMethod(Long memberId, Long alarmId) {

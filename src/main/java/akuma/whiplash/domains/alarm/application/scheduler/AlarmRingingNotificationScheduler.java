@@ -2,10 +2,10 @@ package akuma.whiplash.domains.alarm.application.scheduler;
 
 import akuma.whiplash.domains.alarm.application.dto.etc.RingingPushInfo;
 import akuma.whiplash.domains.alarm.application.dto.etc.RingingPushTargetDto;
+import akuma.whiplash.domains.alarm.domain.service.AlarmQueryService;
 import akuma.whiplash.infrastructure.firebase.FcmService;
 import akuma.whiplash.infrastructure.firebase.dto.FcmMetricResult;
 import akuma.whiplash.infrastructure.redis.RedisService;
-import akuma.whiplash.infrastructure.redis.RingingAlarmRedisRepository;
 import akuma.whiplash.global.log.NoMethodLog;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.Gauge;
@@ -24,7 +24,7 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class AlarmRingingNotificationScheduler {
 
-    private final RingingAlarmRedisRepository ringingAlarmRedisRepository;
+    private final AlarmQueryService alarmQueryService;
     private final RedisService redisService;
     private final FcmService fcmService;
     private final MeterRegistry meterRegistry;
@@ -37,8 +37,8 @@ public class AlarmRingingNotificationScheduler {
     // --- 타이머: 실행 시간 분포 측정 (p50, p95, p99, max 자동 산출) ---
     /** 스케줄러 전체 1회 실행 시간 */
     private Timer schedulerTotalTimer;
-    /** Redis 조회 구간 실행 시간 — DB 폴링 제거 후 Redis 조회 성능 확인용 */
-    private Timer redisQueryTimer;
+    /** 알람 원장 조회 구간 실행 시간 */
+    private Timer targetQueryTimer;
     /** FCM 발송 구간만의 실행 시간 */
     private Timer fcmSendTimer;
 
@@ -60,8 +60,8 @@ public class AlarmRingingNotificationScheduler {
             .tag("scheduler", "alarm-ringing")
             .register(meterRegistry);
 
-        redisQueryTimer = Timer.builder("ringing_alarm.redis_query_duration")
-            .description("Redis Sorted Set 조회 시간 — DB 폴링 제거 후 비교 측정용")
+        targetQueryTimer = Timer.builder("ringing_alarm.target_query_duration")
+            .description("알람 울림 대상 원장 조회 시간")
             .publishPercentileHistogram()
             .tag("scheduler", "alarm-ringing")
             .register(meterRegistry);
@@ -86,10 +86,9 @@ public class AlarmRingingNotificationScheduler {
 
     private void executeRingingNotification() {
 
-        // ── 구간 1: Redis Sorted Set 조회 (DB 풀스캔 제거) ──────────────────────
-        // ZRANGEBYSCORE alarm:ringing 0 nowEpoch — O(log N + K)
-        List<RingingPushInfo> infos = redisQueryTimer.record(
-            ringingAlarmRedisRepository::getRingingAlarms
+        // ── 구간 1: MySQL 원장 기준 울림 대상 조회 ─────────────────────────────
+        List<RingingPushInfo> infos = targetQueryTimer.record(
+            alarmQueryService::getRingingNotificationTargets
         );
 
         currentRingingTargetCount.set(infos.size());

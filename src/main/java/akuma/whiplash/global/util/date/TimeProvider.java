@@ -1,6 +1,7 @@
 package akuma.whiplash.global.util.date;
 
 import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -24,7 +25,19 @@ public class TimeProvider {
         return LocalDateTime.now(clock);
     }
 
+    public LocalDateTime now(ZoneId zoneId) {
+        return LocalDateTime.now(clock.withZone(zoneId));
+    }
+
     public LocalDate today() {
         return LocalDate.now(clock);
+    }
+
+    public LocalDate today(ZoneId zoneId) {
+        return LocalDate.now(clock.withZone(zoneId));
+    }
+
+    public Instant instant() {
+        return clock.instant();
     }
 }

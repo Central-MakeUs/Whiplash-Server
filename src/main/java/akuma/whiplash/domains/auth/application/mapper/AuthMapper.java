@@ -55,6 +55,7 @@ public class AuthMapper {
             .isLoggedIn(true)
             .appVersion(request.appVersion())
             .osVersion(request.osVersion())
+            .timeZone(request.timeZone())
             .build();
     }
 }

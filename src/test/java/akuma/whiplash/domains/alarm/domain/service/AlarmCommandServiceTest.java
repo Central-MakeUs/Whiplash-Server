@@ -27,6 +27,7 @@ import akuma.whiplash.domains.alarm.application.dto.request.AlarmPaymentRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmRegisterRequest;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmCheckinResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmPaymentResponse;
+import akuma.whiplash.domains.alarm.application.dto.response.CreateAlarmResponse;
 import akuma.whiplash.domains.alarm.application.service.AuditLogRecorder;
 import akuma.whiplash.domains.alarm.domain.constant.AlarmStatus;
 import akuma.whiplash.domains.alarm.domain.constant.DeleteType;
@@ -50,8 +51,9 @@ import akuma.whiplash.domains.payment.persistence.repository.PaymentRepository;
 import akuma.whiplash.global.exception.ApplicationException;
 import akuma.whiplash.global.util.date.TimeProvider;
 import akuma.whiplash.infrastructure.payment.PaymentVerificationPort;
-import akuma.whiplash.infrastructure.redis.RingingAlarmRedisRepository;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Stream;
@@ -92,8 +94,6 @@ class AlarmCommandServiceTest {
     @Mock
     private PaymentVerificationPort paymentVerificationPort;
     @Mock
-    private RingingAlarmRedisRepository ringingAlarmRedisRepository;
-    @Mock
     private ApplicationEventPublisher eventPublisher;
     @Mock
     private TimeProvider timeProvider;
@@ -109,6 +109,11 @@ class AlarmCommandServiceTest {
     void setUp() {
         lenient().when(timeProvider.now()).thenReturn(FIXED_NOW);
         lenient().when(timeProvider.today()).thenReturn(FIXED_NOW.toLocalDate());
+        lenient().when(timeProvider.now(any(ZoneId.class))).thenReturn(FIXED_NOW);
+        lenient().when(timeProvider.today(any(ZoneId.class))).thenReturn(FIXED_NOW.toLocalDate());
+        lenient().when(timeProvider.instant()).thenReturn(FIXED_NOW.atZone(ZoneId.of("Asia/Seoul")).toInstant());
+        lenient().when(memberDeviceRepository.findByMember_IdAndDeviceId(anyLong(), any()))
+            .thenReturn(Optional.empty());
     }
 
     @Nested
@@ -135,11 +140,56 @@ class AlarmCommandServiceTest {
             given(memberRepository.findById(member.getId())).willReturn(Optional.of(member));
 
             // when
-            alarmCommandService.createAlarm(request, member.getId());
+            alarmCommandService.createAlarm(request, member.getId(), "device-uuid");
 
             // then
             verify(alarmRepository).save(any(AlarmEntity.class));
             verify(alarmOccurrenceRepository).save(any(AlarmOccurrenceEntity.class));
+        }
+
+        @Test
+        @DisplayName("성공: 요청 기기 timeZone 기준으로 첫 발생 내역의 예정 시각을 저장한다")
+        void success_createFirstOccurrenceByRequestDeviceTimeZone() {
+            // given
+            MemberEntity member = MemberFixture.MEMBER_11.toMockEntity();
+            AlarmFixture fixture = AlarmFixture.ALARM_11;
+            AlarmRegisterRequest request = new AlarmRegisterRequest(
+                new akuma.whiplash.domains.alarm.application.dto.request.PlaceRequest(
+                    fixture.getAddress(),
+                    fixture.getLatitude(),
+                    fixture.getLongitude()
+                ),
+                fixture.getAlarmPurpose(),
+                fixture.getTime(),
+                fixture.getRepeatDays().stream().map(Weekday::name).toList(),
+                fixture.getSoundType().name()
+            );
+            MemberDeviceEntity device = MemberDeviceEntity.builder()
+                .member(member)
+                .deviceId("device-new-york")
+                .platform("IOS")
+                .fcmToken("fcm-token")
+                .isLoggedIn(true)
+                .timeZone("America/New_York")
+                .build();
+            given(memberRepository.findById(member.getId())).willReturn(Optional.of(member));
+            given(memberDeviceRepository.findByMember_IdAndDeviceId(member.getId(), "device-new-york"))
+                .willReturn(Optional.of(device));
+
+            // when
+            CreateAlarmResponse response = alarmCommandService.createAlarm(request, member.getId(), "device-new-york");
+
+            // then
+            ArgumentCaptor<AlarmOccurrenceEntity> captor = ArgumentCaptor.forClass(AlarmOccurrenceEntity.class);
+            verify(alarmOccurrenceRepository).save(captor.capture());
+            assertThat(captor.getValue().getOccurrenceDate()).isEqualTo(FIXED_NOW.toLocalDate().plusDays(2));
+            assertThat(captor.getValue().getOccurrenceTime()).isEqualTo(fixture.getTime());
+            assertThat(captor.getValue().getScheduledAt()).isEqualTo(LocalDateTime.of(2026, 5, 4, 19, 40));
+            assertThat(response.timeZone()).isEqualTo("America/New_York");
+            assertThat(response.nextOccurrence().scheduledDate()).isEqualTo(LocalDate.of(2026, 5, 4));
+            assertThat(response.nextOccurrence().scheduledTime()).isEqualTo("06:40");
+            assertThat(response.nextOccurrence().dayOfWeek()).isEqualTo("월");
+            assertThat(response.nextOccurrence().scheduledAtUtc()).isEqualTo("2026-05-04T10:40:00Z");
         }
 
         @Test
@@ -162,7 +212,7 @@ class AlarmCommandServiceTest {
             given(memberRepository.findById(MemberFixture.MEMBER_6.getId())).willReturn(Optional.empty());
 
             // when & then
-            assertThatThrownBy(() -> alarmCommandService.createAlarm(request, MemberFixture.MEMBER_6.getId()))
+            assertThatThrownBy(() -> alarmCommandService.createAlarm(request, MemberFixture.MEMBER_6.getId(), "device-uuid"))
                 .isInstanceOfSatisfying(ApplicationException.class, e ->
                     assertThat(e.getCode()).isEqualTo(MEMBER_NOT_FOUND)
                 );
@@ -189,7 +239,7 @@ class AlarmCommandServiceTest {
             given(alarmRepository.existsByMemberIdAndAlarmPurpose(member.getId(), request.alarmPurpose())).willReturn(true);
 
             // when & then
-            assertThatThrownBy(() -> alarmCommandService.createAlarm(request, member.getId()))
+            assertThatThrownBy(() -> alarmCommandService.createAlarm(request, member.getId(), "device-uuid"))
                 .isInstanceOfSatisfying(ApplicationException.class, e ->
                     assertThat(e.getCode()).isEqualTo(DUPLICATE_ALARM_PURPOSE)
                 );
@@ -234,9 +284,7 @@ class AlarmCommandServiceTest {
 
             // then
             assertThat(occurrence.getStatus()).isEqualTo(OccurrenceStatus.CHECKIN);
-            assertThat(alarm.getRevision()).isEqualTo(2);
             assertThat(response.alarmId()).isEqualTo(alarm.getId());
-            assertThat(response.alarmRevision()).isEqualTo(2);
             assertThat(response.nextOccurrence()).isNotNull();
             assertThat(response.nextOccurrence().occurrenceId()).isEqualTo(502L);
             verify(eventPublisher).publishEvent(any(AlarmCheckinCompletedEvent.class));
@@ -399,13 +447,11 @@ class AlarmCommandServiceTest {
             // then
             assertThat(occurrence.getStatus()).isEqualTo(OccurrenceStatus.PAYMENT);
             assertThat(occurrence.getDeactivatedAt()).isEqualTo(FIXED_NOW);
-            assertThat(alarm.getRevision()).isEqualTo(2);
             assertThat(response.alarmId()).isEqualTo(alarm.getId());
             assertThat(response.deactivatedAt()).isEqualTo(FIXED_NOW);
             assertThat(response.nextOccurrence().occurrenceId()).isEqualTo(nextOccurrence.getId());
             verify(paymentRepository).saveAndFlush(any(PaymentEntity.class));
             verify(alarmDeactivationLogRepository).save(any(AlarmDeactivationLogEntity.class));
-            verify(ringingAlarmRedisRepository).remove(alarm.getId(), member.getId());
             verify(paymentVerificationPort).consume(request.paymentId());
         }
 
@@ -538,10 +584,8 @@ class AlarmCommandServiceTest {
             // then
             assertThat(alarm.getStatus()).isEqualTo(AlarmStatus.DELETED);
             assertThat(alarm.getDeletedAt()).isEqualTo(FIXED_NOW);
-            assertThat(alarm.getRevision()).isEqualTo(2);
             verify(paymentRepository).saveAndFlush(any(PaymentEntity.class));
             verify(alarmDeleteLogRepository).save(any(AlarmDeleteLogEntity.class));
-            verify(ringingAlarmRedisRepository).remove(alarm.getId(), member.getId());
             verify(paymentVerificationPort).consume(request.paymentId());
         }
 
@@ -741,13 +785,11 @@ class AlarmCommandServiceTest {
             // then
             assertThat(alarm.getStatus()).isEqualTo(AlarmStatus.DELETED);
             assertThat(alarm.getDeletedAt()).isEqualTo(FIXED_NOW);
-            assertThat(alarm.getRevision()).isEqualTo(2);
 
             ArgumentCaptor<AlarmDeleteLogEntity> logCaptor = ArgumentCaptor.forClass(AlarmDeleteLogEntity.class);
             verify(alarmDeleteLogRepository).save(logCaptor.capture());
             assertThat(logCaptor.getValue().getDeleteType()).isEqualTo(DeleteType.AD);
             assertThat(logCaptor.getValue().getAdProofToken()).isEqualTo(request.adProofToken());
-            verify(ringingAlarmRedisRepository).remove(alarm.getId(), member.getId());
         }
 
         @Test
@@ -768,9 +810,7 @@ class AlarmCommandServiceTest {
             // then
             assertThat(alarm.getStatus()).isEqualTo(AlarmStatus.DELETED);
             assertThat(alarm.getDeletedAt()).isEqualTo(FIXED_NOW);
-            assertThat(alarm.getRevision()).isEqualTo(2);
             verify(alarmDeleteLogRepository).save(any(AlarmDeleteLogEntity.class));
-            verify(ringingAlarmRedisRepository).remove(alarm.getId(), member.getId());
         }
 
         @Test
@@ -851,7 +891,7 @@ class AlarmCommandServiceTest {
     class RingAlarmTest {
 
         @Test
-        @DisplayName("성공: 알람이 울리면 alarmRinging=true, 로그 저장, Redis 적재가 모두 수행된다")
+        @DisplayName("성공: 알람이 울리면 alarmRinging=true로 바꾸고 로그를 저장한다")
         void success() {
             // given
             MemberEntity member = MemberFixture.MEMBER_5.toMockEntity();
@@ -864,16 +904,16 @@ class AlarmCommandServiceTest {
             given(alarmOccurrenceRepository
                     .findTopByAlarmIdAndStatusInOrderByOccurrenceDateDescOccurrenceTimeDesc(eq(alarm.getId()), anyList()))
                     .willReturn(Optional.of(occurrence));
+            given(memberDeviceRepository.findByMember_IdAndDeviceId(member.getId(), "device-uuid"))
+                .willReturn(Optional.empty());
 
             // when
-            alarmCommandService.ringAlarm(member.getId(), alarm.getId());
+            alarmCommandService.ringAlarm(member.getId(), alarm.getId(), "device-uuid");
 
             // then
             assertThat(occurrence.isAlarmRinging()).isTrue();          // DB 컬럼 변경
             assertThat(occurrence.getRingingCount()).isEqualTo(1);
             verify(alarmRingingLogRepository).save(any());             // 로그 저장
-            verify(ringingAlarmRedisRepository).add(                   // Redis ZADD
-                    eq(alarm.getId()), eq(member.getId()), anyLong());
         }
 
         @Test
@@ -892,9 +932,11 @@ class AlarmCommandServiceTest {
                 alarmOccurrenceRepository
                     .findTopByAlarmIdAndStatusInOrderByOccurrenceDateDescOccurrenceTimeDesc(eq(alarm.getId()), anyList())
             ).willReturn(Optional.of(occurrence));
+            given(memberDeviceRepository.findByMember_IdAndDeviceId(member.getId(), "device-uuid"))
+                .willReturn(Optional.empty());
 
             // when & then
-            assertThatThrownBy(() -> alarmCommandService.ringAlarm(member.getId(), alarm.getId()))
+            assertThatThrownBy(() -> alarmCommandService.ringAlarm(member.getId(), alarm.getId(), "device-uuid"))
                 .isInstanceOfSatisfying(ApplicationException.class, e ->
                     assertThat(e.getCode()).isEqualTo(NOT_ALARM_TIME)
                 );

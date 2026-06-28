@@ -10,8 +10,8 @@ public record CreateAlarmResponse(
     @Schema(description = "알람 PK", example = "1")
     Long alarmId,
 
-    @Schema(description = "알람 리비전", example = "1")
-    int alarmRevision,
+    @Schema(description = "현재 요청 기기의 IANA Time Zone ID", example = "Asia/Seoul")
+    String timeZone,
 
     @Schema(description = "다음 알람 발생 정보")
     NextOccurrenceResponse nextOccurrence

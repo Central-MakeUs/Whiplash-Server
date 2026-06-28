@@ -2,6 +2,7 @@ package akuma.whiplash.domains.alarm.presentation;
 
 import static akuma.whiplash.domains.alarm.exception.AlarmErrorCode.ALARM_DELETE_REQUIRES_PAYMENT;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -31,6 +32,7 @@ import akuma.whiplash.domains.alarm.persistence.repository.AlarmRingingLogReposi
 import akuma.whiplash.domains.alarm.persistence.repository.AlarmOccurrenceRepository;
 import akuma.whiplash.domains.alarm.persistence.repository.AlarmRepository;
 import akuma.whiplash.domains.auth.exception.AuthErrorCode;
+import akuma.whiplash.domains.member.persistence.entity.MemberDeviceEntity;
 import akuma.whiplash.domains.member.persistence.entity.MemberEntity;
 import akuma.whiplash.domains.member.persistence.repository.MemberDeviceRepository;
 import akuma.whiplash.domains.member.persistence.repository.MemberRepository;
@@ -43,6 +45,7 @@ import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.ZoneId;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -96,6 +99,9 @@ class AlarmControllerIntegrationTest {
     void setUpTimeProvider() {
         given(timeProvider.now()).willReturn(FIXED_NOW);
         given(timeProvider.today()).willReturn(FIXED_NOW.toLocalDate());
+        given(timeProvider.now(any(ZoneId.class))).willReturn(FIXED_NOW);
+        given(timeProvider.today(any(ZoneId.class))).willReturn(FIXED_NOW.toLocalDate());
+        given(timeProvider.instant()).willReturn(FIXED_NOW.atZone(ZoneId.of("Asia/Seoul")).toInstant());
     }
 
     private AlarmEntity saveAlarmForToday(MemberEntity member) {
@@ -153,21 +159,28 @@ class AlarmControllerIntegrationTest {
     class CreateAlarmTest {
 
         @Test
-        @DisplayName("성공: 알람 등록 요청이 성공하면 알람이 저장된다")
+        @DisplayName("성공: 알람 등록 요청이 성공하면 알람과 요청 기기 timeZone 기준 다음 발생 정보가 응답된다")
         void success() throws Exception {
             // given
             MemberEntity member = memberRepository.save(MemberFixture.MEMBER_1.toEntity());
-            AlarmFixture fixture = AlarmFixture.ALARM_01;
+            memberDeviceRepository.save(MemberDeviceEntity.builder()
+                .member(member)
+                .deviceId("mock_device_id")
+                .platform("IOS")
+                .fcmToken("fcm-token")
+                .isLoggedIn(true)
+                .timeZone("Asia/Seoul")
+                .build());
             AlarmRegisterRequest request = new AlarmRegisterRequest(
                 new akuma.whiplash.domains.alarm.application.dto.request.PlaceRequest(
-                    fixture.getAddress(),
-                    fixture.getLatitude(),
-                    fixture.getLongitude()
+                    "서울특별시 중구 퇴계로 24",
+                    37.564213,
+                    127.001698
                 ),
-                fixture.getAlarmPurpose(),
-                fixture.getTime(),
-                fixture.getRepeatDays().stream().map(Weekday::name).toList(),
-                fixture.getSoundType().name()
+                "월요일 점심 알람",
+                LocalTime.of(12, 0),
+                List.of("MONDAY"),
+                SoundType.KARINA_SCOLDING.name()
             );
             String accessToken = jwtProvider.generateAccessToken(member.getId(), member.getRole(), "mock_device_id");
 
@@ -176,7 +189,13 @@ class AlarmControllerIntegrationTest {
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isOk());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.timeZone").value("Asia/Seoul"))
+                .andExpect(jsonPath("$.result.nextOccurrence.scheduledDate").value("2026-05-04"))
+                .andExpect(jsonPath("$.result.nextOccurrence.scheduledTime").value("12:00"))
+                .andExpect(jsonPath("$.result.nextOccurrence.dayOfWeek").value("월"))
+                .andExpect(jsonPath("$.result.nextOccurrence.scheduledAtUtc").value("2026-05-04T03:00:00Z"))
+                .andExpect(jsonPath("$.result.nextOccurrence.scheduledAt").doesNotExist());
 
             // then
             assertThat(alarmRepository.findAllByMemberId(member.getId())).hasSize(1);
@@ -494,8 +513,7 @@ class AlarmControllerIntegrationTest {
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.result.alarmId").value(alarm.getId()))
-                .andExpect(jsonPath("$.result.alarmRevision").value(2));
+                .andExpect(jsonPath("$.result.alarmId").value(alarm.getId()));
 
             // then
             AlarmOccurrenceEntity savedOccurrence = alarmOccurrenceRepository.findById(occurrence.getId()).orElseThrow();
@@ -829,7 +847,6 @@ class AlarmControllerIntegrationTest {
             AlarmEntity deletedAlarm = alarmRepository.findById(alarm.getId()).orElseThrow();
             assertThat(deletedAlarm.getStatus()).isEqualTo(AlarmStatus.DELETED);
             assertThat(deletedAlarm.getDeletedAt()).isEqualTo(FIXED_NOW);
-            assertThat(deletedAlarm.getRevision()).isEqualTo(2);
             assertThat(alarmDeleteLogRepository.findAll())
                 .anySatisfy(log -> {
                     assertThat(log.getDeleteType()).isEqualTo(DeleteType.AD);
@@ -897,13 +914,27 @@ class AlarmControllerIntegrationTest {
             MemberEntity member = memberRepository.save(MemberFixture.MEMBER_3.toEntity());
             AlarmFixture fixture = AlarmFixture.ALARM_03;
             alarmRepository.save(fixture.toEntity(member));
+            memberDeviceRepository.save(MemberDeviceEntity.builder()
+                .member(member)
+                .deviceId("mock_device_id")
+                .platform("IOS")
+                .fcmToken("fcm-token")
+                .isLoggedIn(true)
+                .appVersion("1.0.0")
+                .osVersion("17")
+                .timeZone("America/New_York")
+                .build());
             String accessToken = jwtProvider.generateAccessToken(member.getId(), member.getRole(), "mock_device_id");
 
             // when & then
             mockMvc.perform(get(BASE)
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.result.alarms[0].alarmPurpose").value(fixture.getAlarmPurpose()));
+                .andExpect(jsonPath("$.result.timeZone").value("America/New_York"))
+                .andExpect(jsonPath("$.result.alarms[0].alarmPurpose").value(fixture.getAlarmPurpose()))
+                .andExpect(jsonPath("$.result.alarms[0].nextOccurrence.scheduledDate").value("2026-05-04"))
+                .andExpect(jsonPath("$.result.alarms[0].nextOccurrence.scheduledTime").value("06:50"))
+                .andExpect(jsonPath("$.result.alarms[0].nextOccurrence.scheduledAtUtc").value("2026-05-04T10:50:00Z"));
         }
 
 /*        @Test

@@ -68,7 +68,8 @@ class AuthCommandServiceTest {
             "ANDROID",
             fcmToken,
             "1.0.0",
-            "14"
+            "14",
+            "Asia/Seoul"
         );
     }
 

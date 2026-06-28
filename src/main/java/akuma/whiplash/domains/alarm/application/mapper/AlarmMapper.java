@@ -18,6 +18,7 @@ import akuma.whiplash.domains.alarm.domain.constant.DeleteType;
 import akuma.whiplash.domains.alarm.domain.constant.OccurrenceStatus;
 import akuma.whiplash.domains.alarm.domain.constant.SoundType;
 import akuma.whiplash.domains.alarm.domain.constant.Weekday;
+import akuma.whiplash.domains.alarm.domain.util.AlarmScheduleCalculator;
 import akuma.whiplash.domains.alarm.exception.AlarmErrorCode;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmDeleteLogEntity;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmEntity;
@@ -26,11 +27,11 @@ import akuma.whiplash.domains.alarm.persistence.entity.AlarmOccurrenceEntity;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmRingingLogEntity;
 import akuma.whiplash.domains.member.persistence.entity.MemberEntity;
 import akuma.whiplash.global.exception.ApplicationException;
-import akuma.whiplash.global.util.date.DateUtil;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
@@ -53,16 +54,24 @@ public class AlarmMapper {
             .longitude(request.place().longitude())
             .address(request.place().address())
             .status(AlarmStatus.ACTIVE)
-            .revision(1)
             .build();
     }
 
     public static AlarmOccurrenceEntity mapToFirstAlarmOccurrenceEntity(AlarmEntity alarm, LocalDate nextDate, LocalTime alarmTime) {
+        return mapToFirstAlarmOccurrenceEntity(alarm, nextDate, alarmTime, LocalDateTime.of(nextDate, alarmTime));
+    }
+
+    public static AlarmOccurrenceEntity mapToFirstAlarmOccurrenceEntity(
+        AlarmEntity alarm,
+        LocalDate nextDate,
+        LocalTime alarmTime,
+        LocalDateTime scheduledAt
+    ) {
         return AlarmOccurrenceEntity.builder()
             .alarm(alarm)
             .occurrenceDate(nextDate)
             .occurrenceTime(alarmTime)
-            .scheduledAt(LocalDateTime.of(nextDate, alarmTime))
+            .scheduledAt(scheduledAt)
             .status(OccurrenceStatus.SCHEDULED)
             .alarmRinging(false)
             .ringingCount(0)
@@ -70,14 +79,24 @@ public class AlarmMapper {
             .build();
     }
 
-    public static CreateAlarmResponse mapToCreateAlarmResponse(AlarmEntity alarm, AlarmOccurrenceEntity occurrence) {
+    public static CreateAlarmResponse mapToCreateAlarmResponse(
+        AlarmEntity alarm,
+        AlarmOccurrenceEntity occurrence,
+        ZoneId memberZone
+    ) {
         return CreateAlarmResponse.builder()
             .alarmId(alarm.getId())
-            .alarmRevision(alarm.getRevision())
+            .timeZone(memberZone.getId())
             .nextOccurrence(NextOccurrenceResponse.builder()
                 .occurrenceId(occurrence.getId())
-                .scheduledAt(occurrence.getScheduledAt())
-                .dayOfWeek(DateUtil.getKoreanDayOfWeek(occurrence.getOccurrenceDate()))
+                .scheduledDate(occurrence.getOccurrenceDate())
+                .scheduledTime(occurrence.getOccurrenceTime().format(DateTimeFormatter.ofPattern("HH:mm")))
+                .dayOfWeek(Weekday.getDescriptionOfDayOfWeek(occurrence.getOccurrenceDate().getDayOfWeek()))
+                .scheduledAtUtc(AlarmScheduleCalculator.toInstant(
+                    occurrence.getOccurrenceDate(),
+                    occurrence.getOccurrenceTime(),
+                    memberZone
+                ).toString())
                 .build())
             .build();
     }
@@ -111,11 +130,20 @@ public class AlarmMapper {
     }
 
     public static AlarmOccurrenceEntity mapToAlarmOccurrenceForDate(AlarmEntity alarm, LocalTime alarmTime, LocalDate date) {
+        return mapToAlarmOccurrenceForDate(alarm, alarmTime, date, LocalDateTime.of(date, alarmTime));
+    }
+
+    public static AlarmOccurrenceEntity mapToAlarmOccurrenceForDate(
+        AlarmEntity alarm,
+        LocalTime alarmTime,
+        LocalDate date,
+        LocalDateTime scheduledAt
+    ) {
         return AlarmOccurrenceEntity.builder()
             .alarm(alarm)
             .occurrenceDate(date)
             .occurrenceTime(alarmTime)
-            .scheduledAt(LocalDateTime.of(date, alarmTime))
+            .scheduledAt(scheduledAt)
             .status(OccurrenceStatus.SCHEDULED)
             .deactivatedAt(null)
             .checkinTime(null)
@@ -173,7 +201,6 @@ public class AlarmMapper {
     ) {
         return AlarmCheckinResponse.builder()
             .alarmId(alarm.getId())
-            .alarmRevision(alarm.getRevision())
             .nextOccurrence(nextOccurrence == null ? null : AlarmCheckinResponse.NextOccurrenceInfo.builder()
                 .occurrenceId(nextOccurrence.getId())
                 .scheduledAt(nextOccurrence.getScheduledAt())
@@ -189,7 +216,6 @@ public class AlarmMapper {
         return AlarmPaymentResponse.builder()
             .alarmId(alarm.getId())
             .deactivatedAt(deactivatedAt)
-            .alarmRevision(alarm.getRevision())
             .nextOccurrence(nextOccurrence == null ? null : AlarmPaymentResponse.NextOccurrenceInfo.builder()
                 .occurrenceId(nextOccurrence.getId())
                 .scheduledAt(nextOccurrence.getScheduledAt())
@@ -284,7 +310,8 @@ public class AlarmMapper {
         LocalDate firstDate,
         LocalDate secondDate,
         LocalDate thirdDate,
-        Map<LocalDate, Long> occurrenceIdsByDate
+        Map<LocalDate, Long> occurrenceIdsByDate,
+        ZoneId memberZone
     ) {
         boolean isCurrentOccurrenceProcessed = latestProcessedOccurrence != null
             && latestProcessedOccurrence.getOccurrenceDate().isEqual(firstDate);
@@ -308,34 +335,60 @@ public class AlarmMapper {
             .address(alarm.getAddress())
             .status(status)
             .arrivalCheckEnabled(arrivalCheckEnabled)
-            .nextOccurrence(AlarmPreviewDto.OccurrenceInfo.builder()
-                .occurrenceId(occurrenceIdsByDate.get(resolvedNext))
-                .scheduledDate(resolvedNext)
-                .dayOfWeek(Weekday.getDescriptionOfDayOfWeek(resolvedNext.getDayOfWeek()))
-                .build())
-            .nextNextOccurrence(AlarmPreviewDto.OccurrenceInfo.builder()
-                .occurrenceId(occurrenceIdsByDate.get(resolvedNextNext))
-                .scheduledDate(resolvedNextNext)
-                .dayOfWeek(Weekday.getDescriptionOfDayOfWeek(resolvedNextNext.getDayOfWeek()))
-                .build())
+            .nextOccurrence(mapToOccurrenceInfo(alarm, resolvedNext, occurrenceIdsByDate, memberZone))
+            .nextNextOccurrence(mapToOccurrenceInfo(alarm, resolvedNextNext, occurrenceIdsByDate, memberZone))
             .build();
     }
 
-    public static AlarmSyncItemDto mapToSyncItem(AlarmEntity alarm, AlarmOccurrenceEntity nextOccurrence) {
+    private static AlarmPreviewDto.OccurrenceInfo mapToOccurrenceInfo(
+        AlarmEntity alarm,
+        LocalDate occurrenceDate,
+        Map<LocalDate, Long> occurrenceIdsByDate,
+        ZoneId memberZone
+    ) {
+        return AlarmPreviewDto.OccurrenceInfo.builder()
+            .occurrenceId(occurrenceIdsByDate.get(occurrenceDate))
+            .scheduledDate(occurrenceDate)
+            .scheduledTime(alarm.getTime().format(DateTimeFormatter.ofPattern("HH:mm")))
+            .dayOfWeek(Weekday.getDescriptionOfDayOfWeek(occurrenceDate.getDayOfWeek()))
+            .scheduledAtUtc(AlarmScheduleCalculator.toInstant(
+                occurrenceDate,
+                alarm.getTime(),
+                memberZone
+            ).toString())
+            .build();
+    }
+
+    public static AlarmSyncItemDto mapToSyncItem(
+        AlarmEntity alarm,
+        AlarmOccurrenceEntity nextOccurrence,
+        ZoneId memberZone
+    ) {
         return AlarmSyncItemDto.builder()
             .alarmId(alarm.getId())
-            .alarmRevision(alarm.getRevision())
             .status(mapToStatusLabel(alarm.getStatus()))
             .nextOccurrence(nextOccurrence == null ? null : AlarmSyncItemDto.NextOccurrenceInfo.builder()
                 .occurrenceId(nextOccurrence.getId())
-                .scheduledAt(nextOccurrence.getScheduledAt())
+                .scheduledDate(nextOccurrence.getOccurrenceDate())
+                .scheduledTime(nextOccurrence.getOccurrenceTime().format(DateTimeFormatter.ofPattern("HH:mm")))
+                .dayOfWeek(Weekday.getDescriptionOfDayOfWeek(nextOccurrence.getOccurrenceDate().getDayOfWeek()))
+                .scheduledAtUtc(AlarmScheduleCalculator.toInstant(
+                    nextOccurrence.getOccurrenceDate(),
+                    nextOccurrence.getOccurrenceTime(),
+                    memberZone
+                ).toString())
                 .build())
             .build();
     }
 
-    public static AlarmSyncResponse mapToSyncResponse(LocalDateTime serverTime, List<AlarmSyncItemDto> alarms) {
+    public static AlarmSyncResponse mapToSyncResponse(
+        LocalDateTime serverTime,
+        String timeZone,
+        List<AlarmSyncItemDto> alarms
+    ) {
         return AlarmSyncResponse.builder()
             .serverTime(serverTime)
+            .timeZone(timeZone)
             .alarms(alarms)
             .build();
     }

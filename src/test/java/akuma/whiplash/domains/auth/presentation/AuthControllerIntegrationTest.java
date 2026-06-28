@@ -85,7 +85,14 @@ class AuthControllerIntegrationTest {
         @DisplayName("성공: 액세스 토큰으로 현재 디바이스의 리프레시 토큰과 FCM 토큰을 삭제한다")
         void success() throws Exception {
             // given
-            MemberEntity member = memberRepository.save(MemberFixture.MEMBER_1.toEntity());
+            MemberEntity member = memberRepository.save(MemberEntity.builder()
+                .provider(SocialType.MOCK)
+                .providerUserId("123456789")
+                .email("kmh@gmail.com")
+                .nickname("김민형")
+                .role(MemberFixture.MEMBER_1.getRole())
+                .status(MemberFixture.MEMBER_1.getStatus())
+                .build());
             String deviceId = "device-logout-success";
             String accessToken = jwtProvider.generateAccessToken(member.getId(), member.getRole(), deviceId);
             jwtProvider.generateRefreshToken(member.getId(), deviceId, member.getRole());
@@ -225,7 +232,8 @@ class AuthControllerIntegrationTest {
                 "ANDROID",
                 fcmToken,
                 "1.0.0",
-                "14"
+                "14",
+                "Asia/Seoul"
             );
 
             // when
@@ -253,6 +261,79 @@ class AuthControllerIntegrationTest {
             assertThat(memberDevice.isLoggedIn()).isTrue();
             assertThat(memberDevice.getPlatform()).isEqualTo("ANDROID");
             assertThat(memberDevice.getFcmToken()).isEqualTo(fcmToken);
+            assertThat(memberDevice.getTimeZone()).isEqualTo("Asia/Seoul");
+        }
+
+        @Test
+        @DisplayName("성공: 기존 기기로 재로그인하면 timeZone이 새 값으로 갱신된다")
+        void success_updateTimeZoneOnExistingDevice() throws Exception {
+            // given
+            String deviceId = "device-social-existing";
+            MemberEntity member = memberRepository.save(MemberEntity.builder()
+                .provider(SocialType.MOCK)
+                .providerUserId("123456789")
+                .email("kmh@gmail.com")
+                .nickname("김민형")
+                .role(MemberFixture.MEMBER_1.getRole())
+                .status(MemberFixture.MEMBER_1.getStatus())
+                .build());
+            memberDeviceRepository.save(MemberDeviceEntity.builder()
+                .member(member)
+                .deviceId(deviceId)
+                .platform("ANDROID")
+                .fcmToken("old-fcm-token")
+                .isLoggedIn(false)
+                .appVersion("1.0.0")
+                .osVersion("14")
+                .timeZone("Asia/Seoul")
+                .build());
+
+            SocialLoginRequest request = new SocialLoginRequest(
+                "MOCK",
+                "provider-access-token",
+                deviceId,
+                "IOS",
+                "new-fcm-token",
+                "2.0.0",
+                "18",
+                "America/New_York"
+            );
+
+            // when
+            mockMvc.perform(post(BASE + "/social-login")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk());
+
+            // then
+            MemberDeviceEntity memberDevice = memberDeviceRepository.findByMember_IdAndDeviceId(member.getId(), deviceId)
+                .orElseThrow();
+            assertThat(memberDevice.isLoggedIn()).isTrue();
+            assertThat(memberDevice.getPlatform()).isEqualTo("IOS");
+            assertThat(memberDevice.getFcmToken()).isEqualTo("new-fcm-token");
+            assertThat(memberDevice.getTimeZone()).isEqualTo("America/New_York");
+        }
+
+        @Test
+        @DisplayName("실패: timeZone이 IANA Zone ID가 아니면 400을 반환한다")
+        void fail_invalidTimeZone() throws Exception {
+            // given
+            SocialLoginRequest request = new SocialLoginRequest(
+                "MOCK",
+                "provider-access-token",
+                "device-invalid-time-zone",
+                "ANDROID",
+                "fcm-token",
+                "1.0.0",
+                "14",
+                "UTC+9"
+            );
+
+            // when & then
+            mockMvc.perform(post(BASE + "/social-login")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest());
         }
     }
 }
