@@ -11,12 +11,14 @@ import akuma.whiplash.domains.payment.application.mapper.PaymentMapper;
 import akuma.whiplash.domains.payment.domain.constant.PaymentStatus;
 import akuma.whiplash.domains.payment.domain.constant.PaymentType;
 import akuma.whiplash.domains.payment.persistence.repository.PaymentRepository;
+import akuma.whiplash.global.log.NoMethodLog;
 import java.time.LocalDateTime;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+@NoMethodLog
 @Service
 @RequiredArgsConstructor
 public class AuditLogRecorder {

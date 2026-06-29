@@ -52,12 +52,6 @@ public class AlarmDeactivationLogEntity extends BaseTimeEntity {
     @Column(name = "deactivate_type", length = 20, nullable = false)
     private DeactivateType deactivateType;
 
-    @Column(name = "request_latitude")
-    private Double requestLatitude;
-
-    @Column(name = "request_longitude")
-    private Double requestLongitude;
-
     @Column(name = "request_device_id", length = 100, nullable = false)
     private String requestDeviceId;
 

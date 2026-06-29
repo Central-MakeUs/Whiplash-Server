@@ -99,6 +99,7 @@ findByMember_IdAndDeviceId(Long memberId, String deviceId)
 
 ## 운영 주의사항
 
+- 개인정보, 위치 데이터, 감사 로그, 운영 로그 정책은 `docs/PRIVACY_AND_AUDIT_LOGGING_POLICY.md`를 따른다.
 - 운영 민감 파일은 직접 수정하지 않는다.
 - 특히 아래 파일은 수정 전 반드시 재확인한다.
   - `application-prod*`

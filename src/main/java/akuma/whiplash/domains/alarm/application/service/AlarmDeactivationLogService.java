@@ -30,8 +30,6 @@ public class AlarmDeactivationLogService {
             occurrence,
             member,
             event.deviceId(),
-            event.latitude(),
-            event.longitude(),
             event.requestedAt(),
             event.processedAt()
         );
