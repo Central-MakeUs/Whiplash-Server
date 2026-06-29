@@ -175,8 +175,6 @@ public class AlarmMapper {
         AlarmOccurrenceEntity occurrence,
         MemberEntity member,
         String deviceId,
-        Double latitude,
-        Double longitude,
         LocalDateTime requestedAt,
         LocalDateTime processedAt
     ) {
@@ -185,8 +183,6 @@ public class AlarmMapper {
             .member(member)
             .paymentId(null)
             .deactivateType(DeactivateType.CHECKIN)
-            .requestLatitude(latitude)
-            .requestLongitude(longitude)
             .requestDeviceId(deviceId)
             .requestedAt(requestedAt)
             .processedAt(processedAt)
@@ -238,8 +234,6 @@ public class AlarmMapper {
             .member(member)
             .paymentId(paymentId)
             .deactivateType(DeactivateType.PAYMENT)
-            .requestLatitude(null)
-            .requestLongitude(null)
             .requestDeviceId(deviceId)
             .requestedAt(requestedAt)
             .processedAt(processedAt)

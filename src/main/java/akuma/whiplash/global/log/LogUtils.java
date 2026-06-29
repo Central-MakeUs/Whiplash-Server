@@ -17,9 +17,10 @@ public final class LogUtils {
     private LogUtils() {}
 
     private static final Set<String> SENSITIVE_KEYS = Set.of(
-        "password", "passwd", "pwd", "authorization", "accessToken", "refreshToken",
-        "token", "secret", "apiKey", "privateKey", "email", "phone", "ssn", "address",
-        "deviceId", "clientId", "sessionId"
+        "password", "passwd", "pwd", "authorization", "accesstoken", "refreshtoken",
+        "token", "secret", "apikey", "privatekey", "email", "phone", "ssn", "address",
+        "deviceid", "clientid", "sessionid", "fcmtoken", "paymentid", "adprooftoken",
+        "latitude", "longitude"
     );
 
     public static String nowIso() {
@@ -121,7 +122,7 @@ public final class LogUtils {
                 } else {
                     String key = p.substring(0, eq);
                     String val = p.substring(eq + 1);
-                    String masked = SENSITIVE_KEYS.contains(key.toLowerCase(Locale.ROOT)) ? "****" : val;
+                    String masked = isSensitiveKey(key) ? "****" : val;
                     sb.append(key).append('=').append(masked);
                 }
                 if (i + 1 < parts.length) sb.append('&');
@@ -139,7 +140,7 @@ public final class LogUtils {
             for (Map.Entry<?,?> e : m.entrySet()) {
                 String k = String.valueOf(e.getKey());
                 Object v = e.getValue();
-                if (SENSITIVE_KEYS.contains(k)) {
+                if (isSensitiveKey(k)) {
                     copy.put(k, "****");
                 } else {
                     copy.put(k, maskRecursive(v));
@@ -154,5 +155,9 @@ public final class LogUtils {
             return copy;
         }
         return node;
+    }
+
+    private static boolean isSensitiveKey(String key) {
+        return key != null && SENSITIVE_KEYS.contains(key.toLowerCase(Locale.ROOT));
     }
 }
