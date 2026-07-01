@@ -308,8 +308,6 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
             occurrence.getId(),
             member.getId(),
             request.deviceId(),
-            request.latitude(),
-            request.longitude(),
             processedAt,
             processedAt
         ));
