@@ -15,7 +15,6 @@ import akuma.whiplash.domains.alarm.application.dto.request.AlarmRegisterRequest
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmAdSessionCreateResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmCheckinResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmPaymentResponse;
-import akuma.whiplash.domains.alarm.application.dto.response.CreateAlarmOccurrenceResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.CreateAlarmResponse;
 import akuma.whiplash.domains.alarm.application.mapper.AlarmMapper;
 import akuma.whiplash.domains.alarm.application.service.AuditLogRecorder;
@@ -129,24 +128,6 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
         alarm.updateNextScheduledTime(nextScheduledTime);
 
         return AlarmMapper.mapToCreateAlarmResponse(alarm, occurrence, memberZone);
-    }
-
-    @Override
-    public CreateAlarmOccurrenceResponse createAlarmOccurrence(Long memberId, Long alarmId) {
-        AlarmEntity alarmEntity = findAlarmById(alarmId);
-
-        validAlarmOwner(memberId, alarmEntity.getMember().getId());
-
-        // 각 알람이 울릴 때 알람 발생 내역은 1개만 허용(반복 울림은 alarm_ringing_log로 관리), 오늘 날짜 기준 알람 발생 내역이 이미 존재하면 예외 발생
-        boolean alreadyExists = alarmOccurrenceRepository.existsByAlarmIdAndDate(alarmId, timeProvider.today());
-        if (alreadyExists) {
-            throw ApplicationException.from(ALREADY_OCCURRED_EXISTS);
-        }
-
-        AlarmOccurrenceEntity alarmOccurrenceEntity = AlarmMapper.mapToTodayFirstAlarmOccurrenceEntity(alarmEntity, timeProvider.today());
-        alarmOccurrenceRepository.save(alarmOccurrenceEntity);
-
-        return AlarmMapper.mapToCreateAlarmOccurrenceResponse(alarmOccurrenceEntity.getId());
     }
 
     @Override

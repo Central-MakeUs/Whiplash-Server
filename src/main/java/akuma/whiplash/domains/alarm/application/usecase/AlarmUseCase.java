@@ -11,7 +11,6 @@ import akuma.whiplash.domains.alarm.application.dto.response.AlarmCheckinRespons
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmDeleteMethodResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmPaymentResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmSyncResponse;
-import akuma.whiplash.domains.alarm.application.dto.response.CreateAlarmOccurrenceResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.CreateAlarmResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.GetAlarmsResponse;
 import akuma.whiplash.domains.alarm.domain.service.AlarmCommandService;
@@ -28,10 +27,6 @@ public class AlarmUseCase {
 
     public CreateAlarmResponse createAlarm(AlarmRegisterRequest request, Long memberId, String deviceId) {
         return alarmCommandService.createAlarm(request, memberId, deviceId);
-    }
-
-    public CreateAlarmOccurrenceResponse createAlarmOccurrence(Long memberId, Long alarmId) {
-        return alarmCommandService.createAlarmOccurrence(memberId, alarmId);
     }
 
     public void removeAlarmByPayment(Long memberId, Long alarmId, AlarmDeleteByPaymentRequest request) {
