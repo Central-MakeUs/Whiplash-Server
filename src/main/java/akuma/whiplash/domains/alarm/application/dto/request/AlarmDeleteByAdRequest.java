@@ -10,8 +10,8 @@ public record AlarmDeleteByAdRequest(
     @NotBlank(message = "디바이스 ID를 입력해주세요.")
     String deviceId,
 
-    @Schema(description = "광고 시청 증빙 토큰", example = "ad-proof-token")
-    @NotBlank(message = "광고 증빙 토큰을 입력해주세요.")
-    String adProofToken
+    @Schema(description = "백엔드가 발급한 광고 검증 세션 ID", example = "ad-session-id")
+    @NotBlank(message = "광고 세션 ID를 입력해주세요.")
+    String adSessionId
 ) {
 }

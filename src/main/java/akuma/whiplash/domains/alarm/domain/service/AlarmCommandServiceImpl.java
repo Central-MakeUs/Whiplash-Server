@@ -2,12 +2,17 @@ package akuma.whiplash.domains.alarm.domain.service;
 
 import static akuma.whiplash.domains.alarm.exception.AlarmErrorCode.*;
 
+import akuma.whiplash.domains.ad.domain.constant.AdPurpose;
+import akuma.whiplash.domains.ad.domain.service.AdSessionService;
+import akuma.whiplash.domains.ad.persistence.entity.AdSessionEntity;
+import akuma.whiplash.domains.alarm.application.dto.request.AlarmAdSessionCreateRequest;
 import akuma.whiplash.domains.alarm.application.event.AlarmCheckinCompletedEvent;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmCheckinRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmDeleteByAdRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmDeleteByPaymentRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmPaymentRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmRegisterRequest;
+import akuma.whiplash.domains.alarm.application.dto.response.AlarmAdSessionCreateResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmCheckinResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmPaymentResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.CreateAlarmOccurrenceResponse;
@@ -76,6 +81,7 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
     private final MemberRepository memberRepository;
     private final MemberDeviceRepository memberDeviceRepository;
     private final PaymentRepository paymentRepository;
+    private final AdSessionService adSessionService;
     private final ApplicationEventPublisher eventPublisher;
     private final TimeProvider timeProvider;
 
@@ -144,35 +150,57 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
     }
 
     @Override
+    public AlarmAdSessionCreateResponse createAdSession(Long memberId, Long alarmId, AlarmAdSessionCreateRequest request) {
+        AlarmEntity alarm = findAlarmById(alarmId);
+        MemberEntity member = alarm.getMember();
+        validAlarmOwner(memberId, member.getId());
+        validateAdDeletionAvailable(alarmId);
+
+        LocalDateTime now = timeProvider.now();
+        AdSessionEntity adSession = adSessionService.createSession(
+            member,
+            alarm,
+            request.deviceId(),
+            AdPurpose.DELETE_ALARM,
+            now.plusMinutes(10)
+        );
+        return AlarmMapper.mapToAlarmAdSessionCreateResponse(adSession);
+    }
+
+    @Override
     public void removeAlarmByAd(Long memberId, Long alarmId, AlarmDeleteByAdRequest request) {
-        // 1. 알람을 조회하고 요청자가 알람 소유자인지 검증한다.
+        // 1. 검증 완료된 광고 세션인지 먼저 확인한다.
+        AdSessionEntity adSession = adSessionService.getVerifiedSessionForConsume(
+            request.adSessionId(),
+            memberId,
+            alarmId,
+            request.deviceId(),
+            AdPurpose.DELETE_ALARM
+        );
+
+        // 2. 알람을 조회하고 요청자가 알람 소유자인지 검증한다.
         AlarmEntity alarm = findAlarmById(alarmId);
         MemberEntity member = alarm.getMember();
         validAlarmOwner(memberId, member.getId());
 
-        // 2. 오늘 회차가 아직 대기/울림 상태라면 결제 삭제 정책을 사용해야 한다.
-        alarmOccurrenceRepository.findByAlarmIdAndDate(alarmId, timeProvider.today())
-            .ifPresent(todayOccurrence -> {
-                OccurrenceStatus status = todayOccurrence.getStatus();
-                if (status == OccurrenceStatus.SCHEDULED || status == OccurrenceStatus.RINGING) {
-                    throw ApplicationException.from(ALARM_DELETE_REQUIRES_PAYMENT);
-                }
-            });
+        // 3. 오늘 회차가 아직 대기/울림 상태라면 결제 삭제 정책을 사용해야 한다.
+        validateAdDeletionAvailable(alarmId);
 
-        // 3. 오늘 회차가 없거나 이미 비활성화된 상태라면 알람을 소프트 삭제한다.
+        // 4. 오늘 회차가 없거나 이미 비활성화된 상태라면 알람을 소프트 삭제한다.
         LocalDateTime deletedAt = timeProvider.now();
         alarm.softDelete(deletedAt);
 
-        // 4. 광고 증빙 토큰을 포함한 삭제 이력을 저장한다.
+        // 5. 검증된 광고 세션 식별자를 포함한 삭제 이력을 저장한다.
         alarmDeleteLogRepository.save(AlarmMapper.mapToAdDeleteLogEntity(
             alarm,
             member,
-            request.adProofToken(),
+            request.adSessionId(),
             deletedAt,
             deletedAt
         ));
 
-        // 5. 삭제 성공 시 별도 본문 없이 응답한다.
+        // 6. 광고 세션은 한 번만 사용할 수 있도록 소비 처리한다.
+        adSession.consume(deletedAt);
     }
 
     @Override
@@ -571,6 +599,16 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
                 consume.run();
             }
         });
+    }
+
+    private void validateAdDeletionAvailable(Long alarmId) {
+        alarmOccurrenceRepository.findByAlarmIdAndDate(alarmId, timeProvider.today())
+            .ifPresent(todayOccurrence -> {
+                OccurrenceStatus status = todayOccurrence.getStatus();
+                if (status == OccurrenceStatus.SCHEDULED || status == OccurrenceStatus.RINGING) {
+                    throw ApplicationException.from(ALARM_DELETE_REQUIRES_PAYMENT);
+                }
+            });
     }
 
     private static void validAlarmOwner(Long reqMemberId, Long alarmMemberId) {

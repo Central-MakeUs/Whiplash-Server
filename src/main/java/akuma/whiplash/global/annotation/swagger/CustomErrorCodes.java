@@ -1,5 +1,6 @@
 package akuma.whiplash.global.annotation.swagger;
 
+import akuma.whiplash.domains.ad.exception.AdErrorCode;
 import akuma.whiplash.domains.alarm.exception.AlarmErrorCode;
 import akuma.whiplash.domains.auth.exception.AuthErrorCode;
 import akuma.whiplash.domains.device.exception.DeviceErrorCode;
@@ -17,6 +18,7 @@ import java.lang.annotation.Target;
 public @interface CustomErrorCodes {
 
     CommonErrorCode[] commonErrorCodes() default {};
+    AdErrorCode[] adErrorCodes() default {};
     AuthErrorCode[] authErrorCodes() default {};
     MemberErrorCode[] memberErrorCodes() default {};
     AlarmErrorCode[] alarmErrorCodes() default {};

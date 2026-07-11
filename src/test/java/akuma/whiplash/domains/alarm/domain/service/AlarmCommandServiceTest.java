@@ -19,12 +19,18 @@ import akuma.whiplash.common.fixture.AlarmFixture;
 import akuma.whiplash.common.fixture.MemberDeviceFixture;
 import akuma.whiplash.common.fixture.MemberFixture;
 import akuma.whiplash.common.fixture.PaymentFixture;
+import akuma.whiplash.domains.ad.domain.constant.AdPurpose;
+import akuma.whiplash.domains.ad.domain.constant.AdSessionStatus;
+import akuma.whiplash.domains.ad.domain.service.AdSessionService;
+import akuma.whiplash.domains.ad.persistence.entity.AdSessionEntity;
+import akuma.whiplash.domains.alarm.application.dto.request.AlarmAdSessionCreateRequest;
 import akuma.whiplash.domains.alarm.application.event.AlarmCheckinCompletedEvent;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmCheckinRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmDeleteByAdRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmDeleteByPaymentRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmPaymentRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmRegisterRequest;
+import akuma.whiplash.domains.alarm.application.dto.response.AlarmAdSessionCreateResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmCheckinResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmPaymentResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.CreateAlarmResponse;
@@ -89,6 +95,8 @@ class AlarmCommandServiceTest {
     private MemberDeviceRepository memberDeviceRepository;
     @Mock
     private PaymentRepository paymentRepository;
+    @Mock
+    private AdSessionService adSessionService;
     @Mock
     private List<PaymentVerificationPort> paymentVerificationPorts;
     @Mock
@@ -762,6 +770,47 @@ class AlarmCommandServiceTest {
     }
 
     @Nested
+    @DisplayName("createAdSession - 광고 삭제 세션 발급")
+    class CreateAdSessionTest {
+
+        @Test
+        @DisplayName("성공: 광고 삭제 가능한 알람이면 광고 세션을 발급한다")
+        void success() {
+            // given
+            MemberEntity member = MemberFixture.MEMBER_8.toMockEntity();
+            AlarmEntity alarm = AlarmFixture.ALARM_08.toMockEntity(member);
+            AlarmAdSessionCreateRequest request = new AlarmAdSessionCreateRequest("device-uuid");
+            AdSessionEntity adSession = AdSessionEntity.builder()
+                .adSessionId("ad-session-id-001")
+                .member(member)
+                .alarm(alarm)
+                .deviceId(request.deviceId())
+                .purpose(AdPurpose.DELETE_ALARM)
+                .status(AdSessionStatus.ISSUED)
+                .expiresAt(FIXED_NOW.plusMinutes(10))
+                .build();
+
+            given(alarmRepository.findById(alarm.getId())).willReturn(Optional.of(alarm));
+            given(alarmOccurrenceRepository.findByAlarmIdAndDate(alarm.getId(), FIXED_NOW.toLocalDate()))
+                .willReturn(Optional.empty());
+            given(adSessionService.createSession(
+                eq(member),
+                eq(alarm),
+                eq(request.deviceId()),
+                eq(AdPurpose.DELETE_ALARM),
+                eq(FIXED_NOW.plusMinutes(10))
+            )).willReturn(adSession);
+
+            // when
+            AlarmAdSessionCreateResponse response = alarmCommandService.createAdSession(member.getId(), alarm.getId(), request);
+
+            // then
+            assertThat(response.adSessionId()).isEqualTo(adSession.getAdSessionId());
+            assertThat(response.expiresAt()).isEqualTo(adSession.getExpiresAt());
+        }
+    }
+
+    @Nested
     @DisplayName("removeAlarmByAd - 광고 시청으로 알람 삭제")
     class RemoveAlarmByAdTest {
 
@@ -773,11 +822,19 @@ class AlarmCommandServiceTest {
             AlarmEntity alarm = AlarmFixture.ALARM_08.toMockEntity(member);
             AlarmOccurrenceEntity occurrence = AlarmOccurrenceFixture.ALARM_OCCURRENCE_02
                 .toMockEntity(alarm, 1501L, FIXED_NOW, OccurrenceStatus.CHECKIN);
-            AlarmDeleteByAdRequest request = new AlarmDeleteByAdRequest("device-uuid", "ad-proof-token-001");
+            AlarmDeleteByAdRequest request = new AlarmDeleteByAdRequest("device-uuid", "ad-session-id-001");
+            AdSessionEntity adSession = verifiedAdSession(member, alarm, request);
 
             given(alarmRepository.findById(alarm.getId())).willReturn(Optional.of(alarm));
             given(alarmOccurrenceRepository.findByAlarmIdAndDate(alarm.getId(), FIXED_NOW.toLocalDate()))
                 .willReturn(Optional.of(occurrence));
+            given(adSessionService.getVerifiedSessionForConsume(
+                request.adSessionId(),
+                member.getId(),
+                alarm.getId(),
+                request.deviceId(),
+                AdPurpose.DELETE_ALARM
+            )).willReturn(adSession);
 
             // when
             alarmCommandService.removeAlarmByAd(member.getId(), alarm.getId(), request);
@@ -789,7 +846,8 @@ class AlarmCommandServiceTest {
             ArgumentCaptor<AlarmDeleteLogEntity> logCaptor = ArgumentCaptor.forClass(AlarmDeleteLogEntity.class);
             verify(alarmDeleteLogRepository).save(logCaptor.capture());
             assertThat(logCaptor.getValue().getDeleteType()).isEqualTo(DeleteType.AD);
-            assertThat(logCaptor.getValue().getAdProofToken()).isEqualTo(request.adProofToken());
+            assertThat(logCaptor.getValue().getAdProofToken()).isEqualTo(request.adSessionId());
+            assertThat(adSession.getStatus()).isEqualTo(AdSessionStatus.CONSUMED);
         }
 
         @Test
@@ -798,11 +856,19 @@ class AlarmCommandServiceTest {
             // given
             MemberEntity member = MemberFixture.MEMBER_8.toMockEntity();
             AlarmEntity alarm = AlarmFixture.ALARM_08.toMockEntity(member);
-            AlarmDeleteByAdRequest request = new AlarmDeleteByAdRequest("device-uuid", "ad-proof-token-002");
+            AlarmDeleteByAdRequest request = new AlarmDeleteByAdRequest("device-uuid", "ad-session-id-002");
+            AdSessionEntity adSession = verifiedAdSession(member, alarm, request);
 
             given(alarmRepository.findById(alarm.getId())).willReturn(Optional.of(alarm));
             given(alarmOccurrenceRepository.findByAlarmIdAndDate(alarm.getId(), FIXED_NOW.toLocalDate()))
                 .willReturn(Optional.empty());
+            given(adSessionService.getVerifiedSessionForConsume(
+                request.adSessionId(),
+                member.getId(),
+                alarm.getId(),
+                request.deviceId(),
+                AdPurpose.DELETE_ALARM
+            )).willReturn(adSession);
 
             // when
             alarmCommandService.removeAlarmByAd(member.getId(), alarm.getId(), request);
@@ -811,17 +877,29 @@ class AlarmCommandServiceTest {
             assertThat(alarm.getStatus()).isEqualTo(AlarmStatus.DELETED);
             assertThat(alarm.getDeletedAt()).isEqualTo(FIXED_NOW);
             verify(alarmDeleteLogRepository).save(any(AlarmDeleteLogEntity.class));
+            assertThat(adSession.getStatus()).isEqualTo(AdSessionStatus.CONSUMED);
         }
 
         @Test
         @DisplayName("실패: 알람이 존재하지 않으면 예외를 던진다")
         void fail_alarmNotFound() {
             // given
-            given(alarmRepository.findById(1L)).willReturn(Optional.empty());
-            AlarmDeleteByAdRequest request = new AlarmDeleteByAdRequest("device-uuid", "ad-proof-token");
+            MemberEntity member = MemberFixture.MEMBER_8.toMockEntity();
+            AlarmEntity alarm = AlarmFixture.ALARM_08.toMockEntity(member);
+            AlarmDeleteByAdRequest request = new AlarmDeleteByAdRequest("device-uuid", "ad-session-id");
+            AdSessionEntity adSession = verifiedAdSession(member, alarm, request);
+
+            given(adSessionService.getVerifiedSessionForConsume(
+                request.adSessionId(),
+                member.getId(),
+                alarm.getId(),
+                request.deviceId(),
+                AdPurpose.DELETE_ALARM
+            )).willReturn(adSession);
+            given(alarmRepository.findById(alarm.getId())).willReturn(Optional.empty());
 
             // when & then
-            assertThatThrownBy(() -> alarmCommandService.removeAlarmByAd(1L, 1L, request))
+            assertThatThrownBy(() -> alarmCommandService.removeAlarmByAd(member.getId(), alarm.getId(), request))
                 .isInstanceOfSatisfying(ApplicationException.class, e ->
                     assertThat(e.getCode()).isEqualTo(ALARM_NOT_FOUND)
                 );
@@ -833,8 +911,16 @@ class AlarmCommandServiceTest {
             // given
             MemberEntity owner = MemberFixture.MEMBER_9.toMockEntity();
             AlarmEntity alarm = AlarmFixture.ALARM_09.toMockEntity(owner);
-            AlarmDeleteByAdRequest request = new AlarmDeleteByAdRequest("device-uuid", "ad-proof-token");
+            AlarmDeleteByAdRequest request = new AlarmDeleteByAdRequest("device-uuid", "ad-session-id");
+            AdSessionEntity adSession = verifiedAdSession(owner, alarm, request);
             given(alarmRepository.findById(alarm.getId())).willReturn(Optional.of(alarm));
+            given(adSessionService.getVerifiedSessionForConsume(
+                request.adSessionId(),
+                MemberFixture.MEMBER_10.getId(),
+                alarm.getId(),
+                request.deviceId(),
+                AdPurpose.DELETE_ALARM
+            )).willReturn(adSession);
 
             // when & then
             assertThatThrownBy(() -> alarmCommandService.removeAlarmByAd(MemberFixture.MEMBER_10.getId(), alarm.getId(), request))
@@ -851,11 +937,19 @@ class AlarmCommandServiceTest {
             AlarmEntity alarm = AlarmFixture.ALARM_08.toMockEntity(member);
             AlarmOccurrenceEntity occurrence = AlarmOccurrenceFixture.ALARM_OCCURRENCE_02
                 .toMockEntity(alarm, 1502L, FIXED_NOW, OccurrenceStatus.SCHEDULED);
-            AlarmDeleteByAdRequest request = new AlarmDeleteByAdRequest("device-uuid", "ad-proof-token");
+            AlarmDeleteByAdRequest request = new AlarmDeleteByAdRequest("device-uuid", "ad-session-id");
+            AdSessionEntity adSession = verifiedAdSession(member, alarm, request);
 
             given(alarmRepository.findById(alarm.getId())).willReturn(Optional.of(alarm));
             given(alarmOccurrenceRepository.findByAlarmIdAndDate(alarm.getId(), FIXED_NOW.toLocalDate()))
                 .willReturn(Optional.of(occurrence));
+            given(adSessionService.getVerifiedSessionForConsume(
+                request.adSessionId(),
+                member.getId(),
+                alarm.getId(),
+                request.deviceId(),
+                AdPurpose.DELETE_ALARM
+            )).willReturn(adSession);
 
             // when & then
             assertThatThrownBy(() -> alarmCommandService.removeAlarmByAd(member.getId(), alarm.getId(), request))
@@ -872,17 +966,42 @@ class AlarmCommandServiceTest {
             AlarmEntity alarm = AlarmFixture.ALARM_08.toMockEntity(member);
             AlarmOccurrenceEntity occurrence = AlarmOccurrenceFixture.ALARM_OCCURRENCE_02
                 .toMockEntity(alarm, 1503L, FIXED_NOW, OccurrenceStatus.RINGING);
-            AlarmDeleteByAdRequest request = new AlarmDeleteByAdRequest("device-uuid", "ad-proof-token");
+            AlarmDeleteByAdRequest request = new AlarmDeleteByAdRequest("device-uuid", "ad-session-id");
+            AdSessionEntity adSession = verifiedAdSession(member, alarm, request);
 
             given(alarmRepository.findById(alarm.getId())).willReturn(Optional.of(alarm));
             given(alarmOccurrenceRepository.findByAlarmIdAndDate(alarm.getId(), FIXED_NOW.toLocalDate()))
                 .willReturn(Optional.of(occurrence));
+            given(adSessionService.getVerifiedSessionForConsume(
+                request.adSessionId(),
+                member.getId(),
+                alarm.getId(),
+                request.deviceId(),
+                AdPurpose.DELETE_ALARM
+            )).willReturn(adSession);
 
             // when & then
             assertThatThrownBy(() -> alarmCommandService.removeAlarmByAd(member.getId(), alarm.getId(), request))
                 .isInstanceOfSatisfying(ApplicationException.class, e ->
                     assertThat(e.getCode()).isEqualTo(ALARM_DELETE_REQUIRES_PAYMENT)
                 );
+        }
+
+        private AdSessionEntity verifiedAdSession(
+            MemberEntity member,
+            AlarmEntity alarm,
+            AlarmDeleteByAdRequest request
+        ) {
+            return AdSessionEntity.builder()
+                .adSessionId(request.adSessionId())
+                .member(member)
+                .alarm(alarm)
+                .deviceId(request.deviceId())
+                .purpose(AdPurpose.DELETE_ALARM)
+                .status(AdSessionStatus.VERIFIED)
+                .expiresAt(FIXED_NOW.plusMinutes(10))
+                .verifiedAt(FIXED_NOW.minusMinutes(1))
+                .build();
         }
     }
 

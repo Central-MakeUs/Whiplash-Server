@@ -1,16 +1,19 @@
 package akuma.whiplash.domains.alarm.presentation;
 
 import static akuma.whiplash.domains.alarm.exception.AlarmErrorCode.*;
+import static akuma.whiplash.domains.ad.exception.AdErrorCode.*;
 import static akuma.whiplash.domains.auth.exception.AuthErrorCode.*;
 import static akuma.whiplash.domains.device.exception.DeviceErrorCode.*;
 import static akuma.whiplash.domains.member.exception.MemberErrorCode.MEMBER_NOT_FOUND;
 import static akuma.whiplash.domains.payment.exception.PaymentErrorCode.*;
 
+import akuma.whiplash.domains.alarm.application.dto.request.AlarmAdSessionCreateRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmCheckinRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmDeleteByAdRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmDeleteByPaymentRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmPaymentRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmRegisterRequest;
+import akuma.whiplash.domains.alarm.application.dto.response.AlarmAdSessionCreateResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmCheckinResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmDeleteMethodResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmPaymentResponse;
@@ -77,7 +80,30 @@ public class AlarmController {
         alarmErrorCodes = {ALARM_NOT_FOUND, ALARM_DELETE_REQUIRES_PAYMENT},
         authErrorCodes = {PERMISSION_DENIED}
     )
-    @Operation(summary = "광고 시청으로 알람 삭제", description = "광고 시청 증빙 토큰을 제출하여 알람을 삭제합니다.")
+    @Operation(summary = "광고 삭제 세션 발급", description = "AdMob 보상형 광고 표시 전에 custom_data로 사용할 광고 세션 ID를 발급합니다.")
+    @PostMapping("/{alarmId}/ad-session")
+    public ApplicationResponse<AlarmAdSessionCreateResponse> createAdSession(
+        @AuthenticationPrincipal MemberContext memberContext,
+        @PathVariable Long alarmId,
+        @RequestBody @Valid AlarmAdSessionCreateRequest request
+    ) {
+        return ApplicationResponse.onSuccess(
+            alarmUseCase.createAdSession(memberContext.memberId(), alarmId, request)
+        );
+    }
+
+    @CustomErrorCodes(
+        alarmErrorCodes = {ALARM_NOT_FOUND, ALARM_DELETE_REQUIRES_PAYMENT},
+        adErrorCodes = {
+            AD_SESSION_NOT_VERIFIED,
+            AD_SESSION_EXPIRED,
+            AD_SESSION_MISMATCH,
+            AD_SESSION_NOT_FOUND,
+            AD_SESSION_ALREADY_CONSUMED
+        },
+        authErrorCodes = {PERMISSION_DENIED}
+    )
+    @Operation(summary = "광고 시청으로 알람 삭제", description = "SSV 검증이 완료된 광고 세션을 제출하여 알람을 삭제합니다.")
     @PostMapping("/{alarmId}/delete/ad")
     public ApplicationResponse<Void> removeAlarmByAd(
         @AuthenticationPrincipal MemberContext memberContext,

@@ -4,6 +4,7 @@ import akuma.whiplash.domains.alarm.application.dto.request.AlarmRegisterRequest
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmCheckinResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmDeleteMethodResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmPaymentResponse;
+import akuma.whiplash.domains.alarm.application.dto.response.AlarmAdSessionCreateResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmSyncItemDto;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmSyncResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.CreateAlarmOccurrenceResponse;
@@ -24,6 +25,7 @@ import akuma.whiplash.domains.alarm.persistence.entity.AlarmDeleteLogEntity;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmEntity;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmDeactivationLogEntity;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmOccurrenceEntity;
+import akuma.whiplash.domains.ad.persistence.entity.AdSessionEntity;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmRingingLogEntity;
 import akuma.whiplash.domains.member.persistence.entity.MemberEntity;
 import akuma.whiplash.global.exception.ApplicationException;
@@ -282,7 +284,7 @@ public class AlarmMapper {
     public static AlarmDeleteLogEntity mapToAdDeleteLogEntity(
         AlarmEntity alarm,
         MemberEntity member,
-        String adProofToken,
+        String adSessionId,
         LocalDateTime requestedAt,
         LocalDateTime deletedAt
     ) {
@@ -291,9 +293,16 @@ public class AlarmMapper {
             .member(member)
             .deleteType(DeleteType.AD)
             .reason("")
-            .adProofToken(adProofToken)
+            .adProofToken(adSessionId)
             .requestedAt(requestedAt)
             .deletedAt(deletedAt)
+            .build();
+    }
+
+    public static AlarmAdSessionCreateResponse mapToAlarmAdSessionCreateResponse(AdSessionEntity adSession) {
+        return AlarmAdSessionCreateResponse.builder()
+            .adSessionId(adSession.getAdSessionId())
+            .expiresAt(adSession.getExpiresAt())
             .build();
     }
 

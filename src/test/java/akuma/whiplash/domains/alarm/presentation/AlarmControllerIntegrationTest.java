@@ -16,6 +16,11 @@ import akuma.whiplash.common.fixture.AlarmOccurrenceFixture;
 import akuma.whiplash.common.fixture.MemberDeviceFixture;
 import akuma.whiplash.common.fixture.MemberFixture;
 import akuma.whiplash.common.fixture.PaymentFixture;
+import akuma.whiplash.domains.ad.domain.constant.AdPurpose;
+import akuma.whiplash.domains.ad.domain.constant.AdSessionStatus;
+import akuma.whiplash.domains.ad.persistence.entity.AdSessionEntity;
+import akuma.whiplash.domains.ad.persistence.repository.AdSessionRepository;
+import akuma.whiplash.domains.alarm.application.dto.request.AlarmAdSessionCreateRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmCheckinRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmDeleteByAdRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmDeleteByPaymentRequest;
@@ -76,6 +81,7 @@ class AlarmControllerIntegrationTest {
     @Autowired private AlarmRingingLogRepository alarmRingingLogRepository;
     @Autowired private AlarmDeactivationLogRepository alarmDeactivationLogRepository;
     @Autowired private AlarmDeleteLogRepository alarmDeleteLogRepository;
+    @Autowired private AdSessionRepository adSessionRepository;
     @Autowired private PaymentRepository paymentRepository;
     @MockitoBean private PaymentVerificationPort paymentVerificationPort;
     @MockitoBean private TimeProvider timeProvider;
@@ -87,6 +93,7 @@ class AlarmControllerIntegrationTest {
     void cleanupCommittedData() {
         alarmDeleteLogRepository.deleteAll();
         alarmDeactivationLogRepository.deleteAll();
+        adSessionRepository.deleteAll();
         paymentRepository.deleteAll();
         alarmRingingLogRepository.deleteAll();
         alarmOccurrenceRepository.deleteAll();
@@ -115,6 +122,20 @@ class AlarmControllerIntegrationTest {
             .longitude(126.9780)
             .address("서울특별시 중구 퇴계로 123")
             .member(member)
+            .build());
+    }
+
+    private AdSessionEntity saveVerifiedAdSession(MemberEntity member, AlarmEntity alarm, String deviceId, String adSessionId) {
+        return adSessionRepository.save(AdSessionEntity.builder()
+            .adSessionId(adSessionId)
+            .member(member)
+            .alarm(alarm)
+            .deviceId(deviceId)
+            .purpose(AdPurpose.DELETE_ALARM)
+            .status(AdSessionStatus.VERIFIED)
+            .expiresAt(FIXED_NOW.plusMinutes(10))
+            .verifiedAt(FIXED_NOW.minusMinutes(1))
+            .transactionId("tx-" + adSessionId)
             .build());
     }
 
@@ -822,6 +843,38 @@ class AlarmControllerIntegrationTest {
     }
 
     @Nested
+    @DisplayName("createAdSession - 광고 삭제 세션 발급")
+    class CreateAdSessionTest {
+
+        @Test
+        @DisplayName("성공: 광고 삭제 가능한 알람이면 세션 ID를 반환한다")
+        void success() throws Exception {
+            // given
+            MemberEntity member = memberRepository.save(MemberFixture.MEMBER_8.toEntity());
+            AlarmEntity alarm = alarmRepository.save(AlarmFixture.ALARM_08.toEntity(member));
+            AlarmAdSessionCreateRequest request = new AlarmAdSessionCreateRequest("device-uuid");
+            String accessToken = buildAccessToken(member);
+
+            // when & then
+            mockMvc.perform(post(BASE + "/{alarmId}/ad-session", alarm.getId())
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.adSessionId").isString())
+                .andExpect(jsonPath("$.result.expiresAt").value("2026-05-04T11:10:00"));
+
+            assertThat(adSessionRepository.findAll())
+                .anySatisfy(adSession -> {
+                    assertThat(adSession.getMember().getId()).isEqualTo(member.getId());
+                    assertThat(adSession.getAlarm().getId()).isEqualTo(alarm.getId());
+                    assertThat(adSession.getDeviceId()).isEqualTo(request.deviceId());
+                    assertThat(adSession.getStatus()).isEqualTo(AdSessionStatus.ISSUED);
+                });
+        }
+    }
+
+    @Nested
     @DisplayName("removeAlarmByAd - 광고 시청으로 알람 삭제")
     class RemoveAlarmByAdTest {
 
@@ -832,7 +885,8 @@ class AlarmControllerIntegrationTest {
             MemberEntity member = memberRepository.save(MemberFixture.MEMBER_8.toEntity());
             AlarmEntity alarm = alarmRepository.save(AlarmFixture.ALARM_08.toEntity(member));
             saveOccurrence(alarm, FIXED_NOW, OccurrenceStatus.CHECKIN);
-            AlarmDeleteByAdRequest request = new AlarmDeleteByAdRequest("device-uuid", "ad-proof-token-001");
+            AlarmDeleteByAdRequest request = new AlarmDeleteByAdRequest("device-uuid", "ad-session-id-001");
+            saveVerifiedAdSession(member, alarm, request.deviceId(), request.adSessionId());
             String accessToken = buildAccessToken(member);
 
             // when
@@ -850,8 +904,10 @@ class AlarmControllerIntegrationTest {
             assertThat(alarmDeleteLogRepository.findAll())
                 .anySatisfy(log -> {
                     assertThat(log.getDeleteType()).isEqualTo(DeleteType.AD);
-                    assertThat(log.getAdProofToken()).isEqualTo(request.adProofToken());
+                    assertThat(log.getAdProofToken()).isEqualTo(request.adSessionId());
                 });
+            assertThat(adSessionRepository.findByAdSessionId(request.adSessionId()).orElseThrow().getStatus())
+                .isEqualTo(AdSessionStatus.CONSUMED);
         }
 
         @Test
@@ -860,7 +916,8 @@ class AlarmControllerIntegrationTest {
             // given
             MemberEntity member = memberRepository.save(MemberFixture.MEMBER_9.toEntity());
             AlarmEntity alarm = alarmRepository.save(AlarmFixture.ALARM_09.toEntity(member));
-            AlarmDeleteByAdRequest request = new AlarmDeleteByAdRequest("device-uuid", "ad-proof-token-002");
+            AlarmDeleteByAdRequest request = new AlarmDeleteByAdRequest("device-uuid", "ad-session-id-002");
+            saveVerifiedAdSession(member, alarm, request.deviceId(), request.adSessionId());
             String accessToken = buildAccessToken(member);
 
             // when
@@ -878,8 +935,10 @@ class AlarmControllerIntegrationTest {
             assertThat(alarmDeleteLogRepository.findAll())
                 .anySatisfy(log -> {
                     assertThat(log.getDeleteType()).isEqualTo(DeleteType.AD);
-                    assertThat(log.getAdProofToken()).isEqualTo(request.adProofToken());
+                    assertThat(log.getAdProofToken()).isEqualTo(request.adSessionId());
                 });
+            assertThat(adSessionRepository.findByAdSessionId(request.adSessionId()).orElseThrow().getStatus())
+                .isEqualTo(AdSessionStatus.CONSUMED);
         }
 
         @Test
@@ -889,7 +948,8 @@ class AlarmControllerIntegrationTest {
             MemberEntity member = memberRepository.save(MemberFixture.MEMBER_10.toEntity());
             AlarmEntity alarm = alarmRepository.save(AlarmFixture.ALARM_10.toEntity(member));
             saveOccurrence(alarm, FIXED_NOW, OccurrenceStatus.RINGING);
-            AlarmDeleteByAdRequest request = new AlarmDeleteByAdRequest("device-uuid", "ad-proof-token");
+            AlarmDeleteByAdRequest request = new AlarmDeleteByAdRequest("device-uuid", "ad-session-id");
+            saveVerifiedAdSession(member, alarm, request.deviceId(), request.adSessionId());
             String accessToken = buildAccessToken(member);
 
             // when & then
