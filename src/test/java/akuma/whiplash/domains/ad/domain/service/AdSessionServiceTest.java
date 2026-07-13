@@ -12,6 +12,7 @@ import static org.mockito.Mockito.verify;
 import akuma.whiplash.common.fixture.AlarmFixture;
 import akuma.whiplash.common.fixture.MemberFixture;
 import akuma.whiplash.domains.ad.application.dto.etc.AdMobRewardCallback;
+import akuma.whiplash.domains.ad.application.dto.request.AdMobRewardCallbackRequest;
 import akuma.whiplash.domains.ad.domain.constant.AdPurpose;
 import akuma.whiplash.domains.ad.domain.constant.AdSessionStatus;
 import akuma.whiplash.domains.ad.persistence.entity.AdSessionEntity;
@@ -20,7 +21,6 @@ import akuma.whiplash.domains.alarm.persistence.entity.AlarmEntity;
 import akuma.whiplash.domains.member.persistence.entity.MemberEntity;
 import akuma.whiplash.global.exception.ApplicationException;
 import akuma.whiplash.global.util.date.TimeProvider;
-import jakarta.servlet.http.HttpServletRequest;
 import java.time.LocalDateTime;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
@@ -41,8 +41,6 @@ class AdSessionServiceTest {
     private AdMobRewardVerifier adMobRewardVerifier;
     @Mock
     private TimeProvider timeProvider;
-    @Mock
-    private HttpServletRequest request;
 
     @InjectMocks
     private AdSessionServiceImpl adSessionService;
@@ -61,6 +59,7 @@ class AdSessionServiceTest {
             AlarmEntity alarm = AlarmFixture.ALARM_08.toMockEntity(member);
             AdSessionEntity adSession = issuedAdSession(member, alarm, "ad-session-id");
             AdMobRewardCallback callback = callback("ad-session-id", "transaction-id-001");
+            AdMobRewardCallbackRequest request = request();
 
             given(adMobRewardVerifier.verify(request)).willReturn(callback);
             given(adSessionRepository.existsByTransactionId(callback.transactionId())).willReturn(false);
@@ -81,6 +80,7 @@ class AdSessionServiceTest {
         void success_duplicateTransactionIgnored() {
             // given
             AdMobRewardCallback callback = callback("ad-session-id", "transaction-id-001");
+            AdMobRewardCallbackRequest request = request();
             given(adMobRewardVerifier.verify(request)).willReturn(callback);
             given(adSessionRepository.existsByTransactionId(callback.transactionId())).willReturn(true);
 
@@ -96,6 +96,7 @@ class AdSessionServiceTest {
         void fail_sessionNotFound() {
             // given
             AdMobRewardCallback callback = callback("unknown-session-id", "transaction-id-001");
+            AdMobRewardCallbackRequest request = request();
             given(adMobRewardVerifier.verify(request)).willReturn(callback);
             given(adSessionRepository.existsByTransactionId(callback.transactionId())).willReturn(false);
             given(adSessionRepository.findByAdSessionId(callback.customData())).willReturn(Optional.empty());
@@ -123,6 +124,7 @@ class AdSessionServiceTest {
                 .expiresAt(FIXED_NOW.minusSeconds(1))
                 .build();
             AdMobRewardCallback callback = callback("ad-session-id", "transaction-id-001");
+            AdMobRewardCallbackRequest request = request();
 
             given(adMobRewardVerifier.verify(request)).willReturn(callback);
             given(adSessionRepository.existsByTransactionId(callback.transactionId())).willReturn(false);
@@ -145,6 +147,7 @@ class AdSessionServiceTest {
             AdSessionEntity adSession = issuedAdSession(member, alarm, "ad-session-id");
             adSession.consume(FIXED_NOW.minusMinutes(1));
             AdMobRewardCallback callback = callback("ad-session-id", "transaction-id-001");
+            AdMobRewardCallbackRequest request = request();
 
             given(adMobRewardVerifier.verify(request)).willReturn(callback);
             given(adSessionRepository.existsByTransactionId(callback.transactionId())).willReturn(false);
@@ -177,6 +180,17 @@ class AdSessionServiceTest {
             transactionId,
             "ad-unit-id",
             1,
+            "coin"
+        );
+    }
+
+    private AdMobRewardCallbackRequest request() {
+        return new AdMobRewardCallbackRequest(
+            "custom_data=ad-session-id&transaction_id=transaction-id-001",
+            "ad-session-id",
+            "transaction-id-001",
+            "ad-unit-id",
+            "1",
             "coin"
         );
     }

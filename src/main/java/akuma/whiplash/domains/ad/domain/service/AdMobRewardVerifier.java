@@ -1,9 +1,9 @@
 package akuma.whiplash.domains.ad.domain.service;
 
 import akuma.whiplash.domains.ad.application.dto.etc.AdMobRewardCallback;
-import jakarta.servlet.http.HttpServletRequest;
+import akuma.whiplash.domains.ad.application.dto.request.AdMobRewardCallbackRequest;
 
 public interface AdMobRewardVerifier {
 
-    AdMobRewardCallback verify(HttpServletRequest request);
+    AdMobRewardCallback verify(AdMobRewardCallbackRequest request);
 }

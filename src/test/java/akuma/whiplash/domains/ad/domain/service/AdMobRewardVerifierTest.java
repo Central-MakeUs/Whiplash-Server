@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import akuma.whiplash.domains.ad.application.dto.etc.AdMobRewardCallback;
+import akuma.whiplash.domains.ad.application.dto.request.AdMobRewardCallbackRequest;
 import akuma.whiplash.global.exception.ApplicationException;
 import java.nio.charset.StandardCharsets;
 import java.security.KeyPair;
@@ -20,7 +21,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.web.reactive.function.client.WebClient;
 
 @DisplayName("AdMobRewardVerifier Unit Test")
@@ -52,7 +52,7 @@ class AdMobRewardVerifierTest {
             enqueuePublicKey(keyId, keyPair);
             String signedContent = "custom_data=ad-session-id&transaction_id=transaction-id&reward_amount=1&reward_item=coin&ad_unit=ad-unit";
             String signature = sign(signedContent, keyPair);
-            MockHttpServletRequest request = request(signedContent + "&signature=" + signature + "&key_id=" + keyId);
+            AdMobRewardCallbackRequest request = request(signedContent + "&signature=" + signature + "&key_id=" + keyId);
             AdMobRewardVerifier verifier = verifier();
 
             // when
@@ -74,7 +74,7 @@ class AdMobRewardVerifierTest {
             String signedContent = "custom_data=ad-session-id&transaction_id=transaction-id";
             String invalidSignature = Base64.getUrlEncoder().withoutPadding()
                 .encodeToString("invalid".getBytes(StandardCharsets.UTF_8));
-            MockHttpServletRequest request = request(signedContent + "&signature=" + invalidSignature + "&key_id=" + keyId);
+            AdMobRewardCallbackRequest request = request(signedContent + "&signature=" + invalidSignature + "&key_id=" + keyId);
             AdMobRewardVerifier verifier = verifier();
 
             // when & then
@@ -114,13 +114,14 @@ class AdMobRewardVerifierTest {
         return Base64.getUrlEncoder().withoutPadding().encodeToString(signer.sign());
     }
 
-    private MockHttpServletRequest request(String queryString) {
-        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/ads/rewards/callback/admob");
-        request.setQueryString(queryString);
-        for (String pair : queryString.split("&")) {
-            String[] parts = pair.split("=", 2);
-            request.addParameter(parts[0], parts.length == 2 ? parts[1] : "");
-        }
-        return request;
+    private AdMobRewardCallbackRequest request(String queryString) {
+        return new AdMobRewardCallbackRequest(
+            queryString,
+            "ad-session-id",
+            "transaction-id",
+            "ad-unit",
+            "1",
+            "coin"
+        );
     }
 }

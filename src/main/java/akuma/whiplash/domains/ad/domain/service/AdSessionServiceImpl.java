@@ -1,6 +1,7 @@
 package akuma.whiplash.domains.ad.domain.service;
 
 import akuma.whiplash.domains.ad.application.dto.etc.AdMobRewardCallback;
+import akuma.whiplash.domains.ad.application.dto.request.AdMobRewardCallbackRequest;
 import akuma.whiplash.domains.ad.domain.constant.AdPurpose;
 import akuma.whiplash.domains.ad.domain.constant.AdSessionStatus;
 import akuma.whiplash.domains.ad.exception.AdErrorCode;
@@ -10,7 +11,6 @@ import akuma.whiplash.domains.alarm.persistence.entity.AlarmEntity;
 import akuma.whiplash.domains.member.persistence.entity.MemberEntity;
 import akuma.whiplash.global.exception.ApplicationException;
 import akuma.whiplash.global.util.date.TimeProvider;
-import jakarta.servlet.http.HttpServletRequest;
 import java.time.LocalDateTime;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -46,7 +46,7 @@ public class AdSessionServiceImpl implements AdSessionService {
     }
 
     @Override
-    public void verifyRewardCallback(HttpServletRequest request) {
+    public void verifyRewardCallback(AdMobRewardCallbackRequest request) {
         AdMobRewardCallback callback = adMobRewardVerifier.verify(request);
         if (adSessionRepository.existsByTransactionId(callback.transactionId())) {
             return;

@@ -1,9 +1,9 @@
 package akuma.whiplash.domains.ad.domain.service;
 
 import akuma.whiplash.domains.ad.application.dto.etc.AdMobRewardCallback;
+import akuma.whiplash.domains.ad.application.dto.request.AdMobRewardCallbackRequest;
 import akuma.whiplash.domains.ad.exception.AdErrorCode;
 import akuma.whiplash.global.exception.ApplicationException;
-import jakarta.servlet.http.HttpServletRequest;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.security.KeyFactory;
@@ -44,8 +44,8 @@ public class AdMobRewardVerifierImpl implements AdMobRewardVerifier {
     }
 
     @Override
-    public AdMobRewardCallback verify(HttpServletRequest request) {
-        String queryString = request.getQueryString();
+    public AdMobRewardCallback verify(AdMobRewardCallbackRequest request) {
+        String queryString = request.rawQueryString();
         if (queryString == null || queryString.isBlank()) {
             throw ApplicationException.from(AdErrorCode.INVALID_ADMOB_CALLBACK);
         }
@@ -56,8 +56,8 @@ public class AdMobRewardVerifierImpl implements AdMobRewardVerifier {
 
         verifySignature(signedContent, signature, keyId);
 
-        String customData = request.getParameter("custom_data");
-        String transactionId = request.getParameter("transaction_id");
+        String customData = request.customData();
+        String transactionId = request.transactionId();
         if (customData == null || customData.isBlank() || transactionId == null || transactionId.isBlank()) {
             throw ApplicationException.from(AdErrorCode.INVALID_ADMOB_CALLBACK);
         }
@@ -65,9 +65,9 @@ public class AdMobRewardVerifierImpl implements AdMobRewardVerifier {
         return new AdMobRewardCallback(
             customData,
             transactionId,
-            request.getParameter("ad_unit"),
-            parseInteger(request.getParameter("reward_amount")),
-            request.getParameter("reward_item")
+            request.adUnit(),
+            parseInteger(request.rewardAmount()),
+            request.rewardItem()
         );
     }
 

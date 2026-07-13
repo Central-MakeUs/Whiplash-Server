@@ -2,6 +2,7 @@ package akuma.whiplash.domains.ad.presentation;
 
 import static akuma.whiplash.domains.ad.exception.AdErrorCode.INVALID_ADMOB_CALLBACK;
 
+import akuma.whiplash.domains.ad.application.dto.request.AdMobRewardCallbackRequest;
 import akuma.whiplash.domains.ad.domain.service.AdSessionService;
 import akuma.whiplash.global.annotation.swagger.CustomErrorCodes;
 import akuma.whiplash.global.response.ApplicationResponse;
@@ -21,7 +22,14 @@ public class AdController {
     @Operation(summary = "AdMob 보상형 광고 SSV 콜백", description = "AdMob이 호출하는 서버 사이드 검증 콜백입니다.")
     @GetMapping("/api/v1/ads/rewards/callback/admob")
     public ApplicationResponse<Void> verifyRewardCallback(HttpServletRequest request) {
-        adSessionService.verifyRewardCallback(request);
+        adSessionService.verifyRewardCallback(new AdMobRewardCallbackRequest(
+            request.getQueryString(),
+            request.getParameter("custom_data"),
+            request.getParameter("transaction_id"),
+            request.getParameter("ad_unit"),
+            request.getParameter("reward_amount"),
+            request.getParameter("reward_item")
+        ));
         return ApplicationResponse.onSuccess();
     }
 }
