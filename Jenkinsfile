@@ -105,12 +105,22 @@ pipeline {
                                 // 6. 운영/QA 서버에 무중단 배포 실행
                                 stage("Deploy Blue/Green to ${env.DEPLOY_ENV.toUpperCase()}") {
                                     script {
-                                        // prod면 /opt/app/scripts, qa면 /opt/db/scripts
-                                        env.REMOTE_SCRIPT_DIR = (env.DEPLOY_ENV == 'prod') ? '/opt/app/scripts' : '/opt/db/scripts'
-
-                                        sh """
-                                            ssh -p ${WAS_SSH_PORT} -o StrictHostKeyChecking=no ${WAS_USERNAME}@${WAS_HOST} 'cd ${env.REMOTE_SCRIPT_DIR} && ./deploy.sh "${env.SHORT_SHA}" "${IMAGE_NAME}" "${DOCKER_USER}" "${DOCKER_PASS}" "${env.DEPLOY_ENV}"'
-                                        """
+                                        if (env.DEPLOY_ENV == 'qa') {
+                                            // QA의 Git 관리 deploy.sh는 tag·image·env만 인자로 받고,
+                                            // Docker registry credential은 표준 입력으로만 받는다.
+                                            // Jenkins agent의 known_hosts에 QA WAS host key가 등록돼 있어야 한다.
+                                            sh '''
+                                                printf '%s\\n%s\\n' "$DOCKER_USER" "$DOCKER_PASS" | \\
+                                                  ssh -p "$WAS_SSH_PORT" -o StrictHostKeyChecking=yes \\
+                                                    "$WAS_USERNAME@$WAS_HOST" \\
+                                                    "cd /opt/db/scripts && ./deploy.sh '$SHORT_SHA' '$IMAGE_NAME' qa"
+                                            '''
+                                        } else {
+                                            // Production은 기존 서버 스크립트 전환 전까지 현 호출 규약을 유지한다.
+                                            sh """
+                                                ssh -p ${WAS_SSH_PORT} -o StrictHostKeyChecking=no ${WAS_USERNAME}@${WAS_HOST} 'cd /opt/app/scripts && ./deploy.sh "${env.SHORT_SHA}" "${IMAGE_NAME}" "${DOCKER_USER}" "${DOCKER_PASS}" prod'
+                                            """
+                                        }
                                     }
                                 }
                             }
