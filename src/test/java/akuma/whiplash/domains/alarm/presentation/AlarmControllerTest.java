@@ -19,22 +19,27 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import akuma.whiplash.common.fixture.AlarmFixture;
 import akuma.whiplash.common.fixture.MemberFixture;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmCheckinRequest;
-import akuma.whiplash.domains.alarm.application.dto.request.AlarmOffRequest;
+import akuma.whiplash.domains.alarm.application.dto.request.AlarmDeleteByAdRequest;
+import akuma.whiplash.domains.alarm.application.dto.request.AlarmDeleteByPaymentRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmRegisterRequest;
-import akuma.whiplash.domains.alarm.application.dto.request.AlarmRemoveRequest;
-import akuma.whiplash.domains.alarm.application.dto.response.AlarmInfoPreviewResponse;
-import akuma.whiplash.domains.alarm.application.dto.response.AlarmOffResultResponse;
-import akuma.whiplash.domains.alarm.application.dto.response.AlarmRemainingOffCountResponse;
+import akuma.whiplash.domains.alarm.application.dto.response.AlarmDeleteMethodResponse;
+import akuma.whiplash.domains.alarm.application.dto.response.AlarmPreviewDto;
+import akuma.whiplash.domains.alarm.application.dto.response.AlarmSyncItemDto;
+import akuma.whiplash.domains.alarm.application.dto.response.AlarmSyncResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.CreateAlarmResponse;
+import akuma.whiplash.domains.alarm.application.dto.response.GetAlarmsResponse;
 import akuma.whiplash.domains.alarm.application.usecase.AlarmUseCase;
+import akuma.whiplash.domains.alarm.domain.constant.AlarmDeleteMethod;
 import akuma.whiplash.domains.alarm.domain.constant.Weekday;
 import akuma.whiplash.domains.alarm.exception.AlarmErrorCode;
 import akuma.whiplash.domains.auth.application.dto.etc.MemberContext;
 import akuma.whiplash.domains.auth.exception.AuthErrorCode;
 import akuma.whiplash.domains.member.exception.MemberErrorCode;
+import akuma.whiplash.domains.payment.exception.PaymentErrorCode;
 import akuma.whiplash.global.config.security.SecurityConfig;
 import akuma.whiplash.global.config.security.jwt.JwtAuthenticationFilter;
 import akuma.whiplash.global.exception.ApplicationException;
+import akuma.whiplash.global.response.code.CommonErrorCode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -57,7 +62,6 @@ import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.ResultActions;
 
 
 @WebMvcTest(
@@ -80,7 +84,7 @@ class AlarmControllerTest {
     @MockitoBean
     private AlarmUseCase alarmUseCase;
 
-    private static final String BASE = "/api/alarms";
+    private static final String BASE = "/api/v1/alarms";
 
     private void setSecurityContext(MemberContext context) {
         UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
@@ -99,11 +103,15 @@ class AlarmControllerTest {
         return MemberContext.builder()
             .memberId(fixture.getId())
             .role(fixture.getRole())
-            .socialId(fixture.getSocialId())
+            .provider(fixture.getProvider())
             .email(fixture.getEmail())
             .nickname(fixture.getNickname())
             .deviceId("mock_device_id")
             .build();
+    }
+
+    private AlarmCheckinRequest buildCheckinRequest() {
+        return new AlarmCheckinRequest(501L, "device-uuid", 37.0, 127.0);
     }
 
     @AfterEach
@@ -113,7 +121,7 @@ class AlarmControllerTest {
 
 
     @Nested
-    @DisplayName("[POST] /api/alarms - 알람 등록")
+    @DisplayName("[POST] /api/v1/alarms - 알람 등록")
     class CreateAlarmTest {
 
         @Test
@@ -123,27 +131,30 @@ class AlarmControllerTest {
             // given
             AlarmFixture fixture = AlarmFixture.ALARM_03;
             AlarmRegisterRequest request = new AlarmRegisterRequest(
-                fixture.getAddress(),
-                fixture.getLatitude(),
-                fixture.getLongitude(),
+                new akuma.whiplash.domains.alarm.application.dto.request.PlaceRequest(
+                    fixture.getAddress(),
+                    fixture.getLatitude(),
+                    fixture.getLongitude()
+                ),
                 fixture.getAlarmPurpose(),
-                fixture.getTime(),
-                fixture.getRepeatDays().stream().map(Weekday::getDescription).toList(),
-                fixture.getSoundType().getDescription()
+                LocalTime.parse("08:30"),
+                fixture.getRepeatDays().stream().map(Weekday::name).toList(),
+                fixture.getSoundType().name()
             );
             setSecurityContext(buildContext(MEMBER_3));
             CreateAlarmResponse response = CreateAlarmResponse.builder().alarmId(123L).build();
 
             // when
-            when(alarmUseCase.createAlarm(any(AlarmRegisterRequest.class), anyLong())).thenReturn(response);
+            when(alarmUseCase.createAlarm(any(AlarmRegisterRequest.class), anyLong(), anyString())).thenReturn(response);
 
-            mockMvc.perform(post("/api/alarms")
+            mockMvc.perform(post(BASE)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk());
 
             // then
-            verify(alarmUseCase, times(1)).createAlarm(any(AlarmRegisterRequest.class), eq(MEMBER_3.getId()));
+            verify(alarmUseCase, times(1))
+                .createAlarm(any(AlarmRegisterRequest.class), eq(MEMBER_3.getId()), eq("mock_device_id"));
         }
 
         @Test
@@ -154,29 +165,31 @@ class AlarmControllerTest {
             setSecurityContext(buildContext(MEMBER_3));
             String json = """
                 {
-                  \"address\": \"서울시 중구 퇴계로 24\",
-                  \"latitude\": 37.564213,
-                  \"longitude\": 127.001698,
-                  \"alarmPurpose\": \"도서관 정기 출석 알람\",
-                  \"time\": \"24:30\",
-                  \"repeatDays\": [\"월\"],
-                  \"soundType\": \"알람 소리1\"
+                  "place": {
+                    "address": "서울시 중구 퇴계로 24",
+                    "latitude": 37.564213,
+                    "longitude": 127.001698
+                  },
+                  "alarmPurpose": "도서관 정기 출석 알람",
+                  "alarmTime": "24:30",
+                  "repeatDays": ["MONDAY"],
+                  "soundType": "KARINA_SCOLDING"
                 }
                 """;
             CreateAlarmResponse response = CreateAlarmResponse.builder().alarmId(1L).build();
 
             // when
-            when(alarmUseCase.createAlarm(any(AlarmRegisterRequest.class), anyLong())).thenReturn(response);
+            when(alarmUseCase.createAlarm(any(AlarmRegisterRequest.class), anyLong(), anyString())).thenReturn(response);
 
-            mockMvc.perform(post("/api/alarms")
+            mockMvc.perform(post(BASE)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(json))
                 .andExpect(status().isOk());
 
             // then
             ArgumentCaptor<AlarmRegisterRequest> captor = ArgumentCaptor.forClass(AlarmRegisterRequest.class);
-            verify(alarmUseCase, times(1)).createAlarm(captor.capture(), eq(MEMBER_3.getId()));
-            assertThat(captor.getValue().time()).isEqualTo(LocalTime.of(0, 30));
+            verify(alarmUseCase, times(1)).createAlarm(captor.capture(), eq(MEMBER_3.getId()), eq("mock_device_id"));
+            assertThat(captor.getValue().alarmTime()).isEqualTo(LocalTime.of(0, 30));
         }
 
         @Test
@@ -186,21 +199,24 @@ class AlarmControllerTest {
             // given
             AlarmFixture fixture = AlarmFixture.ALARM_04;
             AlarmRegisterRequest request = new AlarmRegisterRequest(
-                fixture.getAddress(),
-                fixture.getLatitude(),
-                fixture.getLongitude(),
+                new akuma.whiplash.domains.alarm.application.dto.request.PlaceRequest(
+                    fixture.getAddress(),
+                    fixture.getLatitude(),
+                    fixture.getLongitude()
+                ),
                 fixture.getAlarmPurpose(),
                 fixture.getTime(),
-                fixture.getRepeatDays().stream().map(Weekday::getDescription).toList(),
-                fixture.getSoundType().getDescription()
+                fixture.getRepeatDays().stream().map(Weekday::name).toList(),
+                fixture.getSoundType().name()
             );
             setSecurityContext(buildContext(MEMBER_4));
 
-            // when & then
-            when(alarmUseCase.createAlarm(any(AlarmRegisterRequest.class), anyLong()))
+            // when
+            when(alarmUseCase.createAlarm(any(AlarmRegisterRequest.class), anyLong(), anyString()))
                 .thenThrow(ApplicationException.from(MemberErrorCode.MEMBER_NOT_FOUND));
 
-            mockMvc.perform(post("/api/alarms")
+            // then
+            mockMvc.perform(post(BASE)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isNotFound());
@@ -214,28 +230,30 @@ class AlarmControllerTest {
         // given
         AlarmFixture fixture = AlarmFixture.ALARM_03;
         AlarmRegisterRequest request = new AlarmRegisterRequest(
-            fixture.getAddress(),
-            fixture.getLatitude(),
-            fixture.getLongitude(),
+            new akuma.whiplash.domains.alarm.application.dto.request.PlaceRequest(
+                fixture.getAddress(),
+                fixture.getLatitude(),
+                fixture.getLongitude()
+            ),
             fixture.getAlarmPurpose(),
             fixture.getTime(),
-            fixture.getRepeatDays().stream().map(Weekday::getDescription).toList(),
-            fixture.getSoundType().getDescription()
+            fixture.getRepeatDays().stream().map(Weekday::name).toList(),
+            fixture.getSoundType().name()
         );
         setSecurityContext(buildContext(MEMBER_3));
 
         // when & then
-        when(alarmUseCase.createAlarm(any(AlarmRegisterRequest.class), anyLong()))
+        when(alarmUseCase.createAlarm(any(AlarmRegisterRequest.class), anyLong(), anyString()))
             .thenThrow(ApplicationException.from(AlarmErrorCode.DUPLICATE_ALARM_PURPOSE));
 
-        mockMvc.perform(post("/api/alarms")
+        mockMvc.perform(post(BASE)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
             .andExpect(status().isConflict());
     }
 
     @Nested
-    @DisplayName("[POST] /api/alarms/{id}/ring - 알람 울림")
+    @DisplayName("[POST] /api/v1/alarms/{id}/ring - 알람 울림")
     class RingAlarmTest {
 
         @Test
@@ -246,11 +264,11 @@ class AlarmControllerTest {
             setSecurityContext(buildContext(MEMBER_3));
 
             // when
-            mockMvc.perform(post("/api/alarms/{alarmId}/ring", 1L))
+            mockMvc.perform(post(BASE + "/{alarmId}/ring", 1L))
                 .andExpect(status().isOk());
 
             // then
-            verify(alarmUseCase, times(1)).ringAlarm(eq(MEMBER_3.getId()), eq(1L));
+            verify(alarmUseCase, times(1)).ringAlarm(eq(MEMBER_3.getId()), eq(1L), eq("mock_device_id"));
         }
 
         @Test
@@ -263,16 +281,16 @@ class AlarmControllerTest {
             // when
             doThrow(ApplicationException.from(AlarmErrorCode.NOT_ALARM_TIME))
                 .when(alarmUseCase)
-                .ringAlarm(eq(MEMBER_3.getId()), eq(1L));
+                .ringAlarm(eq(MEMBER_3.getId()), eq(1L), eq("mock_device_id"));
 
             // then
-            mockMvc.perform(post("/api/alarms/{alarmId}/ring", 1L))
+            mockMvc.perform(post(BASE + "/{alarmId}/ring", 1L))
                 .andExpect(status().isBadRequest());
         }
     }
 
     @Nested
-    @DisplayName("[POST] /api/alarms/{alarmId}/checkin - 도착 인증")
+    @DisplayName("[POST] /api/v1/alarms/{alarmId}/off/checkin - 도착 인증")
     class CheckinTest {
 
         @Test
@@ -280,10 +298,10 @@ class AlarmControllerTest {
         void success() throws Exception {
             // given
             setSecurityContext(buildContext(MemberFixture.MEMBER_8));
-            AlarmCheckinRequest request = new AlarmCheckinRequest(37.0, 127.0);
+            AlarmCheckinRequest request = buildCheckinRequest();
 
             // when & then
-            mockMvc.perform(post("/api/alarms/{alarmId}/checkin", 1L)
+            mockMvc.perform(post(BASE + "/{alarmId}/off/checkin", 1L)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk());
@@ -300,10 +318,10 @@ class AlarmControllerTest {
             doThrow(ApplicationException.from(AlarmErrorCode.ALARM_NOT_FOUND))
                 .when(alarmUseCase)
                 .checkinAlarm(anyLong(), anyLong(), any(AlarmCheckinRequest.class));
-            AlarmCheckinRequest request = new AlarmCheckinRequest(37.0, 127.0);
+            AlarmCheckinRequest request = buildCheckinRequest();
 
             // when & then
-            mockMvc.perform(post("/api/alarms/{alarmId}/checkin", 1L)
+            mockMvc.perform(post(BASE + "/{alarmId}/off/checkin", 1L)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isNotFound());
@@ -317,10 +335,10 @@ class AlarmControllerTest {
             doThrow(ApplicationException.from(AuthErrorCode.PERMISSION_DENIED))
                 .when(alarmUseCase)
                 .checkinAlarm(anyLong(), anyLong(), any(AlarmCheckinRequest.class));
-            AlarmCheckinRequest request = new AlarmCheckinRequest(37.0, 127.0);
+            AlarmCheckinRequest request = buildCheckinRequest();
 
             // when & then
-            mockMvc.perform(post("/api/alarms/{alarmId}/checkin", 1L)
+            mockMvc.perform(post(BASE + "/{alarmId}/off/checkin", 1L)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isForbidden());
@@ -334,10 +352,10 @@ class AlarmControllerTest {
             doThrow(ApplicationException.from(AlarmErrorCode.ALREADY_DEACTIVATED))
                 .when(alarmUseCase)
                 .checkinAlarm(anyLong(), anyLong(), any(AlarmCheckinRequest.class));
-            AlarmCheckinRequest request = new AlarmCheckinRequest(37.0, 127.0);
+            AlarmCheckinRequest request = buildCheckinRequest();
 
             // when & then
-            mockMvc.perform(post("/api/alarms/{alarmId}/checkin", 1L)
+            mockMvc.perform(post(BASE + "/{alarmId}/off/checkin", 1L)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest());
@@ -351,27 +369,27 @@ class AlarmControllerTest {
             doThrow(ApplicationException.from(AlarmErrorCode.CHECKIN_OUT_OF_RANGE))
                 .when(alarmUseCase)
                 .checkinAlarm(anyLong(), anyLong(), any(AlarmCheckinRequest.class));
-            AlarmCheckinRequest request = new AlarmCheckinRequest(37.0, 127.0);
+            AlarmCheckinRequest request = buildCheckinRequest();
 
             // when & then
-            mockMvc.perform(post("/api/alarms/{alarmId}/checkin", 1L)
+            mockMvc.perform(post(BASE + "/{alarmId}/off/checkin", 1L)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest());
         }
 
         @Test
-        @DisplayName("실패: 다음 주 알람에는 도착 인증할 수 없다")
-        void fail_nextWeek() throws Exception {
+        @DisplayName("실패: 인증 가능 시간 전이면 400을 반환한다")
+        void fail_notYetAvailable() throws Exception {
             // given
             setSecurityContext(buildContext(MemberFixture.MEMBER_13));
-            doThrow(ApplicationException.from(AlarmErrorCode.NEXT_WEEK_ALARM_DEACTIVATION_NOT_ALLOWED))
+            doThrow(ApplicationException.from(AlarmErrorCode.CHECKIN_NOT_YET_AVAILABLE))
                 .when(alarmUseCase)
                 .checkinAlarm(anyLong(), anyLong(), any(AlarmCheckinRequest.class));
-            AlarmCheckinRequest request = new AlarmCheckinRequest(37.0, 127.0);
+            AlarmCheckinRequest request = buildCheckinRequest();
 
             // when & then
-            mockMvc.perform(post("/api/alarms/{alarmId}/checkin", 1L)
+            mockMvc.perform(post(BASE + "/{alarmId}/off/checkin", 1L)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest());
@@ -379,217 +397,38 @@ class AlarmControllerTest {
     }
 
     @Nested
-    @DisplayName("[POST] /api/alarms/{id}/off - 알람 끄기(OFF)")
-    class AlarmOffTest {
+    @DisplayName("[POST] /api/v1/alarms/{alarmId}/delete/payment - 결제로 알람 삭제")
+    class RemoveAlarmByPaymentTest {
 
         @Test
-        @DisplayName("성공: 주간 잔여 OFF 횟수를 포함해 200 OK를 반환한다")
+        @DisplayName("성공: 결제 삭제 요청이 성공하면 200을 반환한다")
         void success() throws Exception {
             // given
-            setSecurityContext(buildContext(MEMBER_3));
-            AlarmOffRequest request = new AlarmOffRequest(LocalDateTime.now());
-            AlarmOffResultResponse response = AlarmOffResultResponse.builder()
-                .offTargetDate(LocalDate.now())
-                .offTargetDayOfWeek("월요일")
-                .reactivateDate(LocalDate.now().plusDays(1))
-                .reactivateDayOfWeek("화요일")
-                .remainingOffCount(1)
-                .build();
-            when(alarmUseCase.alarmOff(anyLong(), anyLong(), any(LocalDateTime.class)))
-                .thenReturn(response);
-
-            // when & then
-            mockMvc.perform(post(BASE + "/" + 1L + "/off")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isOk());
-        }
-
-        @Test
-        @DisplayName("실패: 회원이 없으면 404와 에러 코드를 반환한다")
-        void fail_memberNotFound() throws Exception {
-            // given
-            setSecurityContext(buildContext(MEMBER_4));
-            AlarmOffRequest request = new AlarmOffRequest(LocalDateTime.now());
-            when(alarmUseCase.alarmOff(anyLong(), anyLong(), any(LocalDateTime.class)))
-                .thenThrow(ApplicationException.from(MemberErrorCode.MEMBER_NOT_FOUND));
-
-            // when & then
-            mockMvc.perform(post(BASE + "/" + 1L + "/off")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isNotFound());
-        }
-
-        @Test
-        @DisplayName("실패: 알람이 없으면 404와 에러 코드를 반환한다")
-        void fail_alarmNotFound() throws Exception {
-            // given
-            setSecurityContext(buildContext(MEMBER_5));
-            AlarmOffRequest request = new AlarmOffRequest(LocalDateTime.now());
-            when(alarmUseCase.alarmOff(anyLong(), anyLong(), any(LocalDateTime.class)))
-                .thenThrow(ApplicationException.from(AlarmErrorCode.ALARM_NOT_FOUND));
-
-            // when & then
-            mockMvc.perform(post(BASE + "/" + 1L + "/off")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isNotFound());
-        }
-
-        @Test
-        @DisplayName("실패: 소유자가 아니면 403과 에러 코드를 반환한다")
-        void fail_permissionDenied() throws Exception {
-            // given
-            setSecurityContext(buildContext(MEMBER_6));
-            AlarmOffRequest request = new AlarmOffRequest(LocalDateTime.now());
-            when(alarmUseCase.alarmOff(anyLong(), anyLong(), any(LocalDateTime.class)))
-                .thenThrow(ApplicationException.from(AuthErrorCode.PERMISSION_DENIED));
-
-            // when & then
-            mockMvc.perform(post(BASE + "/" + 1L + "/off")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isForbidden());
-        }
-
-        @Test
-        @DisplayName("실패: 클라이언트 날짜가 서버와 다르면 400과 에러 코드를 반환한다")
-        void fail_invalidClientDate() throws Exception {
-            // given
-            setSecurityContext(buildContext(MEMBER_7));
-            AlarmOffRequest request = new AlarmOffRequest(LocalDateTime.now().minusDays(1));
-            when(alarmUseCase.alarmOff(anyLong(), anyLong(), any(LocalDateTime.class)))
-                .thenThrow(ApplicationException.from(AlarmErrorCode.INVALID_CLIENT_DATE));
-
-            // when & then
-            mockMvc.perform(post(BASE + "/" + 1L + "/off")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isBadRequest());
-        }
-
-        @Test
-        @DisplayName("실패: 주간 OFF 한도를 초과하면 400과 에러 코드를 반환한다")
-        void fail_weeklyLimitExceeded() throws Exception {
-            // given
-            setSecurityContext(buildContext(MEMBER_8));
-            AlarmOffRequest request = new AlarmOffRequest(LocalDateTime.now());
-            when(alarmUseCase.alarmOff(anyLong(), anyLong(), any(LocalDateTime.class)))
-                .thenThrow(ApplicationException.from(AlarmErrorCode.ALARM_OFF_LIMIT_EXCEEDED));
-
-            // when & then
-            mockMvc.perform(post(BASE + "/" + 1L + "/off")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isBadRequest());
-        }
-
-        @Test
-        @DisplayName("실패: 이미 끈 알람이면 400과 에러 코드를 반환한다")
-        void fail_alreadyDeactivated() throws Exception {
-            // given
-            setSecurityContext(buildContext(MEMBER_9));
-            AlarmOffRequest request = new AlarmOffRequest(LocalDateTime.now());
-            when(alarmUseCase.alarmOff(anyLong(), anyLong(), any(LocalDateTime.class)))
-                .thenThrow(ApplicationException.from(AlarmErrorCode.ALREADY_DEACTIVATED));
-
-            // when & then
-            mockMvc.perform(post(BASE + "/" + 1L + "/off")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isBadRequest());
-        }
-
-        @Test
-        @DisplayName("실패: 다음 주 알람은 끌 수 없어 400과 에러 코드를 반환한다")
-        void fail_nextWeekAlarmDeactivationNotAllowed() throws Exception {
-            // given
-            setSecurityContext(buildContext(MEMBER_10));
-            AlarmOffRequest request = new AlarmOffRequest(LocalDateTime.now());
-            when(alarmUseCase.alarmOff(anyLong(), anyLong(), any(LocalDateTime.class)))
-                .thenThrow(ApplicationException.from(AlarmErrorCode.NEXT_WEEK_ALARM_DEACTIVATION_NOT_ALLOWED));
-
-            // when & then
-            mockMvc.perform(post(BASE + "/" + 1L + "/off")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isBadRequest());
-        }
-    }
-
-    @Nested
-    @DisplayName("[GET] /api/alarms/off-count - 남은 알람 끄기 횟수 조회")
-    class GetWeeklyRemainingOffCountTest {
-
-        @Test
-        @DisplayName("성공: 남은 알람 끄기 횟수를 포함해 200 OK를 반환한다")
-        void success() throws Exception {
-            // given
-            setSecurityContext(buildContext(MEMBER_3));
-            AlarmRemainingOffCountResponse response = AlarmRemainingOffCountResponse.builder()
-                .remainingOffCount(1)
-                .build();
-            when(alarmUseCase.getWeeklyRemainingOffCount(anyLong())).thenReturn(response);
-
-            // when
-            ResultActions result = mockMvc.perform(get("/api/alarms/off-count"));
-
-            // then
-            result.andExpect(status().isOk())
-                .andExpect(jsonPath("$.result.remainingOffCount").value(1));
-
-            verify(alarmUseCase, times(1)).getWeeklyRemainingOffCount(MEMBER_3.getId());
-        }
-
-        @Test
-        @DisplayName("실패: 회원이 없으면 404와 에러 코드를 반환한다")
-        void fail_memberNotFound() throws Exception {
-            // given
-            setSecurityContext(buildContext(MEMBER_4));
-            when(alarmUseCase.getWeeklyRemainingOffCount(anyLong()))
-                .thenThrow(ApplicationException.from(MemberErrorCode.MEMBER_NOT_FOUND));
-
-            // when
-            ResultActions result = mockMvc.perform(get("/api/alarms/off-count"));
-
-            // then
-            result.andExpect(status().isNotFound());
-        }
-    }
-
-    @Nested
-    @DisplayName("[DELETE] /api/alarms/{alarmId} - 알람 삭제")
-    class RemoveAlarmTest {
-
-        @Test
-        @DisplayName("성공: 알람 삭제 요청이 성공하면 200을 반환한다")
-        void success() throws Exception {
-            // given
-            AlarmRemoveRequest request = new AlarmRemoveRequest("사유");
+            AlarmDeleteByPaymentRequest request = new AlarmDeleteByPaymentRequest("device-uuid", "payment-id");
             setSecurityContext(buildContext(MEMBER_5));
 
             // when & then
-            mockMvc.perform(delete("/api/alarms/{alarmId}", 1L)
+            mockMvc.perform(post(BASE + "/{alarmId}/delete/payment", 1L)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isOk());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result").doesNotExist());
 
             verify(alarmUseCase, times(1))
-                .removeAlarm(eq(MEMBER_5.getId()), eq(1L), anyString());
+                .removeAlarmByPayment(eq(MEMBER_5.getId()), eq(1L), any(AlarmDeleteByPaymentRequest.class));
         }
 
         @Test
         @DisplayName("실패: 알람이 존재하지 않으면 404를 반환한다")
         void fail_alarmNotFound() throws Exception {
             // given
-            AlarmRemoveRequest request = new AlarmRemoveRequest("사유");
+            AlarmDeleteByPaymentRequest request = new AlarmDeleteByPaymentRequest("device-uuid", "payment-id");
             setSecurityContext(buildContext(MEMBER_6));
-            org.mockito.Mockito.doThrow(ApplicationException.from(akuma.whiplash.domains.alarm.exception.AlarmErrorCode.ALARM_NOT_FOUND))
-                .when(alarmUseCase).removeAlarm(anyLong(), anyLong(), anyString());
+            doThrow(ApplicationException.from(AlarmErrorCode.ALARM_NOT_FOUND))
+                .when(alarmUseCase).removeAlarmByPayment(anyLong(), anyLong(), any(AlarmDeleteByPaymentRequest.class));
 
             // when & then
-            mockMvc.perform(delete("/api/alarms/{alarmId}", 1L)
+            mockMvc.perform(post(BASE + "/{alarmId}/delete/payment", 1L)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isNotFound());
@@ -599,27 +438,43 @@ class AlarmControllerTest {
         @DisplayName("실패: 소유자가 아니면 403을 반환한다")
         void fail_permissionDenied() throws Exception {
             // given
-            AlarmRemoveRequest request = new AlarmRemoveRequest("사유");
+            AlarmDeleteByPaymentRequest request = new AlarmDeleteByPaymentRequest("device-uuid", "payment-id");
             setSecurityContext(buildContext(MEMBER_7));
-            org.mockito.Mockito.doThrow(ApplicationException.from(AuthErrorCode.PERMISSION_DENIED))
-                .when(alarmUseCase).removeAlarm(anyLong(), anyLong(), anyString());
+            doThrow(ApplicationException.from(AuthErrorCode.PERMISSION_DENIED))
+                .when(alarmUseCase).removeAlarmByPayment(anyLong(), anyLong(), any(AlarmDeleteByPaymentRequest.class));
 
             // when & then
-            mockMvc.perform(delete("/api/alarms/{alarmId}", 1L)
+            mockMvc.perform(post(BASE + "/{alarmId}/delete/payment", 1L)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isForbidden());
         }
 
         @Test
-        @DisplayName("실패: 삭제 사유가 비어 있으면 400을 반환한다")
-        void fail_reasonBlank() throws Exception {
+        @DisplayName("실패: 결제 ID가 비어 있으면 400을 반환한다")
+        void fail_paymentIdBlank() throws Exception {
             // given
-            AlarmRemoveRequest request = new AlarmRemoveRequest("");
+            AlarmDeleteByPaymentRequest request = new AlarmDeleteByPaymentRequest("device-uuid", "");
             setSecurityContext(buildContext(MEMBER_8));
 
             // when & then
-            mockMvc.perform(delete("/api/alarms/{alarmId}", 1L)
+            mockMvc.perform(post(BASE + "/{alarmId}/delete/payment", 1L)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest());
+        }
+
+        @Test
+        @DisplayName("실패: 결제 검증에 실패하면 400을 반환한다")
+        void fail_paymentVerificationFailed() throws Exception {
+            // given
+            AlarmDeleteByPaymentRequest request = new AlarmDeleteByPaymentRequest("device-uuid", "payment-id");
+            setSecurityContext(buildContext(MEMBER_8));
+            doThrow(ApplicationException.from(PaymentErrorCode.PAYMENT_VERIFICATION_FAILED))
+                .when(alarmUseCase).removeAlarmByPayment(anyLong(), anyLong(), any(AlarmDeleteByPaymentRequest.class));
+
+            // when & then
+            mockMvc.perform(post(BASE + "/{alarmId}/delete/payment", 1L)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest());
@@ -627,37 +482,249 @@ class AlarmControllerTest {
     }
 
     @Nested
-    @DisplayName("[GET] /api/alarms - 알람 목록 조회")
+    @DisplayName("[POST] /api/v1/alarms/{alarmId}/delete/ad - 광고 시청으로 알람 삭제")
+    class RemoveAlarmByAdTest {
+
+        @Test
+        @DisplayName("성공: 광고 삭제 요청이 성공하면 200을 반환한다")
+        void success() throws Exception {
+            // given
+            AlarmDeleteByAdRequest request = new AlarmDeleteByAdRequest("device-uuid", "ad-proof-token");
+            setSecurityContext(buildContext(MEMBER_5));
+
+            // when & then
+            mockMvc.perform(post(BASE + "/{alarmId}/delete/ad", 1L)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result").doesNotExist());
+
+            verify(alarmUseCase, times(1))
+                .removeAlarmByAd(eq(MEMBER_5.getId()), eq(1L), any(AlarmDeleteByAdRequest.class));
+        }
+
+        @Test
+        @DisplayName("실패: 광고 증빙 토큰이 비어 있으면 400을 반환한다")
+        void fail_adProofTokenBlank() throws Exception {
+            // given
+            AlarmDeleteByAdRequest request = new AlarmDeleteByAdRequest("device-uuid", "");
+            setSecurityContext(buildContext(MEMBER_8));
+
+            // when & then
+            mockMvc.perform(post(BASE + "/{alarmId}/delete/ad", 1L)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest());
+        }
+
+        @Test
+        @DisplayName("실패: 결제 삭제가 필요한 알람이면 400과 에러 코드를 반환한다")
+        void fail_alarmDeleteRequiresPayment() throws Exception {
+            // given
+            AlarmDeleteByAdRequest request = new AlarmDeleteByAdRequest("device-uuid", "ad-proof-token");
+            setSecurityContext(buildContext(MEMBER_8));
+            doThrow(ApplicationException.from(AlarmErrorCode.ALARM_DELETE_REQUIRES_PAYMENT))
+                .when(alarmUseCase).removeAlarmByAd(anyLong(), anyLong(), any(AlarmDeleteByAdRequest.class));
+
+            // when & then
+            mockMvc.perform(post(BASE + "/{alarmId}/delete/ad", 1L)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.isSuccess").value(false))
+                .andExpect(jsonPath("$.code").value(AlarmErrorCode.ALARM_DELETE_REQUIRES_PAYMENT.getCustomCode()));
+        }
+
+        @Test
+        @DisplayName("실패: 소유자가 아니면 403을 반환한다")
+        void fail_permissionDenied() throws Exception {
+            // given
+            AlarmDeleteByAdRequest request = new AlarmDeleteByAdRequest("device-uuid", "ad-proof-token");
+            setSecurityContext(buildContext(MEMBER_7));
+            doThrow(ApplicationException.from(AuthErrorCode.PERMISSION_DENIED))
+                .when(alarmUseCase).removeAlarmByAd(anyLong(), anyLong(), any(AlarmDeleteByAdRequest.class));
+
+            // when & then
+            mockMvc.perform(post(BASE + "/{alarmId}/delete/ad", 1L)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isForbidden());
+        }
+
+        @Test
+        @DisplayName("실패: 알람이 존재하지 않으면 404를 반환한다")
+        void fail_alarmNotFound() throws Exception {
+            // given
+            AlarmDeleteByAdRequest request = new AlarmDeleteByAdRequest("device-uuid", "ad-proof-token");
+            setSecurityContext(buildContext(MEMBER_6));
+            doThrow(ApplicationException.from(AlarmErrorCode.ALARM_NOT_FOUND))
+                .when(alarmUseCase).removeAlarmByAd(anyLong(), anyLong(), any(AlarmDeleteByAdRequest.class));
+
+            // when & then
+            mockMvc.perform(post(BASE + "/{alarmId}/delete/ad", 1L)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isNotFound());
+        }
+    }
+
+    @Nested
+    @DisplayName("getAlarmDeleteMethod - 알람 삭제 방법 조회")
+    class GetAlarmDeleteMethodTest {
+
+        @Nested
+        @DisplayName("광고 삭제 방법인 경우")
+        class AdMethodTest {
+
+            @Test
+            @DisplayName("성공: 광고 삭제 방법을 반환한다")
+            void success() throws Exception {
+                // given
+                setSecurityContext(buildContext(MEMBER_5));
+                when(alarmUseCase.getAlarmDeleteMethod(MEMBER_5.getId(), 1L))
+                    .thenReturn(AlarmDeleteMethodResponse.builder()
+                        .deleteMethod(AlarmDeleteMethod.AD.name())
+                        .build());
+
+                // when
+                var result = mockMvc.perform(get(BASE + "/{alarmId}/delete-method", 1L));
+
+                // then
+                result
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.result.deleteMethod").value(AlarmDeleteMethod.AD.name()))
+                    .andExpect(jsonPath("$.result.alarmId").doesNotExist());
+                verify(alarmUseCase, times(1)).getAlarmDeleteMethod(MEMBER_5.getId(), 1L);
+            }
+        }
+
+        @Nested
+        @DisplayName("결제 삭제 방법인 경우")
+        class PaymentMethodTest {
+
+            @Test
+            @DisplayName("성공: 결제 삭제 방법을 반환한다")
+            void success() throws Exception {
+                // given
+                setSecurityContext(buildContext(MEMBER_5));
+                when(alarmUseCase.getAlarmDeleteMethod(MEMBER_5.getId(), 1L))
+                    .thenReturn(AlarmDeleteMethodResponse.builder()
+                        .deleteMethod(AlarmDeleteMethod.PAYMENT.name())
+                        .build());
+
+                // when
+                var result = mockMvc.perform(get(BASE + "/{alarmId}/delete-method", 1L));
+
+                // then
+                result
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.result.deleteMethod").value(AlarmDeleteMethod.PAYMENT.name()));
+                verify(alarmUseCase, times(1)).getAlarmDeleteMethod(MEMBER_5.getId(), 1L);
+            }
+        }
+
+        @Test
+        @DisplayName("실패: 알람이 존재하지 않으면 404를 반환한다")
+        void fail_alarmNotFound() throws Exception {
+            // given
+            setSecurityContext(buildContext(MEMBER_6));
+            doThrow(ApplicationException.from(AlarmErrorCode.ALARM_NOT_FOUND))
+                .when(alarmUseCase).getAlarmDeleteMethod(anyLong(), anyLong());
+
+            // when
+            var result = mockMvc.perform(get(BASE + "/{alarmId}/delete-method", 1L));
+
+            // then
+            result
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.isSuccess").value(false))
+                .andExpect(jsonPath("$.code").value(AlarmErrorCode.ALARM_NOT_FOUND.getCustomCode()));
+        }
+
+        @Test
+        @DisplayName("실패: 소유자가 아니면 403을 반환한다")
+        void fail_permissionDenied() throws Exception {
+            // given
+            setSecurityContext(buildContext(MEMBER_7));
+            doThrow(ApplicationException.from(AuthErrorCode.PERMISSION_DENIED))
+                .when(alarmUseCase).getAlarmDeleteMethod(anyLong(), anyLong());
+
+            // when
+            var result = mockMvc.perform(get(BASE + "/{alarmId}/delete-method", 1L));
+
+            // then
+            result
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.isSuccess").value(false))
+                .andExpect(jsonPath("$.code").value(AuthErrorCode.PERMISSION_DENIED.getCustomCode()));
+        }
+
+        @Test
+        @DisplayName("실패: 알람 ID가 양수가 아니면 400을 반환한다")
+        void fail_alarmIdNotPositive() throws Exception {
+            // given
+            setSecurityContext(buildContext(MEMBER_7));
+
+            // when
+            var result = mockMvc.perform(get(BASE + "/{alarmId}/delete-method", 0L));
+
+            // then
+            result
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.isSuccess").value(false))
+                .andExpect(jsonPath("$.code").value(CommonErrorCode.METHOD_ARGUMENT_NOT_VALID.getCustomCode()));
+        }
+    }
+
+    @Nested
+    @DisplayName("[GET] /api/v1/alarms - 알람 목록 조회")
     class GetAlarmsTest {
 
         @Test
-        @DisplayName("성공: 200 OK와 알람 목록을 반환한다")
+        @DisplayName("성공: 200 OK와 result.alarms 래퍼로 알람 목록을 반환한다")
         void success() throws Exception {
             // given
             setSecurityContext(buildContext(MEMBER_3));
-            AlarmInfoPreviewResponse response = AlarmInfoPreviewResponse.builder()
+            AlarmPreviewDto dto = AlarmPreviewDto.builder()
                 .alarmId(1L)
                 .alarmPurpose("출근")
-                .repeatsDays(List.of("월"))
-                .time("07:00")
+                .repeatDays(List.of("월"))
+                .alarmTime("07:00")
                 .address("서울")
-                .latitude(0.0)
-                .longitude(0.0)
-                .isToggleOn(true)
-                .firstUpcomingDay(LocalDate.now())
-                .firstUpcomingDayOfWeek("월요일")
-                .secondUpcomingDay(LocalDate.now().plusDays(1))
-                .secondUpcomingDayOfWeek("화요일")
+                .status("활성화")
+                .arrivalCheckEnabled(false)
+                .nextOccurrence(AlarmPreviewDto.OccurrenceInfo.builder()
+                    .occurrenceId(null)
+                    .scheduledDate(LocalDate.now())
+                    .scheduledTime("07:00")
+                    .dayOfWeek("월")
+                    .scheduledAtUtc("2026-06-30T22:00:00Z")
+                    .build())
+                .nextNextOccurrence(AlarmPreviewDto.OccurrenceInfo.builder()
+                    .occurrenceId(null)
+                    .scheduledDate(LocalDate.now().plusDays(7))
+                    .scheduledTime("07:00")
+                    .dayOfWeek("월")
+                    .scheduledAtUtc("2026-07-07T22:00:00Z")
+                    .build())
                 .build();
 
-            when(alarmUseCase.getAlarms(anyLong()))
-                .thenReturn(List.of(response));
+            when(alarmUseCase.getAlarms(anyLong(), anyString()))
+                .thenReturn(GetAlarmsResponse.builder()
+                    .timeZone("Asia/Seoul")
+                    .alarms(List.of(dto))
+                    .build());
 
             // when & then
             mockMvc.perform(get(BASE))
-                .andExpect(status().isOk());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.timeZone").value("Asia/Seoul"))
+                .andExpect(jsonPath("$.result.alarms[0].nextOccurrence.scheduledTime").value("07:00"))
+                .andExpect(jsonPath("$.result.alarms[0].nextOccurrence.scheduledAtUtc").value("2026-06-30T22:00:00Z"))
+                .andExpect(jsonPath("$.result.alarms[0].nextNextOccurrence.scheduledTime").value("07:00"))
+                .andExpect(jsonPath("$.result.alarms[0].nextNextOccurrence.scheduledAtUtc").value("2026-07-07T22:00:00Z"));
 
-            verify(alarmUseCase, times(1)).getAlarms(eq(MEMBER_3.getId()));
+            verify(alarmUseCase, times(1)).getAlarms(eq(MEMBER_3.getId()), eq("mock_device_id"));
         }
 
         @Test
@@ -666,11 +733,69 @@ class AlarmControllerTest {
             // given
             setSecurityContext(buildContext(MEMBER_4));
 
-            when(alarmUseCase.getAlarms(anyLong()))
+            when(alarmUseCase.getAlarms(anyLong(), anyString()))
                 .thenThrow(ApplicationException.from(MemberErrorCode.MEMBER_NOT_FOUND));
 
             // when & then
             mockMvc.perform(get(BASE))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value(MemberErrorCode.MEMBER_NOT_FOUND.getCustomCode()));
+        }
+    }
+
+    @Nested
+    @DisplayName("[GET] /api/v1/alarms/sync - 알람 전체 동기화 조회")
+    class GetSyncAlarmsTest {
+
+        @Test
+        @DisplayName("성공: 200 OK와 서버 시간 및 동기화 알람 목록을 반환한다")
+        void success() throws Exception {
+            // given
+            setSecurityContext(buildContext(MEMBER_3));
+            LocalDateTime scheduledAt = LocalDateTime.now().plusDays(1);
+            AlarmSyncItemDto dto = AlarmSyncItemDto.builder()
+                .alarmId(1L)
+                .status("활성화")
+                .nextOccurrence(AlarmSyncItemDto.NextOccurrenceInfo.builder()
+                    .occurrenceId(10L)
+                    .scheduledDate(scheduledAt.toLocalDate())
+                    .scheduledTime("07:00")
+                    .dayOfWeek("월")
+                    .scheduledAtUtc("2026-06-30T22:00:00Z")
+                    .build())
+                .build();
+            when(alarmUseCase.getSyncAlarms(anyLong(), any()))
+                .thenReturn(AlarmSyncResponse.builder()
+                    .serverTime(LocalDateTime.now())
+                    .timeZone("Asia/Seoul")
+                    .alarms(List.of(dto))
+                    .build());
+
+            // when
+            mockMvc.perform(get(BASE + "/sync"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.serverTime").exists())
+                .andExpect(jsonPath("$.result.timeZone").value("Asia/Seoul"))
+                .andExpect(jsonPath("$.result.alarms[0].alarmId").value(1L))
+                .andExpect(jsonPath("$.result.alarms[0].status").value("활성화"))
+                .andExpect(jsonPath("$.result.alarms[0].nextOccurrence.occurrenceId").value(10L))
+                .andExpect(jsonPath("$.result.alarms[0].nextOccurrence.scheduledTime").value("07:00"))
+                .andExpect(jsonPath("$.result.alarms[0].nextOccurrence.scheduledAtUtc").value("2026-06-30T22:00:00Z"));
+
+            // then
+            verify(alarmUseCase, times(1)).getSyncAlarms(eq(MEMBER_3.getId()), eq("mock_device_id"));
+        }
+
+        @Test
+        @DisplayName("실패: 회원이 없으면 404와 에러 코드를 반환한다")
+        void fail_memberNotFound() throws Exception {
+            // given
+            setSecurityContext(buildContext(MEMBER_4));
+            when(alarmUseCase.getSyncAlarms(anyLong(), any()))
+                .thenThrow(ApplicationException.from(MemberErrorCode.MEMBER_NOT_FOUND));
+
+            // when & then
+            mockMvc.perform(get(BASE + "/sync"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value(MemberErrorCode.MEMBER_NOT_FOUND.getCustomCode()));
         }

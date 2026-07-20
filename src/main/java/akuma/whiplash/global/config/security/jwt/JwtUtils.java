@@ -62,10 +62,8 @@ public class JwtUtils {
                 validateRefreshTokenExists(token, memberId, deviceId);
             }
         } catch (ExpiredJwtException e) {
-            jwtExceptionHandler(response, TOKEN_EXPIRED);
             throw ApplicationException.from(TOKEN_EXPIRED);
         } catch (Exception e) {
-            jwtExceptionHandler(response, INVALID_TOKEN);
             throw ApplicationException.from(INVALID_TOKEN);
         }
     }

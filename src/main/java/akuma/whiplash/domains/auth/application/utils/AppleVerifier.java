@@ -27,7 +27,7 @@ public class AppleVerifier implements SocialVerifier {
     @Override
     public SocialMemberInfo verify(SocialLoginRequest request) {
         try {
-            SignedJWT signedJWT = SignedJWT.parse(request.token());
+            SignedJWT signedJWT = SignedJWT.parse(request.providerAccessToken());
             JWTClaimsSet claims = signedJWT.getJWTClaimsSet();
 
             // 1. aud(client_id) 검증
@@ -37,26 +37,17 @@ public class AppleVerifier implements SocialVerifier {
                 throw ApplicationException.from(CommonErrorCode.BAD_REQUEST);
             }
 
-            // nonce 검증은 일단 제거
-            // 2. nonce 검증
-//            String tokenNonce = claims.getStringClaim("nonce");
-//            String originalNonce = request.originalNonce();
-//            if (!StringUtils.hasText(originalNonce) && !originalNonce.equals(tokenNonce)) {
-//                log.warn("Invalid nonce: token={}, expected={}", tokenNonce, originalNonce);
-//                throw ApplicationException.from(CommonErrorCode.BAD_REQUEST);
-//            }
-
-            String socialId = SocialType.APPLE.name() + "_" + claims.getSubject();
+            String providerUserId = claims.getSubject();
             String email = (String) claims.getClaim("email");
 
-            // TODO: 닉네임 생성 정책 수정 필요
             // 애플은 닉네임 제공하지 않으므로 랜덤 생성
             String nickname = nicknameGenerator.generate();
 
-            log.info("Apple API user info: socialId={}, email={}, name={}", socialId, email, nickname);
+            log.info("Apple API user info: providerUserId={}, email={}, name={}", providerUserId, email, nickname);
 
             return SocialMemberInfo.builder()
-                .socialId(socialId)
+                .provider(SocialType.APPLE)
+                .providerUserId(providerUserId)
                 .email(email)
                 .name(nickname)
                 .build();

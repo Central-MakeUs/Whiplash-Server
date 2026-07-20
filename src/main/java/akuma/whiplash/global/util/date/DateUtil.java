@@ -29,7 +29,7 @@ public class DateUtil {
      * ISO-8601 주 기준: 주 시작일은 월요일
      */
     public static boolean isSameWeek(LocalDate date1, LocalDate date2) {
-        WeekFields weekFields = WeekFields.of(Locale.KOREA);
+        WeekFields weekFields = WeekFields.ISO;
         int week1 = date1.get(weekFields.weekOfWeekBasedYear());
         int week2 = date2.get(weekFields.weekOfWeekBasedYear());
         int year1 = date1.get(weekFields.weekBasedYear());
@@ -119,5 +119,29 @@ public class DateUtil {
 
         throw ApplicationException.from(REPEAT_DAYS_NOT_CONFIG);
     }
-}
 
+    /**
+     * 기준 시각(fromDateTime) 이후에 울릴 가장 가까운 알람 날짜를 반환합니다.
+     * - 오늘이 반복 요일이고, 알람 시간이 현재 시각보다 뒤라면 오늘을 반환합니다.
+     * - 그 외에는 내일부터 7일 이내 반복 요일 중 가장 빠른 날짜를 반환합니다.
+     *
+     * @param repeatDays 알람 반복 요일 (예: 월, 수, 금)
+     * @param fromDateTime 기준 시각
+     * @param alarmTime 알람 시각
+     * @return 가장 가까운 알람 발생일
+     */
+    public static LocalDate getNextOccurrenceDate(
+        Set<DayOfWeek> repeatDays,
+        LocalDateTime fromDateTime,
+        LocalTime alarmTime
+    ) {
+        LocalDate today = fromDateTime.toLocalDate();
+        LocalTime now = fromDateTime.toLocalTime();
+
+        if (repeatDays.contains(today.getDayOfWeek()) && alarmTime.isAfter(now)) {
+            return today;
+        }
+
+        return getNextOccurrenceDate(repeatDays, today.plusDays(1));
+    }
+}

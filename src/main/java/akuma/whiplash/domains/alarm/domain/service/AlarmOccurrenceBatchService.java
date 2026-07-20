@@ -2,14 +2,19 @@ package akuma.whiplash.domains.alarm.domain.service;
 
 import akuma.whiplash.domains.alarm.application.dto.etc.AlarmOccurrenceCreateBatchResult;
 import akuma.whiplash.domains.alarm.application.mapper.AlarmMapper;
+import akuma.whiplash.domains.alarm.domain.constant.AlarmStatus;
+import akuma.whiplash.domains.alarm.domain.util.AlarmScheduleCalculator;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmEntity;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmOccurrenceEntity;
 import akuma.whiplash.domains.alarm.persistence.repository.AlarmOccurrenceRepository;
 import akuma.whiplash.domains.alarm.persistence.repository.AlarmRepository;
+import akuma.whiplash.domains.alarm.persistence.repository.AlarmRepository.AlarmOccurrenceBatchTarget;
+import akuma.whiplash.global.util.date.TimeProvider;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
-import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -22,6 +27,7 @@ public class AlarmOccurrenceBatchService {
 
     private final AlarmRepository alarmRepository;
     private final AlarmOccurrenceRepository alarmOccurrenceRepository;
+    private final TimeProvider timeProvider;
 
     /**
      * 오늘 울릴 알람 중 아직 alarm_occurrence가 없는 알람에 대해 이력을 생성합니다.
@@ -30,39 +36,53 @@ public class AlarmOccurrenceBatchService {
      */
     @Transactional
     public AlarmOccurrenceCreateBatchResult createTodayAlarmOccurrences() {
-        LocalDate today = LocalDate.now();
-        DayOfWeek todayDayOfWeek = today.getDayOfWeek();
+        List<AlarmOccurrenceBatchTarget> activeAlarms = alarmRepository.findBatchTargetsByStatus(AlarmStatus.ACTIVE.name());
 
-        // 1. 오늘 반복 요일에 해당하는 알람만 DB에서 조회 (native query + LIKE)
-        String likeKeyword = "\"" + todayDayOfWeek.name() + "\""; // ex: "MONDAY"
-        List<AlarmEntity> todayAlarms = alarmRepository.findByRepeatDaysLike(likeKeyword);
-
-        log.info("[AlarmOccurrence Create Batch] 오늘({}) 울릴 알람 수: {}", todayDayOfWeek, todayAlarms.size());
-
-        // 2. 이미 alarm_occurrence가 생성된 알람 ID 목록 조회
-        Set<Long> existingAlarmIds = alarmOccurrenceRepository.findAlarmIdsByDate(today);
+        log.info("[AlarmOccurrence Create Batch] 활성 알람 수: {}", activeAlarms.size());
 
         int createdCount = 0;
         int skippedCount = 0;
         int failedCount = 0;
 
-        // 3. 생성되지 않은 알람에 대해서만 alarm_occurrence 생성
-        for (AlarmEntity alarm : todayAlarms) {
-            if (existingAlarmIds.contains(alarm.getId())) {
+        // 사용자 timeZone 기준 오늘 반복 요일인 알람에 대해서만 alarm_occurrence를 생성한다.
+        for (AlarmOccurrenceBatchTarget target : activeAlarms) {
+            Long alarmId = target.getAlarmId();
+            ZoneId memberZone = AlarmScheduleCalculator.resolveZone(target.getTimeZone());
+            LocalDate today = timeProvider.today(memberZone);
+            DayOfWeek todayDayOfWeek = today.getDayOfWeek();
+
+            if (!containsRepeatDay(target.getRepeatDays(), todayDayOfWeek)) {
+                skippedCount++;
+                continue;
+            }
+
+            if (alarmOccurrenceRepository.existsByAlarmIdAndDate(alarmId, today)) {
                 skippedCount++;
                 continue;
             }
 
             try {
-                AlarmOccurrenceEntity occurrence = AlarmMapper.mapToAlarmOccurrenceForDate(alarm, today);
+                AlarmEntity alarmReference = alarmRepository.getReferenceById(alarmId);
+                LocalDateTime scheduledAt = AlarmScheduleCalculator.toDefaultZoneLocalDateTime(
+                    today,
+                    target.getAlarmTime(),
+                    memberZone
+                );
+                AlarmOccurrenceEntity occurrence = AlarmMapper.mapToAlarmOccurrenceForDate(
+                    alarmReference,
+                    target.getAlarmTime(),
+                    today,
+                    scheduledAt
+                );
                 alarmOccurrenceRepository.save(occurrence);
+
                 createdCount++;
 
-                log.info("[AlarmOccurrence Create Batch] 생성 완료: alarmId={}, date={}", alarm.getId(), today);
+                log.info("[AlarmOccurrence Create Batch] 생성 완료: alarmId={}, date={}", alarmId, today);
 
             } catch (Exception e) {
                 failedCount++;
-                log.error("[AlarmOccurrence Create Batch] 생성 실패: alarmId={}, error={}", alarm.getId(), e.getMessage());
+                log.error("[AlarmOccurrence Create Batch] 생성 실패: alarmId={}, error={}", alarmId, e.getMessage());
             }
         }
 
@@ -74,5 +94,9 @@ public class AlarmOccurrenceBatchService {
             .skippedCount(skippedCount)
             .failedCount(failedCount)
             .build();
+    }
+
+    private boolean containsRepeatDay(String repeatDays, DayOfWeek dayOfWeek) {
+        return repeatDays != null && repeatDays.contains("\"" + dayOfWeek.name() + "\"");
     }
 }

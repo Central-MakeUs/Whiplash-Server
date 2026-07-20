@@ -30,9 +30,8 @@ public class RequestMatcherHolder {
 
 
         // auth
-        new RequestInfo(POST, "/api/auth/social-login", null),
-        new RequestInfo(POST, "/api/auth/logout", USER),
-        new RequestInfo(POST, "/api/auth/reissue", USER),
+        new RequestInfo(POST, "/api/v1/auth/social-login", null),
+        new RequestInfo(POST, "/api/v1/auth/**", USER),
 
         // swagger
         new RequestInfo(GET, "/api/nuntteo/swagger-ui.html", null),              // 진입점
@@ -46,23 +45,40 @@ public class RequestMatcherHolder {
         new RequestInfo(GET, "/webjars/**",null),
         new RequestInfo(GET, "/favicon.ico",null),
 
+        // 부하 테스트 전용 (profile: !prod) — prod에서는 Controller Bean 자체가 생성되지 않음
+        new RequestInfo(GET, "/api/load-test/**", null),
+        new RequestInfo(POST, "/api/load-test/**", null),
+        new RequestInfo(DELETE, "/api/load-test/**", null),
+
         // alarm
-        new RequestInfo(GET, "/api/alarms/**",USER),
-        new RequestInfo(POST, "/api/alarms/**",USER),
-        new RequestInfo(PUT, "/api/alarms/**",USER),
-        new RequestInfo(DELETE, "/api/alarms/**",USER),
+        new RequestInfo(GET, "/api/v1/alarms/**",USER),
+        new RequestInfo(POST, "/api/v1/alarms/**",USER),
+        new RequestInfo(PUT, "/api/v1/alarms/**",USER),
+        new RequestInfo(DELETE, "/api/v1/alarms/**",USER),
 
         // member
-        new RequestInfo(GET, "/api/members/**", USER),
-        new RequestInfo(POST, "/api/members/**", USER),
-        new RequestInfo(PUT, "/api/members/**", USER),
-        new RequestInfo(DELETE, "/api/members/**", USER),
+        new RequestInfo(GET, "/api/v1/members/**", USER),
+        new RequestInfo(POST, "/api/v1/members/**", USER),
+        new RequestInfo(PUT, "/api/v1/members/**", USER),
+        new RequestInfo(DELETE, "/api/v1/members/**", USER),
+
+        // device
+        new RequestInfo(GET, "/api/v1/devices/**", USER),
+        new RequestInfo(POST, "/api/v1/devices/**", USER),
+        new RequestInfo(PUT, "/api/v1/devices/**", USER),
+        new RequestInfo(DELETE, "/api/v1/devices/**", USER),
 
         // place
         new RequestInfo(GET, "/api/places/**", USER),
 
         // actuator
         new RequestInfo(GET, "/actuator/**", null),
+
+        // 로컬 테스트
+        new RequestInfo(POST, "/api/dev/auth/login", null),
+
+        // QA 전용 토큰 발급 (SecurityConfig에서 qa 프로파일에서만 등록)
+        new RequestInfo(POST, "/qa/auth/token", null),
 
         // 빌드 에러 방지를 위해 각 권한에 대한 RequestInfo가 최소 1개씩은 리스트에 있어야함
         new RequestInfo(GET, "/api/admin/**", ADMIN)

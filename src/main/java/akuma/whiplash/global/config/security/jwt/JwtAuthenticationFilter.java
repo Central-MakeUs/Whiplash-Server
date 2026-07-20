@@ -54,11 +54,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             }
 
             try {
-                if (request.getRequestURI().contains("/reissue")) {
+                if (request.getRequestURI().contains("/token/reissue")) {
                     log.info("재발급 진행");
-                    jwtUtils.validateToken(response, token, REFRESH);
-                } else if (request.getRequestURI().contains("/logout")) {
-                    log.info("로그아웃 진행");
                     jwtUtils.validateToken(response, token, REFRESH);
                 } else {
                     log.info("일반 접근");

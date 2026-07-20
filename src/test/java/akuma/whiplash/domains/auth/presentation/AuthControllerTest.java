@@ -2,10 +2,7 @@ package akuma.whiplash.domains.auth.presentation;
 
 import static akuma.whiplash.common.fixture.MemberFixture.*;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -14,7 +11,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import akuma.whiplash.common.fixture.MemberFixture;
 import akuma.whiplash.domains.auth.application.dto.etc.MemberContext;
-import akuma.whiplash.domains.auth.application.dto.request.RegisterFcmTokenRequest;
+import akuma.whiplash.domains.auth.application.dto.request.SocialLoginRequest;
+import akuma.whiplash.domains.auth.application.dto.response.LoginResponse;
 import akuma.whiplash.domains.auth.application.dto.response.TokenResponse;
 import akuma.whiplash.domains.auth.application.usecase.AuthUseCase;
 import akuma.whiplash.domains.auth.exception.AuthErrorCode;
@@ -57,13 +55,26 @@ class AuthControllerTest {
     @Autowired private ObjectMapper objectMapper;
     @MockitoBean private AuthUseCase authUseCase;
 
-    private static final String BASE = "/api/auth";
+    private static final String BASE = "/api/v1/auth";
+
+    private SocialLoginRequest buildSocialLoginRequest(String provider) {
+        return new SocialLoginRequest(
+            provider,
+            "provider-access-token",
+            "device-social-login",
+            "ANDROID",
+            "fcm-social-login",
+            "1.0.0",
+            "14",
+            "Asia/Seoul"
+        );
+    }
 
     private MemberContext buildContext(MemberFixture fixture) {
         return MemberContext.builder()
             .memberId(fixture.getId())
             .role(fixture.getRole())
-            .socialId(fixture.getSocialId())
+            .provider(fixture.getProvider())
             .email(fixture.getEmail())
             .nickname(fixture.getNickname())
             .deviceId("mock_device")
@@ -84,6 +95,63 @@ class AuthControllerTest {
     @AfterEach
     void clearContext() {
         SecurityContextHolder.clearContext();
+    }
+
+    @Nested
+    @DisplayName("[POST] /api/auth/social-login - 소셜 로그인")
+    class SocialLoginTest {
+
+        @Test
+        @DisplayName("성공: 200과 accessToken, refreshToken, member 필드를 반환한다")
+        void success() throws Exception {
+            // given
+            SocialLoginRequest request = buildSocialLoginRequest("MOCK");
+            LoginResponse response = LoginResponse.builder()
+                .accessToken("Bearer access-token")
+                .refreshToken("Bearer refresh-token")
+                .member(LoginResponse.MemberInfo.builder()
+                    .memberId(1L)
+                    .provider("MOCK")
+                    .nickname("김민형")
+                    .email("kmh@gmail.com")
+                    .isNewMember(true)
+                    .status("ACTIVE")
+                    .build())
+                .build();
+
+            org.mockito.Mockito.when(authUseCase.socialLogin(any(SocialLoginRequest.class)))
+                .thenReturn(response);
+
+            // when & then
+            mockMvc.perform(post(BASE + "/social-login")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.accessToken").value("Bearer access-token"))
+                .andExpect(jsonPath("$.result.refreshToken").value("Bearer refresh-token"))
+                .andExpect(jsonPath("$.result.member.memberId").value(1L))
+                .andExpect(jsonPath("$.result.member.provider").value("MOCK"))
+                .andExpect(jsonPath("$.result.member.nickname").value("김민형"))
+                .andExpect(jsonPath("$.result.member.email").value("kmh@gmail.com"))
+                .andExpect(jsonPath("$.result.member.isNewMember").value(true))
+                .andExpect(jsonPath("$.result.member.status").value("ACTIVE"));
+        }
+
+        @Test
+        @DisplayName("실패: 지원하지 않는 provider이면 400을 반환한다")
+        void fail_unsupportedProvider() throws Exception {
+            // given
+            SocialLoginRequest request = buildSocialLoginRequest("MOCK");
+            org.mockito.Mockito.when(authUseCase.socialLogin(any(SocialLoginRequest.class)))
+                .thenThrow(ApplicationException.from(AuthErrorCode.UNSUPPORTED_SOCIAL_TYPE));
+
+            // when & then
+            mockMvc.perform(post(BASE + "/social-login")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(AuthErrorCode.UNSUPPORTED_SOCIAL_TYPE.getCustomCode()));
+        }
     }
 
     @Nested
@@ -152,7 +220,7 @@ class AuthControllerTest {
     }
 
     @Nested
-    @DisplayName("[POST] /api/auth/reissue - 토큰 재발급")
+    @DisplayName("[POST] /api/v1/auth/token/reissue - 토큰 재발급")
     class ReissueTokenTest {
 
         @Test
@@ -168,7 +236,7 @@ class AuthControllerTest {
                 .thenReturn(response);
 
             // when & then
-            mockMvc.perform(post("/api/auth/reissue"))
+            mockMvc.perform(post(BASE + "/token/reissue"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.result.accessToken").value("Bearer newAccess"))
                 .andExpect(jsonPath("$.result.refreshToken").value("Bearer newRefresh"));
@@ -183,7 +251,7 @@ class AuthControllerTest {
                 .thenThrow(ApplicationException.from(AuthErrorCode.INVALID_TOKEN));
 
             // when & then
-            mockMvc.perform(post("/api/auth/reissue"))
+            mockMvc.perform(post(BASE + "/token/reissue"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value(AuthErrorCode.INVALID_TOKEN.getCustomCode()));
         }
@@ -197,7 +265,7 @@ class AuthControllerTest {
                 .thenThrow(ApplicationException.from(AuthErrorCode.INVALID_TOKEN));
 
             // when & then
-            mockMvc.perform(post("/api/auth/reissue"))
+            mockMvc.perform(post(BASE + "/token/reissue"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value(AuthErrorCode.INVALID_TOKEN.getCustomCode()));
         }
@@ -211,48 +279,10 @@ class AuthControllerTest {
                 .thenThrow(ApplicationException.from(AuthErrorCode.TOKEN_EXPIRED));
 
             // when & then
-            mockMvc.perform(post("/api/auth/reissue"))
+            mockMvc.perform(post(BASE + "/token/reissue"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value(AuthErrorCode.TOKEN_EXPIRED.getCustomCode()));
         }
     }
 
-    @Nested
-    @DisplayName("[POST] /api/auth/fcm-token - FCM 토큰 등록")
-    class RegisterFcmTokenTest {
-
-        @Test
-        @DisplayName("성공: 토큰 등록 후 200 OK를 반환한다")
-        void success() throws Exception {
-            // given
-            RegisterFcmTokenRequest request = new RegisterFcmTokenRequest("token-123");
-            setSecurityContext(buildContext(MEMBER_1)); // ✅ 통일
-
-            // when & then
-            mockMvc.perform(post(BASE + "/fcm-token")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isOk());
-
-            // then
-            verify(authUseCase, times(1))
-                .registerFcmToken(eq(MEMBER_1.getId()), eq("mock_device"), eq("token-123"));
-        }
-        @Test
-        @DisplayName("실패: FCM 토큰이 비어 있으면 400과 에러 코드를 반환한다")
-        void fail_blankToken() throws Exception {
-            // given
-            RegisterFcmTokenRequest request = new RegisterFcmTokenRequest("");
-            setSecurityContext(buildContext(MEMBER_2));
-
-            // when & then
-            mockMvc.perform(post(BASE + "/fcm-token")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isBadRequest());
-
-            // then
-            verify(authUseCase, never()).registerFcmToken(anyLong(), eq("mock_device_id"), eq(""));
-        }
-    }
 }

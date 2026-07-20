@@ -1,27 +1,36 @@
 package akuma.whiplash.domains.alarm.domain.service;
 
+import static akuma.whiplash.domains.alarm.exception.AlarmErrorCode.ALARM_NOT_FOUND;
+
 import akuma.whiplash.domains.alarm.application.dto.etc.OccurrencePushInfo;
 import akuma.whiplash.domains.alarm.application.dto.etc.RingingPushInfo;
-import akuma.whiplash.domains.alarm.application.dto.response.AlarmInfoPreviewResponse;
-import akuma.whiplash.domains.alarm.application.dto.response.AlarmRemainingOffCountResponse;
-import akuma.whiplash.domains.alarm.domain.constant.DeactivateType;
+import akuma.whiplash.domains.alarm.application.dto.response.AlarmDeleteMethodResponse;
+import akuma.whiplash.domains.alarm.application.dto.response.AlarmSyncResponse;
+import akuma.whiplash.domains.alarm.application.dto.response.GetAlarmsResponse;
+import akuma.whiplash.domains.alarm.application.mapper.AlarmMapper;
+import akuma.whiplash.domains.alarm.domain.constant.AlarmDeleteMethod;
+import akuma.whiplash.domains.alarm.domain.constant.AlarmStatus;
+import akuma.whiplash.domains.alarm.domain.constant.OccurrenceStatus;
 import akuma.whiplash.domains.alarm.domain.constant.Weekday;
+import akuma.whiplash.domains.alarm.domain.util.AlarmScheduleCalculator;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmEntity;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmOccurrenceEntity;
 import akuma.whiplash.domains.alarm.persistence.repository.AlarmOccurrenceRepository;
-import akuma.whiplash.domains.alarm.persistence.repository.AlarmOffLogRepository;
 import akuma.whiplash.domains.alarm.persistence.repository.AlarmRepository;
+import akuma.whiplash.domains.auth.exception.AuthErrorCode;
 import akuma.whiplash.domains.member.exception.MemberErrorCode;
+import akuma.whiplash.domains.member.persistence.entity.MemberDeviceEntity;
+import akuma.whiplash.domains.member.persistence.repository.MemberDeviceRepository;
 import akuma.whiplash.domains.member.persistence.repository.MemberRepository;
 import akuma.whiplash.global.exception.ApplicationException;
 import akuma.whiplash.global.util.date.DateUtil;
+import akuma.whiplash.global.util.date.TimeProvider;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.LocalTime;
-import java.util.ArrayList;
+import java.time.ZoneId;
 import java.util.List;
-import java.util.Optional;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -36,154 +45,189 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class AlarmQueryServiceImpl implements AlarmQueryService {
 
+    private static final List<OccurrenceStatus> PROCESSED_STATUSES = List.of(
+        OccurrenceStatus.CHECKIN,
+        OccurrenceStatus.WATCH_AD,
+        OccurrenceStatus.PAYMENT,
+        OccurrenceStatus.CANCELED,
+        OccurrenceStatus.MISSED
+    );
+
     private final AlarmRepository alarmRepository;
     private final AlarmOccurrenceRepository alarmOccurrenceRepository;
-    private final AlarmOffLogRepository alarmOffLogRepository;
     private final MemberRepository memberRepository;
+    private final MemberDeviceRepository memberDeviceRepository;
+    private final TimeProvider timeProvider;
 
-    private static final int WEEKLY_OFF_LIMIT = 2;
-
-    @Transactional
     @Override
-    public List<AlarmInfoPreviewResponse> getAlarms(Long memberId) {
-        // 1. 요청한 회원 존재 여부 검증
+    public GetAlarmsResponse getAlarms(Long memberId, String deviceId) {
         memberRepository.findById(memberId)
             .orElseThrow(() -> ApplicationException.from(MemberErrorCode.MEMBER_NOT_FOUND));
 
-        // 2. 알람 목록 조회
-        List<AlarmEntity> alarms = alarmRepository.findAllByMemberId(memberId);
-        LocalDate today = LocalDate.now();
+        ZoneId memberZone = resolveMemberZone(memberId, deviceId);
+        List<AlarmEntity> alarms = alarmRepository.findAllByMemberIdAndStatusNot(memberId, AlarmStatus.DELETED);
 
-        return alarms.stream()
-            .map(alarm -> buildPreviewResponse(alarm, today, memberId))
+        if (alarms.isEmpty()) {
+            return GetAlarmsResponse.builder()
+                .timeZone(memberZone.getId())
+                .alarms(List.of())
+                .build();
+        }
+
+        LocalDate today = timeProvider.today(memberZone);
+        LocalDateTime now = timeProvider.now(memberZone);
+        List<Long> alarmIds = alarms.stream().map(AlarmEntity::getId).toList();
+
+        // 1. 최근 처리 완료 회차 벌크 조회 (N+1 제거)
+        Map<Long, AlarmOccurrenceEntity> latestProcessedMap =
+            alarmOccurrenceRepository
+                .findLatestProcessedByAlarmIds(alarmIds, PROCESSED_STATUSES)
+                .stream()
+                .collect(Collectors.toMap(
+                    ao -> ao.getAlarm().getId(),
+                    ao -> ao,
+                    (a, b) -> a
+                ));
+
+        // 2. 각 알람의 first / second / third 날짜 계산
+        record AlarmDates(LocalDate first, LocalDate second, LocalDate third) {}
+
+        Map<Long, AlarmDates> alarmDatesMap = alarms.stream().collect(
+            Collectors.toMap(
+                AlarmEntity::getId,
+                alarm -> {
+                    Set<DayOfWeek> days = alarm.getRepeatDays().stream()
+                        .map(Weekday::getDayOfWeek)
+                        .collect(Collectors.toSet());
+                    LocalDate first = DateUtil.getNextOccurrenceDate(days, today);
+                    LocalDate second = DateUtil.getNextOccurrenceDate(days, first.plusDays(1));
+                    LocalDate third = DateUtil.getNextOccurrenceDate(days, second.plusDays(1));
+                    return new AlarmDates(first, second, third);
+                }
+            )
+        );
+
+        // 3. occurrenceId 벌크 조회 (다음다음다음 회차까지 포함: 현재 회차 처리 시 nextNext가 third로 밀릴 수 있음)
+        List<LocalDate> targetDates = alarmDatesMap.values().stream()
+            .flatMap(d -> Stream.of(d.first(), d.second(), d.third()))
+            .distinct()
             .toList();
+
+        Map<Long, Map<LocalDate, Long>> occurrenceIdMap = alarmOccurrenceRepository
+            .findByAlarmIdsAndOccurrenceDates(alarmIds, targetDates)
+            .stream()
+            .collect(Collectors.groupingBy(
+                ao -> ao.getAlarm().getId(),
+                Collectors.toMap(
+                    AlarmOccurrenceEntity::getOccurrenceDate,
+                    AlarmOccurrenceEntity::getId
+                )
+            ));
+
+        // 4. 응답 DTO 생성
+        return GetAlarmsResponse.builder()
+            .alarms(alarms.stream()
+                .map(alarm -> AlarmMapper.mapToAlarmPreviewDto(
+                    alarm,
+                    now,
+                    latestProcessedMap.get(alarm.getId()),
+                    alarmDatesMap.get(alarm.getId()).first(),
+                    alarmDatesMap.get(alarm.getId()).second(),
+                    alarmDatesMap.get(alarm.getId()).third(),
+                    occurrenceIdMap.getOrDefault(alarm.getId(), Map.of()),
+                    memberZone
+                ))
+                .toList())
+            .timeZone(memberZone.getId())
+            .build();
+    }
+
+    @Override
+    public AlarmSyncResponse getSyncAlarms(Long memberId, String deviceId) {
+        // 동기화는 회원 기준 데이터이므로, 먼저 유효한 회원인지 확인한다.
+        memberRepository.findById(memberId)
+            .orElseThrow(() -> ApplicationException.from(MemberErrorCode.MEMBER_NOT_FOUND));
+
+        ZoneId memberZone = resolveMemberZone(memberId, deviceId);
+
+        // 삭제된 알람은 클라이언트 로컬 예약 대상이 아니므로 제외한다.
+        List<AlarmEntity> alarms = alarmRepository.findAllByMemberIdAndStatusNot(memberId, AlarmStatus.DELETED);
+        LocalDateTime now = timeProvider.now();
+        LocalDateTime serverTime = timeProvider.now(memberZone);
+
+        if (alarms.isEmpty()) {
+            return AlarmMapper.mapToSyncResponse(serverTime, memberZone.getId(), List.of());
+        }
+
+        // 각 알람의 다음 예정 회차를 한 번에 조회해 N+1 쿼리를 방지한다.
+        List<Long> alarmIds = alarms.stream().map(AlarmEntity::getId).toList();
+        Map<Long, AlarmOccurrenceEntity> nextOccurrenceMap = alarmOccurrenceRepository
+            .findNextScheduledByAlarmIds(alarmIds, OccurrenceStatus.SCHEDULED, now)
+            .stream()
+            .collect(Collectors.toMap(
+                ao -> ao.getAlarm().getId(),
+                ao -> ao,
+                (a, b) -> a
+            ));
+
+        // 다음 회차가 없는 알람은 nextOccurrence=null로 내려 클라이언트가 예약을 생략하게 한다.
+        return AlarmMapper.mapToSyncResponse(
+            serverTime,
+            memberZone.getId(),
+            alarms.stream()
+                .map(alarm -> AlarmMapper.mapToSyncItem(alarm, nextOccurrenceMap.get(alarm.getId()), memberZone))
+                .toList()
+        );
+    }
+
+    @Override
+    public AlarmDeleteMethodResponse getAlarmDeleteMethod(Long memberId, Long alarmId) {
+        AlarmEntity alarm = findAlarmById(alarmId);
+        validAlarmOwner(memberId, alarm.getMember().getId());
+
+        AlarmDeleteMethod deleteMethod = alarmOccurrenceRepository
+            .findStatusByAlarmIdAndDate(alarmId, timeProvider.today())
+            .map(status -> requiresPayment(status)
+                ? AlarmDeleteMethod.PAYMENT
+                : AlarmDeleteMethod.AD)
+            .orElse(AlarmDeleteMethod.AD);
+
+        return AlarmMapper.mapToAlarmDeleteMethodResponse(deleteMethod);
     }
 
     @Override
     public List<OccurrencePushInfo> getPreNotificationTargets(LocalDateTime startInclusive, LocalDateTime endInclusive) {
-        LocalDate startDate = startInclusive.toLocalDate();
-        LocalTime startTime = startInclusive.toLocalTime();
-        LocalDate endDate   = endInclusive.toLocalDate();
-        LocalTime endTime   = endInclusive.toLocalTime();
-
-        // startDate == endDate -> 검색 범위가 같은 날짜 안이면 단일 쿼리
-        if (startDate.equals(endDate)) {
-            return alarmOccurrenceRepository.findPreNotificationTargetsSameDay(
-                startDate, startTime, endTime, DeactivateType.NONE
-            );
-        }
-
-        //  startDate < endDate -> 검색 범위가 다음 날로 넘어가면 두 구간 합집합
-        List<OccurrencePushInfo> part1 = alarmOccurrenceRepository.findPreNotificationTargetsFromTime(
-            startDate, startTime, DeactivateType.NONE
-        ); // [startDate startTime ~ 23:59:59]
-        List<OccurrencePushInfo> part2 = alarmOccurrenceRepository.findPreNotificationTargetsUntilTime(
-            endDate, endTime, DeactivateType.NONE
-        );// [endDate 00:00:00 ~ endTime]
-
-        // 중복 제거(혹시 모를 중복 대비)
-        return Stream.concat(part1.stream(), part2.stream())
-            .collect(Collectors.collectingAndThen(
-                Collectors.toMap(OccurrencePushInfo::occurrenceId, x -> x, (a, b) -> a),
-                m -> new ArrayList<>(m.values())
-            ));
-    }
-
-    @Override
-    public AlarmRemainingOffCountResponse getWeeklyRemainingOffCount(Long memberId) {
-        memberRepository
-            .findById(memberId)
-            .orElseThrow(() -> ApplicationException.from(MemberErrorCode.MEMBER_NOT_FOUND));
-
-        LocalDate today = LocalDate.now();
-        LocalDate monday = today.with(DayOfWeek.MONDAY);
-        LocalDateTime weekStart = monday.atStartOfDay();
-        LocalDateTime now = LocalDateTime.now();
-
-        long offCount = alarmOffLogRepository.countByMemberIdAndCreatedAtBetween(
-            memberId, weekStart, now
+        return alarmOccurrenceRepository.findPreNotificationTargetsByScheduledAtBetween(
+            startInclusive,
+            endInclusive,
+            OccurrenceStatus.SCHEDULED
         );
-
-        int count = (int) Math.max(0, WEEKLY_OFF_LIMIT - offCount);
-
-        return AlarmRemainingOffCountResponse.builder()
-            .remainingOffCount(count)
-            .build();
-    }
-
-    private AlarmInfoPreviewResponse buildPreviewResponse(AlarmEntity alarm, LocalDate today, Long memberId) {
-        // 1. 가장 최근 OFF 또는 CHECKIN 이력 조회
-        Optional<AlarmOccurrenceEntity> recentOccurrenceOpt =
-            alarmOccurrenceRepository.findTopByAlarmIdAndDeactivateTypeInOrderByDateDescTimeDesc(
-                alarm.getId(),
-                List.of(DeactivateType.OFF, DeactivateType.CHECKIN)
-            );
-
-        // 2. 반복 요일을 DayOfWeek로 변환
-        Set<DayOfWeek> repeatSet = alarm.getRepeatDays().stream()
-            .map(Weekday::getDayOfWeek)
-            .collect(Collectors.toSet());
-
-        // 3. 오늘 기준 알람 예정일 계산: 첫 번째/두 번째/세 번째 텀
-        LocalDate firstDate = DateUtil.getNextOccurrenceDate(repeatSet, today);
-        LocalDate secondDate = DateUtil.getNextOccurrenceDate(repeatSet, firstDate.plusDays(1));
-        LocalDate thirdDate = DateUtil.getNextOccurrenceDate(repeatSet, secondDate.plusDays(1));
-
-        /**
-         * 최근 알람 비활성화(OFF) 이력이 오늘의 알람에 대해 발생한 경우,
-         * 현재(firstDate)는 이미 꺼진 상태이므로 다음 알람(firstUpcomingDate)은 그 다음 텀(secondDate)이 되어야 한다.
-         *
-         * 예시)
-         *   - 알람 반복 요일이 월, 수, 금일 때
-         *   - 오늘이 수요일이고 최근 OFF 이력이 수요일(firstDate)로 존재한다면,
-         *     → 이번 수요일 알람은 꺼졌으므로 다음 울림일은 금요일(secondDate)이 되어야 함.
-         *
-         * 또한,
-         *   - 최근 끄기 이력이 OFF 타입인 경우에만 isToggleOn = false (수동 OFF에만 토글 반영)
-         *   - CHECKIN은 출석으로 꺼졌기 때문에 토글은 그대로 유지됨 (isToggleOn = true)
-         */
-
-        // 4. 다음 알람일(firstUpcomingDate), 다음+1 알람일(secondUpcomingDate) 결정
-        boolean isCurrentDeactivated = recentOccurrenceOpt
-            .map(occ -> occ.getDate().equals(firstDate))
-            .orElse(false);
-
-        boolean isOff = recentOccurrenceOpt
-            .map(occ -> occ.getDeactivateType() == DeactivateType.OFF)
-            .orElse(false);
-
-        // 현재 비활성화 상태이고, OFF로 꺼졌으면 toggle 비활성화
-        boolean isToggleOn = !(isCurrentDeactivated && isOff);
-
-        // final로 선언된 upcomingDate
-        final LocalDate resolvedFirstUpcomingDate = isCurrentDeactivated ? secondDate : firstDate;
-        final LocalDate resolvedSecondUpcomingDate = isCurrentDeactivated ? thirdDate : secondDate;
-
-        return AlarmInfoPreviewResponse.builder()
-            .alarmId(alarm.getId())
-            .alarmPurpose(alarm.getAlarmPurpose())
-            .repeatsDays(
-                alarm.getRepeatDays().stream()
-                    .map(Weekday::getDescription)
-                    .toList()
-            )
-            .time(alarm.getTime().toString())
-            .address(alarm.getAddress())
-            .latitude(alarm.getLatitude())
-            .longitude(alarm.getLongitude())
-            .isToggleOn(isToggleOn)
-            .firstUpcomingDay(resolvedFirstUpcomingDate)
-            .firstUpcomingDayOfWeek(DateUtil.getKoreanDayOfWeek(resolvedFirstUpcomingDate))
-            .secondUpcomingDay(resolvedSecondUpcomingDate)
-            .secondUpcomingDayOfWeek(DateUtil.getKoreanDayOfWeek(resolvedSecondUpcomingDate))
-            .build();
     }
 
     @Override
     public List<RingingPushInfo> getRingingNotificationTargets() {
-        return alarmOccurrenceRepository.findRingingNotificationTargets(DeactivateType.NONE);
+        return alarmOccurrenceRepository.findRingingNotificationTargets(OccurrenceStatus.RINGING);
+    }
+
+    private AlarmEntity findAlarmById(Long alarmId) {
+        return alarmRepository.findByIdWithMember(alarmId)
+            .orElseThrow(() -> ApplicationException.from(ALARM_NOT_FOUND));
+    }
+
+    private boolean requiresPayment(OccurrenceStatus status) {
+        return status == OccurrenceStatus.SCHEDULED || status == OccurrenceStatus.RINGING;
+    }
+
+    private static void validAlarmOwner(Long reqMemberId, Long alarmMemberId) {
+        if (!reqMemberId.equals(alarmMemberId)) {
+            throw ApplicationException.from(AuthErrorCode.PERMISSION_DENIED);
+        }
+    }
+
+    private ZoneId resolveMemberZone(Long memberId, String deviceId) {
+        return memberDeviceRepository.findByMember_IdAndDeviceId(memberId, deviceId)
+            .map(MemberDeviceEntity::getTimeZone)
+            .map(AlarmScheduleCalculator::resolveZone)
+            .orElse(AlarmScheduleCalculator.DEFAULT_ZONE);
     }
 }
-
-
-

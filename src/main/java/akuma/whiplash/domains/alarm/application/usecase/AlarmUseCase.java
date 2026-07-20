@@ -1,17 +1,20 @@
 package akuma.whiplash.domains.alarm.application.usecase;
 
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmCheckinRequest;
+import akuma.whiplash.domains.alarm.application.dto.request.AlarmDeleteByAdRequest;
+import akuma.whiplash.domains.alarm.application.dto.request.AlarmDeleteByPaymentRequest;
+import akuma.whiplash.domains.alarm.application.dto.request.AlarmPaymentRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmRegisterRequest;
-import akuma.whiplash.domains.alarm.application.dto.response.AlarmInfoPreviewResponse;
-import akuma.whiplash.domains.alarm.application.dto.response.AlarmOffResultResponse;
-import akuma.whiplash.domains.alarm.application.dto.response.AlarmRemainingOffCountResponse;
+import akuma.whiplash.domains.alarm.application.dto.response.AlarmCheckinResponse;
+import akuma.whiplash.domains.alarm.application.dto.response.AlarmDeleteMethodResponse;
+import akuma.whiplash.domains.alarm.application.dto.response.AlarmPaymentResponse;
+import akuma.whiplash.domains.alarm.application.dto.response.AlarmSyncResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.CreateAlarmOccurrenceResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.CreateAlarmResponse;
+import akuma.whiplash.domains.alarm.application.dto.response.GetAlarmsResponse;
 import akuma.whiplash.domains.alarm.domain.service.AlarmCommandService;
 import akuma.whiplash.domains.alarm.domain.service.AlarmQueryService;
 import akuma.whiplash.global.annotation.architecture.UseCase;
-import java.time.LocalDateTime;
-import java.util.List;
 import lombok.RequiredArgsConstructor;
 
 @UseCase
@@ -21,35 +24,43 @@ public class AlarmUseCase {
     private final AlarmCommandService alarmCommandService;
     private final AlarmQueryService alarmQueryService;
 
-    public CreateAlarmResponse createAlarm(AlarmRegisterRequest request, Long memberId) {
-        return alarmCommandService.createAlarm(request, memberId);
+    public CreateAlarmResponse createAlarm(AlarmRegisterRequest request, Long memberId, String deviceId) {
+        return alarmCommandService.createAlarm(request, memberId, deviceId);
     }
 
     public CreateAlarmOccurrenceResponse createAlarmOccurrence(Long memberId, Long alarmId) {
         return alarmCommandService.createAlarmOccurrence(memberId, alarmId);
     }
 
-    public AlarmOffResultResponse alarmOff(Long memberId, Long alarmId, LocalDateTime clientNow) {
-        return alarmCommandService.alarmOff(memberId, alarmId, clientNow);
+    public void removeAlarmByPayment(Long memberId, Long alarmId, AlarmDeleteByPaymentRequest request) {
+        alarmCommandService.removeAlarmByPayment(memberId, alarmId, request);
     }
 
-    public void removeAlarm(Long memberId, Long alarmId, String reason) {
-        alarmCommandService.removeAlarm(memberId, alarmId, reason);
+    public void removeAlarmByAd(Long memberId, Long alarmId, AlarmDeleteByAdRequest request) {
+        alarmCommandService.removeAlarmByAd(memberId, alarmId, request);
     }
 
-    public void checkinAlarm(Long memberId, Long alarmId, AlarmCheckinRequest request) {
-        alarmCommandService.checkinAlarm(memberId, alarmId, request);
+    public AlarmCheckinResponse checkinAlarm(Long memberId, Long alarmId, AlarmCheckinRequest request) {
+        return alarmCommandService.checkinAlarm(memberId, alarmId, request);
     }
 
-    public void ringAlarm(Long memberId, Long alarmId) {
-        alarmCommandService.ringAlarm(memberId, alarmId);
+    public AlarmPaymentResponse deactivateByPayment(Long memberId, Long alarmId, AlarmPaymentRequest request) {
+        return alarmCommandService.deactivateByPayment(memberId, alarmId, request);
     }
 
-    public List<AlarmInfoPreviewResponse> getAlarms(Long memberId) {
-        return alarmQueryService.getAlarms(memberId);
+    public void ringAlarm(Long memberId, Long alarmId, String deviceId) {
+        alarmCommandService.ringAlarm(memberId, alarmId, deviceId);
     }
 
-    public AlarmRemainingOffCountResponse getWeeklyRemainingOffCount(Long memberId) {
-        return alarmQueryService.getWeeklyRemainingOffCount(memberId);
+    public GetAlarmsResponse getAlarms(Long memberId, String deviceId) {
+        return alarmQueryService.getAlarms(memberId, deviceId);
+    }
+
+    public AlarmSyncResponse getSyncAlarms(Long memberId, String deviceId) {
+        return alarmQueryService.getSyncAlarms(memberId, deviceId);
+    }
+
+    public AlarmDeleteMethodResponse getAlarmDeleteMethod(Long memberId, Long alarmId) {
+        return alarmQueryService.getAlarmDeleteMethod(memberId, alarmId);
     }
 }

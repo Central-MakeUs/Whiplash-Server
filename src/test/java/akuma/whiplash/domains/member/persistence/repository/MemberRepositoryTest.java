@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import akuma.whiplash.common.config.PersistenceTest;
 import akuma.whiplash.common.fixture.MemberFixture;
+import akuma.whiplash.domains.member.domain.contants.MemberStatus;
 import akuma.whiplash.domains.member.persistence.entity.MemberEntity;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
@@ -18,22 +19,7 @@ class MemberRepositoryTest {
     @Autowired
     private MemberRepository memberRepository;
 
-    @DisplayName("푸시 알림 수신 동의를 변경하면 수정된 값이 저장된다")
-    @Test
-    void success_updatesPushNotificationPolicy() {
-        // given
-        MemberEntity member = memberRepository.save(MemberFixture.MEMBER_9.toEntity());
-
-        // when
-        member.updatePushNotificationPolicy(false);
-        memberRepository.save(member);
-
-        // then
-        MemberEntity updated = memberRepository.findById(member.getId()).orElseThrow();
-        assertThat(updated.isPushNotificationPolicy()).isFalse();
-    }
-
-    @DisplayName("등록되지 않은 회원 ID로 조회하면 비어있는 Optional을 반환한다")
+    @DisplayName("존재하지 않는 회원 ID로 조회하면 빈 Optional을 반환한다")
     @Test
     void fail_returnsEmpty_whenMemberNotExists() {
         // when
@@ -44,34 +30,72 @@ class MemberRepositoryTest {
     }
 
     @Nested
-    @DisplayName("updatePrivacyPolicy - 개인정보 수집 동의 업데이트")
-    class UpdatePrivacyPolicyTest {
+    @DisplayName("findByProviderAndProviderUserId - provider 기반 회원 조회")
+    class FindByProviderAndProviderUserIdTest {
 
         @Test
-        @DisplayName("성공: 개인정보 수집 동의를 변경하면 저장된다")
+        @DisplayName("성공: provider와 providerUserId로 회원을 조회한다")
         void success() {
             // given
-            MemberEntity member = MemberFixture.MEMBER_7.toEntity();
-            member.updatePrivacyPolicy(false);
-            member = memberRepository.save(member);
+            MemberEntity member = memberRepository.save(MemberFixture.MEMBER_1.toEntity());
 
             // when
-            member.updatePrivacyPolicy(true);
-            memberRepository.save(member);
+            Optional<MemberEntity> result = memberRepository.findByProviderAndProviderUserId(
+                member.getProvider(), member.getProviderUserId()
+            );
 
             // then
-            MemberEntity found = memberRepository.findById(member.getId()).orElseThrow();
-            assertThat(found.isPrivacyPolicy()).isTrue();
+            assertThat(result).isPresent();
+            assertThat(result.get().getEmail()).isEqualTo(member.getEmail());
         }
 
         @Test
-        @DisplayName("실패: 존재하지 않는 회원이면 빈 값을 반환한다")
+        @DisplayName("실패: 존재하지 않는 providerUserId이면 빈 값을 반환한다")
         void fail_memberNotFound() {
             // when
-            Optional<MemberEntity> result = memberRepository.findById(999L);
+            Optional<MemberEntity> result = memberRepository.findByProviderAndProviderUserId(
+                MemberFixture.MEMBER_1.getProvider(), "non-existent-id"
+            );
 
             // then
             assertThat(result).isEmpty();
+        }
+    }
+
+    @Nested
+    @DisplayName("updateLastLoginAt - 마지막 로그인 시각 업데이트")
+    class UpdateLastLoginAtTest {
+
+        @Test
+        @DisplayName("성공: updateLastLoginAt 호출 후 lastLoginAt이 저장된다")
+        void success() {
+            // given
+            MemberEntity member = memberRepository.save(MemberFixture.MEMBER_2.toEntity());
+            assertThat(member.getLastLoginAt()).isNull();
+
+            // when
+            member.updateLastLoginAt();
+            memberRepository.save(member);
+
+            // then
+            MemberEntity updated = memberRepository.findById(member.getId()).orElseThrow();
+            assertThat(updated.getLastLoginAt()).isNotNull();
+        }
+    }
+
+    @Nested
+    @DisplayName("isDeleted - 탈퇴 회원 판별")
+    class IsDeletedTest {
+
+        @Test
+        @DisplayName("성공: status가 ACTIVE이면 isDeleted는 false를 반환한다")
+        void success_activeIsNotDeleted() {
+            // given
+            MemberEntity member = MemberFixture.MEMBER_3.toMockEntity();
+
+            // when & then
+            assertThat(member.isDeleted()).isFalse();
+            assertThat(member.getStatus()).isEqualTo(MemberStatus.ACTIVE);
         }
     }
 }

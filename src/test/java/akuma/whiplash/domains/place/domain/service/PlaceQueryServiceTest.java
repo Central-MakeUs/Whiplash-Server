@@ -2,49 +2,86 @@ package akuma.whiplash.domains.place.domain.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
-import akuma.whiplash.domains.place.application.dto.response.PlaceInfoResponse;
-import java.io.IOException;
+import akuma.whiplash.domains.place.domain.client.GoogleClient;
+import akuma.whiplash.domains.place.domain.constant.PlaceProvider;
+import akuma.whiplash.domains.place.domain.model.PlaceDetail;
+import akuma.whiplash.domains.place.domain.model.PlaceAutocompleteCriteria;
+import akuma.whiplash.domains.place.domain.model.PlaceAutocompleteSuggestion;
+import akuma.whiplash.domains.place.domain.model.PlaceDetailsCriteria;
+import akuma.whiplash.domains.place.domain.model.PlaceSearchCriteria;
+import akuma.whiplash.domains.place.domain.model.PlaceSearchResult;
+import akuma.whiplash.domains.place.domain.model.SelectedPlaceDetail;
+import akuma.whiplash.domains.place.exception.PlaceErrorCode;
+import akuma.whiplash.global.exception.ApplicationException;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
-import okhttp3.mockwebserver.MockResponse;
-import okhttp3.mockwebserver.MockWebServer;
-import okhttp3.mockwebserver.RecordedRequest;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-import org.springframework.web.reactive.function.client.WebClient;
-import org.springframework.web.reactive.function.client.WebClientResponseException;
 
-// TODO: 테스트 코드 고치고 이 애노테이션 제거
-@Disabled
 class PlaceQueryServiceTest {
 
     private PlaceQueryServiceImpl placeQueryService;
-    private MockWebServer mockWebServer;
+    private GoogleClient googleClient;
 
     @BeforeEach
-    void setUp() throws Exception {
-        mockWebServer = new MockWebServer();
-        mockWebServer.start();
-
-        // ✅ MockWebServer 주소를 baseUrl로 설정하고, 네이버 헤더를 기본 헤더로 세팅
-        WebClient webClient = WebClient.builder()
-            .baseUrl(mockWebServer.url("/").toString()) // e.g. http://127.0.0.1:50543/
-            .defaultHeader("X-Naver-Client-Id", "test-id")
-            .defaultHeader("X-Naver-Client-Secret", "test-secret")
-            .build();
-
-        // ✅ 구현체가 WebClient를 주입받아 상대경로로 호출한다고 가정
-        placeQueryService = new PlaceQueryServiceImpl(webClient);
+    void setUp() {
+        googleClient = mock(GoogleClient.class);
+        placeQueryService = new PlaceQueryServiceImpl(googleClient);
     }
 
-    @AfterEach
-    void tearDown() throws IOException {
-        mockWebServer.shutdown();
+    @Nested
+    @DisplayName("getPlaceAutocompleteSuggestions - 장소 자동완성")
+    class GetPlaceAutocompleteSuggestionsTest {
+
+        @Test
+        @DisplayName("성공: 자동완성 조건을 Google client에 전달한다")
+        void success() {
+            // given
+            PlaceAutocompleteCriteria criteria = new PlaceAutocompleteCriteria(
+                "구리", null, null, "ko", "KR", "550e8400-e29b-41d4-a716-446655440000"
+            );
+            List<PlaceAutocompleteSuggestion> expected = List.of(
+                new PlaceAutocompleteSuggestion("구리시청", "경기도 구리시", "ChIJ")
+            );
+            when(googleClient.autocomplete(criteria)).thenReturn(expected);
+
+            // when
+            var result = placeQueryService.getPlaceAutocompleteSuggestions(criteria);
+
+            // then
+            assertThat(result).isEqualTo(expected);
+            verify(googleClient).autocomplete(criteria);
+        }
+    }
+
+    @Nested
+    @DisplayName("getPlaceDetails - 선택 장소 상세 조회")
+    class GetPlaceDetailsTest {
+
+        @Test
+        @DisplayName("성공: 선택 장소 조건을 Google client에 전달한다")
+        void success() {
+            // given
+            PlaceDetailsCriteria criteria = new PlaceDetailsCriteria(
+                "ChIJ", "550e8400-e29b-41d4-a716-446655440000", "ko", "KR"
+            );
+            SelectedPlaceDetail expected = new SelectedPlaceDetail(
+                "경기도 구리시 아차산로 439", 37.5943, 127.1296, "KR", "ChIJ"
+            );
+            when(googleClient.getPlaceDetails(criteria)).thenReturn(expected);
+
+            // when
+            SelectedPlaceDetail result = placeQueryService.getPlaceDetails(criteria);
+
+            // then
+            assertThat(result).isEqualTo(expected);
+            verify(googleClient).getPlaceDetails(criteria);
+        }
     }
 
     @Nested
@@ -52,51 +89,87 @@ class PlaceQueryServiceTest {
     class SearchPlacesTest {
 
         @Test
-        @DisplayName("성공: 키워드 검색 결과를 반환한다")
-        void success() throws Exception {
-            // given (서비스의 변환 규칙에 맞춘 응답)
-            String body = """
-                {"items":[
-                  {"title":"<b>카페</b>","roadAddress":"서울시 강남구","latitude":37.0,"longitude":127.0}
-                ]}
-                """;
-            mockWebServer.enqueue(new MockResponse()
-                .setResponseCode(200)
-                .setBody(body)
-                .addHeader("Content-Type", "application/json"));
+        @DisplayName("성공: 한국 검색도 Google을 사용하고 거리를 계산한다")
+        void success() {
+            // given
+            PlaceSearchCriteria criteria = new PlaceSearchCriteria("카페", 37.0, 127.0, 5, "ko", "KR");
+            when(googleClient.searchPlaces(criteria)).thenReturn(List.of(new PlaceSearchResult(
+                "카페", "서울시 강남구", 37.0, 127.0, PlaceProvider.GOOGLE, "ChIJ", "KR", null
+            )));
 
             // when
-            List<PlaceInfoResponse> responses = placeQueryService.searchPlaces("카페");
+            List<PlaceSearchResult> responses = placeQueryService.searchPlaces(criteria);
 
             // then
             assertThat(responses).hasSize(1);
-            assertThat(responses.get(0).name()).isEqualTo("카페");           // <b> 제거 로직 반영
+            assertThat(responses.get(0).name()).isEqualTo("카페");
             assertThat(responses.get(0).address()).isEqualTo("서울시 강남구");
             assertThat(responses.get(0).latitude()).isEqualTo(37.0);
             assertThat(responses.get(0).longitude()).isEqualTo(127.0);
+            assertThat(responses.get(0).distanceMeters()).isZero();
+            assertThat(responses.get(0).provider()).isEqualTo(PlaceProvider.GOOGLE);
+            verify(googleClient).searchPlaces(criteria);
+        }
 
-            // ✅ 실제로 MockWebServer가 호출되었는지 검증(외부로 나가지 않음 보장)
-            RecordedRequest req = mockWebServer.takeRequest(3, TimeUnit.SECONDS);
-            assertThat(req).isNotNull();
-            assertThat(req.getPath()).startsWith("/v1/search/local.json");
-            assertThat(req.getHeader("X-Naver-Client-Id")).isEqualTo("test-id");
-            assertThat(req.getHeader("X-Naver-Client-Secret")).isEqualTo("test-secret");
+        @Test
+        @DisplayName("성공: 검색 힌트가 없어도 Google을 사용한다")
+        void success_withoutHints() {
+            // given
+            PlaceSearchCriteria criteria = new PlaceSearchCriteria("카페", null, null, 5, null, null);
+            when(googleClient.searchPlaces(criteria)).thenReturn(List.of(new PlaceSearchResult(
+                "카페", "서울시 강남구", 37.0, 127.0, PlaceProvider.GOOGLE, "ChIJ", "KR", null
+            )));
+
+            // when
+            List<PlaceSearchResult> responses = placeQueryService.searchPlaces(criteria);
+
+            // then
+            assertThat(responses.get(0).distanceMeters()).isNull();
+            verify(googleClient).searchPlaces(criteria);
         }
 
         @Test
         @DisplayName("실패: 외부 API가 에러를 반환하면 예외를 던진다")
-        void fail_externalApiError() throws Exception {
+        void fail_externalApiError() {
             // given
-            mockWebServer.enqueue(new MockResponse().setResponseCode(400));
+            PlaceSearchCriteria criteria = new PlaceSearchCriteria("카페", null, null, 5, null, null);
+            when(googleClient.searchPlaces(criteria))
+                .thenThrow(ApplicationException.from(PlaceErrorCode.PROVIDER_ERROR));
 
-            // when & then (구현이 retrieve() 기본 onStatus 사용 시 WebClientResponseException 발생)
-            assertThatThrownBy(() -> placeQueryService.searchPlaces("카페"))
-                .isInstanceOf(WebClientResponseException.class);
+            // when & then
+            assertThatThrownBy(() -> placeQueryService.searchPlaces(criteria))
+                .isInstanceOfSatisfying(ApplicationException.class, exception ->
+                    assertThat(exception.getCode()).isEqualTo(PlaceErrorCode.PROVIDER_ERROR)
+                );
+        }
+    }
 
-            // ✅ 요청이 MockWebServer로 갔는지 확인
-            RecordedRequest req = mockWebServer.takeRequest(3, TimeUnit.SECONDS);
-            assertThat(req).isNotNull();
-            assertThat(req.getPath()).startsWith("/v1/search/local.json");
+    @Nested
+    @DisplayName("getPlaceDetailByCoord - 장소 상세 조회")
+    class GetPlaceDetailByCoordTest {
+
+        @Test
+        @DisplayName("성공: 한국 좌표와 응답 언어를 Google client에 전달한다")
+        void success() {
+            // given
+            double latitude = 37.5665;
+            double longitude = 126.9780;
+            PlaceDetail expected = new PlaceDetail(
+                "대한민국 서울특별시",
+                "서울특별시",
+                "대한민국 서울특별시",
+                latitude,
+                longitude,
+                "KR"
+            );
+            when(googleClient.reverseGeocode(latitude, longitude, "ko")).thenReturn(expected);
+
+            // when
+            PlaceDetail result = placeQueryService.getPlaceDetailByCoord(latitude, longitude, "ko");
+
+            // then
+            assertThat(result).isEqualTo(expected);
+            verify(googleClient).reverseGeocode(latitude, longitude, "ko");
         }
     }
 }

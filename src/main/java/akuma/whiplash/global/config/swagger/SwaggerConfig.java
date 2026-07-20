@@ -2,7 +2,10 @@ package akuma.whiplash.global.config.swagger;
 
 import akuma.whiplash.domains.alarm.exception.AlarmErrorCode;
 import akuma.whiplash.domains.auth.exception.AuthErrorCode;
+import akuma.whiplash.domains.device.exception.DeviceErrorCode;
 import akuma.whiplash.domains.member.exception.MemberErrorCode;
+import akuma.whiplash.domains.payment.exception.PaymentErrorCode;
+import akuma.whiplash.domains.place.exception.PlaceErrorCode;
 import akuma.whiplash.global.annotation.swagger.CustomErrorCodes;
 import akuma.whiplash.global.response.ApplicationResponse;
 import akuma.whiplash.global.response.code.BaseErrorCode;
@@ -25,6 +28,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
+import org.springframework.core.env.Environment;
 import org.springframework.web.method.HandlerMethod;
 
 @Configuration
@@ -34,20 +38,10 @@ public class SwaggerConfig {
     private String serverUrl;
 
     @Bean
-    @Profile("local")
-    public OpenAPI localOpenAPI() {
-        return createOpenAPI(getLocalServer());
+    @Profile({"local", "dev", "qa", "prod"})
+    public OpenAPI openAPI(Environment environment) {
+        return createOpenAPI(getServer(environment));
     }
-
-    @Bean
-    @Profile("dev")
-    public OpenAPI devOpenAPI() {
-        return createOpenAPI(getDevServer());
-    }
-
-    @Bean
-    @Profile("prod")
-    public OpenAPI prodOpenAPI() {return  createOpenAPI(getProdServer()); }
 
     private OpenAPI createOpenAPI(Server server) {
         return new OpenAPI()
@@ -64,22 +58,30 @@ public class SwaggerConfig {
                 .addSecurityItem(new SecurityRequirement().addList("bearerAuth"));
     }
 
-    private Server getLocalServer() {
-        return new Server()
-                .url(serverUrl)
-                .description("Local Server");
-    }
-
-    private Server getDevServer() {
-        return new Server()
-                .url(serverUrl)
-                .description("Dev Server");
-    }
-
-    private Server getProdServer() {
+    private Server getServer(Environment environment) {
+        String description = resolveServerDescription(environment);
         return new Server()
             .url(serverUrl)
-            .description("Prod Server");
+            .description(description);
+    }
+
+    private String resolveServerDescription(Environment environment) {
+        for (String profile : environment.getActiveProfiles()) {
+            switch (profile) {
+                case "local":
+                    return "Local Server";
+                case "dev":
+                    return "Dev Server";
+                case "qa":
+                    return "Qa Server";
+                case "prod":
+                    return "Prod Server";
+                default:
+                    break;
+            }
+        }
+
+        return "Server";
     }
 
     @Bean
@@ -93,7 +95,10 @@ public class SwaggerConfig {
                     customErrorCodes.commonErrorCodes(),
                     customErrorCodes.alarmErrorCodes(),
                     customErrorCodes.authErrorCodes(),
-                    customErrorCodes.memberErrorCodes()
+                    customErrorCodes.memberErrorCodes(),
+                    customErrorCodes.deviceErrorCodes(),
+                    customErrorCodes.paymentErrorCodes(),
+                    customErrorCodes.placeErrorCodes()
                 );
             }
 
@@ -106,7 +111,10 @@ public class SwaggerConfig {
             CommonErrorCode[] commonErrorCodes,
             AlarmErrorCode[] alarmErrorCodes,
             AuthErrorCode[] authErrorCodes,
-            MemberErrorCode[] memberErrorCodes
+            MemberErrorCode[] memberErrorCodes,
+            DeviceErrorCode[] deviceErrorCodes,
+            PaymentErrorCode[] paymentErrorCodes,
+            PlaceErrorCode[] placeErrorCodes
     ) {
         ApiResponses responses = operation.getResponses();
 
@@ -127,6 +135,21 @@ public class SwaggerConfig {
             }
 
             for (MemberErrorCode errorCode : memberErrorCodes) {
+                SwaggerExampleHolder SwaggerExampleHolder = getSwaggerExampleHolder(errorCode);
+                addExamplesToResponses(responses, SwaggerExampleHolder);
+            }
+
+            for (DeviceErrorCode errorCode : deviceErrorCodes) {
+                SwaggerExampleHolder SwaggerExampleHolder = getSwaggerExampleHolder(errorCode);
+                addExamplesToResponses(responses, SwaggerExampleHolder);
+            }
+
+            for (PaymentErrorCode errorCode : paymentErrorCodes) {
+                SwaggerExampleHolder SwaggerExampleHolder = getSwaggerExampleHolder(errorCode);
+                addExamplesToResponses(responses, SwaggerExampleHolder);
+            }
+
+            for (PlaceErrorCode errorCode : placeErrorCodes) {
                 SwaggerExampleHolder SwaggerExampleHolder = getSwaggerExampleHolder(errorCode);
                 addExamplesToResponses(responses, SwaggerExampleHolder);
             }

@@ -2,50 +2,62 @@ package akuma.whiplash.domains.alarm.domain.service;
 
 import static akuma.whiplash.domains.alarm.exception.AlarmErrorCode.*;
 
+import akuma.whiplash.domains.alarm.application.event.AlarmCheckinCompletedEvent;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmCheckinRequest;
+import akuma.whiplash.domains.alarm.application.dto.request.AlarmDeleteByAdRequest;
+import akuma.whiplash.domains.alarm.application.dto.request.AlarmDeleteByPaymentRequest;
+import akuma.whiplash.domains.alarm.application.dto.request.AlarmPaymentRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmRegisterRequest;
-import akuma.whiplash.domains.alarm.application.dto.response.AlarmOffResultResponse;
+import akuma.whiplash.domains.alarm.application.dto.response.AlarmCheckinResponse;
+import akuma.whiplash.domains.alarm.application.dto.response.AlarmPaymentResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.CreateAlarmOccurrenceResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.CreateAlarmResponse;
 import akuma.whiplash.domains.alarm.application.mapper.AlarmMapper;
-import akuma.whiplash.domains.alarm.domain.constant.DeactivateType;
+import akuma.whiplash.domains.alarm.application.service.AuditLogRecorder;
+import akuma.whiplash.domains.alarm.domain.constant.OccurrenceStatus;
+import akuma.whiplash.domains.alarm.domain.constant.DeactivationResult;
 import akuma.whiplash.domains.alarm.domain.constant.Weekday;
+import akuma.whiplash.domains.alarm.domain.util.AlarmScheduleCalculator;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmEntity;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmOccurrenceEntity;
-import akuma.whiplash.domains.alarm.persistence.entity.AlarmOffLogEntity;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmRingingLogEntity;
+import akuma.whiplash.domains.alarm.persistence.repository.AlarmDeactivationLogRepository;
+import akuma.whiplash.domains.alarm.persistence.repository.AlarmDeleteLogRepository;
 import akuma.whiplash.domains.alarm.persistence.repository.AlarmOccurrenceRepository;
-import akuma.whiplash.domains.alarm.persistence.repository.AlarmOffLogRepository;
 import akuma.whiplash.domains.alarm.persistence.repository.AlarmRepository;
 import akuma.whiplash.domains.alarm.persistence.repository.AlarmRingingLogRepository;
 import akuma.whiplash.domains.auth.exception.AuthErrorCode;
+import akuma.whiplash.domains.device.exception.DeviceErrorCode;
 import akuma.whiplash.domains.member.exception.MemberErrorCode;
 import akuma.whiplash.domains.member.persistence.entity.MemberEntity;
+import akuma.whiplash.domains.member.persistence.entity.MemberDeviceEntity;
+import akuma.whiplash.domains.member.persistence.repository.MemberDeviceRepository;
 import akuma.whiplash.domains.member.persistence.repository.MemberRepository;
+import akuma.whiplash.domains.payment.application.mapper.PaymentMapper;
+import akuma.whiplash.domains.payment.domain.constant.PaymentStatus;
+import akuma.whiplash.domains.payment.domain.constant.PaymentType;
+import akuma.whiplash.domains.payment.exception.PaymentErrorCode;
+import akuma.whiplash.domains.payment.persistence.repository.PaymentRepository;
 import akuma.whiplash.global.exception.ApplicationException;
-import akuma.whiplash.global.service.ArchiveService;
-import akuma.whiplash.global.util.date.DateUtil;
-import com.google.api.services.sheets.v4.Sheets;
-import com.google.api.services.sheets.v4.SheetsScopes;
-import com.google.api.services.sheets.v4.model.ValueRange;
-import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
-import com.google.api.client.json.jackson2.JacksonFactory;
-import com.google.auth.http.HttpCredentialsAdapter;
-import com.google.auth.oauth2.ServiceAccountCredentials;
+import akuma.whiplash.global.response.code.CommonErrorCode;
+import akuma.whiplash.global.util.date.TimeProvider;
+import akuma.whiplash.infrastructure.payment.PaymentVerificationPort;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
-import java.util.Collections;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.List;
-import java.util.Optional;
+import java.util.Locale;
 import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.io.ClassPathResource;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.annotation.Transactional;
 
 @Slf4j
@@ -54,27 +66,23 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional
 public class AlarmCommandServiceImpl implements AlarmCommandService {
 
+    private final List<PaymentVerificationPort> paymentVerificationPorts;
+    private final AuditLogRecorder auditLogRecorder;
     private final AlarmRepository alarmRepository;
     private final AlarmOccurrenceRepository alarmOccurrenceRepository;
-    private final AlarmOffLogRepository alarmOffLogRepository;
     private final AlarmRingingLogRepository alarmRingingLogRepository;
+    private final AlarmDeactivationLogRepository alarmDeactivationLogRepository;
+    private final AlarmDeleteLogRepository alarmDeleteLogRepository;
     private final MemberRepository memberRepository;
-    private final ArchiveService archiveService;
+    private final MemberDeviceRepository memberDeviceRepository;
+    private final PaymentRepository paymentRepository;
+    private final ApplicationEventPublisher eventPublisher;
+    private final TimeProvider timeProvider;
 
-    @Value("${oauth.google.sheet.id}")
-    private String spreadsheetsId;
-
-    @Value("${oauth.google.sheet.credentials-path}")
-    private String credentialsPath;
-
-    @Value("${oauth.google.sheet.range}")
-    private String sheetRange;
-
-    private static final double CHECKIN_RADIUS_METERS = 100.0;
-    private static final int WEEKLY_OFF_LIMIT = 2;
+    private static final double CHECKIN_RADIUS_METERS = 50.0;
 
     @Override
-    public CreateAlarmResponse createAlarm(AlarmRegisterRequest request, Long memberId) {
+    public CreateAlarmResponse createAlarm(AlarmRegisterRequest request, Long memberId, String deviceId) {
         MemberEntity memberEntity = findMemberById(memberId);
 
         boolean exists = alarmRepository.existsByMemberIdAndAlarmPurpose(memberId, request.alarmPurpose());
@@ -82,12 +90,39 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
             throw ApplicationException.from(DUPLICATE_ALARM_PURPOSE);
         }
 
+        // 1. 알람 엔티티 생성 및 저장
         AlarmEntity alarm = AlarmMapper.mapToAlarmEntity(request, memberEntity);
         alarmRepository.save(alarm);
 
-        return CreateAlarmResponse.builder()
-            .alarmId(alarm.getId())
-            .build();
+        // 2. 다음 알람 발생 날짜 계산
+        ZoneId memberZone = resolveMemberZone(memberId, deviceId);
+        Set<DayOfWeek> repeatDays = alarm.getRepeatDays().stream()
+            .map(Weekday::getDayOfWeek)
+            .collect(Collectors.toSet());
+        LocalDate nextDate = AlarmScheduleCalculator.getNextOccurrenceDate(
+            repeatDays,
+            ZonedDateTime.of(timeProvider.now(memberZone), memberZone),
+            alarm.getTime()
+        );
+        LocalDateTime nextScheduledTime = AlarmScheduleCalculator.toDefaultZoneLocalDateTime(
+            nextDate,
+            alarm.getTime(),
+            memberZone
+        );
+
+        // 3. 첫 알람 발생 내역 생성 및 저장
+        AlarmOccurrenceEntity occurrence = AlarmMapper.mapToFirstAlarmOccurrenceEntity(
+            alarm,
+            nextDate,
+            alarm.getTime(),
+            nextScheduledTime
+        );
+        alarmOccurrenceRepository.save(occurrence);
+
+        // 4. 알람의 다음 예정 시각 업데이트
+        alarm.updateNextScheduledTime(nextScheduledTime);
+
+        return AlarmMapper.mapToCreateAlarmResponse(alarm, occurrence, memberZone);
     }
 
     @Override
@@ -97,153 +132,159 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
         validAlarmOwner(memberId, alarmEntity.getMember().getId());
 
         // 각 알람이 울릴 때 알람 발생 내역은 1개만 허용(반복 울림은 alarm_ringing_log로 관리), 오늘 날짜 기준 알람 발생 내역이 이미 존재하면 예외 발생
-        boolean alreadyExists = alarmOccurrenceRepository.existsByAlarmIdAndDate(alarmId, LocalDate.now());
+        boolean alreadyExists = alarmOccurrenceRepository.existsByAlarmIdAndDate(alarmId, timeProvider.today());
         if (alreadyExists) {
             throw ApplicationException.from(ALREADY_OCCURRED_EXISTS);
         }
 
-        AlarmOccurrenceEntity alarmOccurrenceEntity = AlarmMapper.mapToTodayFirstAlarmOccurrenceEntity(alarmEntity);
+        AlarmOccurrenceEntity alarmOccurrenceEntity = AlarmMapper.mapToTodayFirstAlarmOccurrenceEntity(alarmEntity, timeProvider.today());
         alarmOccurrenceRepository.save(alarmOccurrenceEntity);
 
         return AlarmMapper.mapToCreateAlarmOccurrenceResponse(alarmOccurrenceEntity.getId());
     }
 
     @Override
-    public AlarmOffResultResponse alarmOff(Long memberId, Long alarmId, LocalDateTime clientNow) {
-        LocalDateTime serverNow = LocalDateTime.now(); // 서버 기준 현재 시간 (DB 기록용)
-        LocalDate clientDate = clientNow.toLocalDate(); // 클라이언트 기준 날짜
+    public void removeAlarmByAd(Long memberId, Long alarmId, AlarmDeleteByAdRequest request) {
+        // 1. 알람을 조회하고 요청자가 알람 소유자인지 검증한다.
+        AlarmEntity alarm = findAlarmById(alarmId);
+        MemberEntity member = alarm.getMember();
+        validAlarmOwner(memberId, member.getId());
 
-        // 1. 클라이언트와 서버 시간 간 불일치 검사
-        validClockSkew(clientNow, serverNow);
+        // 2. 오늘 회차가 아직 대기/울림 상태라면 결제 삭제 정책을 사용해야 한다.
+        alarmOccurrenceRepository.findByAlarmIdAndDate(alarmId, timeProvider.today())
+            .ifPresent(todayOccurrence -> {
+                OccurrenceStatus status = todayOccurrence.getStatus();
+                if (status == OccurrenceStatus.SCHEDULED || status == OccurrenceStatus.RINGING) {
+                    throw ApplicationException.from(ALARM_DELETE_REQUIRES_PAYMENT);
+                }
+            });
 
-        // 2. 알람 조회 및 소유자 검증
-        AlarmEntity findAlarm = findAlarmById(alarmId);
-        validAlarmOwner(findAlarm.getMember().getId(), memberId);
+        // 3. 오늘 회차가 없거나 이미 비활성화된 상태라면 알람을 소프트 삭제한다.
+        LocalDateTime deletedAt = timeProvider.now();
+        alarm.softDelete(deletedAt);
 
-        // 3. 이번 주 시작~끝 날짜 계산 (주간 OFF 제한용)
-        LocalDate weekStart = DateUtil.getWeekStartDate(clientDate);
-        LocalDate weekEnd = DateUtil.getWeekEndDate(weekStart);
+        // 4. 광고 증빙 토큰을 포함한 삭제 이력을 저장한다.
+        alarmDeleteLogRepository.save(AlarmMapper.mapToAdDeleteLogEntity(
+            alarm,
+            member,
+            request.adProofToken(),
+            deletedAt,
+            deletedAt
+        ));
 
-        // 4. 이번 주 끈 횟수 조회
-        long weeklyOffCount = alarmOffLogRepository.countByMemberIdAndCreatedAtBetween(
-            memberId,
-            weekStart.atStartOfDay(),
-            weekEnd.plusDays(1).atStartOfDay()
-        );
+        // 5. 삭제 성공 시 별도 본문 없이 응답한다.
+    }
 
-        // 5. 제한 초과 시 예외 발생
-        if (weeklyOffCount >= WEEKLY_OFF_LIMIT) {
-            throw ApplicationException.from(ALARM_OFF_LIMIT_EXCEEDED);
-        }
+    @Override
+    public void removeAlarmByPayment(Long memberId, Long alarmId, AlarmDeleteByPaymentRequest request) {
+        // 1. 알람을 조회하고 요청자가 알람 소유자인지 검증한다.
+        AlarmEntity alarm = findAlarmById(alarmId);
+        MemberEntity member = alarm.getMember();
+        validAlarmOwner(memberId, member.getId());
 
-        // 6. 오늘 알람 발생 내역 조회
-        Optional<AlarmOccurrenceEntity> todayOccurrenceOpt =
-            alarmOccurrenceRepository.findByAlarmIdAndDate(alarmId, clientDate);
+        // 2. 오늘 알람 회차가 있어야 결제 삭제 대상이 된다.
+        AlarmOccurrenceEntity todayOccurrence = alarmOccurrenceRepository
+            .findByAlarmIdAndDate(alarmId, timeProvider.today())
+            .orElseThrow(() -> ApplicationException.from(TODAY_IS_NOT_ALARM_DAY));
 
-        // 7. 알람이 울렸고 비활성화되지 않은 상태라면 → 다음 알람을 대상으로 설정
-        boolean isAfterRinging = todayOccurrenceOpt
-            .filter(o -> o.isAlarmRinging() && o.getDeactivateType() == DeactivateType.NONE)
-            .map(o -> clientNow.isAfter(o.getTime().atDate(clientDate)))
-            .orElse(false);
-
-        // 8. 꺼야 할 알람 날짜 계산
-        LocalDate searchStartDate = isAfterRinging ? clientDate.plusDays(1) : clientDate;
-        Set<DayOfWeek> repeatDays = findAlarm.getRepeatDays().stream()
-            .map(Weekday::getDayOfWeek)
-            .collect(Collectors.toSet());
-        LocalDate offTargetDate = DateUtil.getNextOccurrenceDate(repeatDays, searchStartDate);
-
-        // 9. 같은 주인지 검증
-        validSameWeek(offTargetDate, clientDate);
-
-        // 10. 발생 내역 조회 또는 생성
-        AlarmOccurrenceEntity targetOccurrence = alarmOccurrenceRepository
-            .findByAlarmIdAndDate(alarmId, offTargetDate)
-            .orElseGet(() -> alarmOccurrenceRepository.save(
-                AlarmMapper.mapToAlarmOccurrenceForDate(findAlarm, offTargetDate)));
-
-        // 11. 이미 꺼져 있다면 예외
-        if (targetOccurrence.getDeactivateType() != DeactivateType.NONE) {
+        // 3. 이미 비활성화된 회차는 광고 삭제 정책으로 넘긴다.
+        if (todayOccurrence.getStatus() != OccurrenceStatus.SCHEDULED
+            && todayOccurrence.getStatus() != OccurrenceStatus.RINGING) {
             throw ApplicationException.from(ALREADY_DEACTIVATED);
         }
 
-        // 12. 발생 내역 상태 변경 및 로그 기록
-        targetOccurrence.deactivate(DeactivateType.OFF, serverNow);
-        AlarmOffLogEntity alarmOffLog = AlarmMapper.mapToAlarmOffLogEntity(findAlarm, findAlarm.getMember());
-
-        alarmOccurrenceRepository.save(targetOccurrence);
-        alarmOffLogRepository.save(alarmOffLog);
-
-        // 13. 다음 알람 울림 날짜 계산 및 응답 구성
-        LocalDate reactivateDate = DateUtil.getNextOccurrenceDate(repeatDays, offTargetDate.plusDays(1));
-        int remainingCount = (int) Math.max(0, WEEKLY_OFF_LIMIT - (weeklyOffCount + 1));
-
-        return AlarmOffResultResponse.builder()
-            .offTargetDate(offTargetDate)
-            .offTargetDayOfWeek(DateUtil.getKoreanDayOfWeek(offTargetDate))
-            .reactivateDate(reactivateDate)
-            .reactivateDayOfWeek(DateUtil.getKoreanDayOfWeek(reactivateDate))
-            .remainingOffCount(remainingCount)
-            .build();
-    }
-
-    @Override
-    public void removeAlarm(Long memberId, Long alarmId, String reason) {
-        // 1-1. 알람 조회 및 소유자 검증
-        AlarmEntity alarm = findAlarmById(alarmId);
-        validAlarmOwner(memberId, alarm.getMember().getId());
-
-        // 1-2. 삭제할 데이터 삭제 전 아카이빙
-        archiveService.archiveAlarmWithRelations(alarmId);
-
-        // 2. 삭제 사유를 Google Sheets에 로그로 기록
-        logDeleteReason(alarm.getAlarmPurpose(), reason);
-
-        // 3. 알람 발생 내역 전체 조회 및 관련 로그 제거
-        List<AlarmOccurrenceEntity> occurrences = alarmOccurrenceRepository.findAllByAlarmId(alarmId);
-        for (AlarmOccurrenceEntity occ : occurrences) {
-            alarmRingingLogRepository.deleteAllByAlarmOccurrenceId(occ.getId());
+        // 4. 같은 플랫폼 결제 ID가 이미 처리됐다면 재사용을 막는다.
+        if (paymentRepository.existsByPaymentId(request.paymentId())) {
+            throw ApplicationException.from(PaymentErrorCode.DUPLICATE_PAYMENT);
         }
 
-        // 4. 알람 발생 이력, 끈 이력 삭제
-        alarmOccurrenceRepository.deleteAll(occurrences);
-        alarmOffLogRepository.deleteAllByAlarmId(alarmId);
+        // 5. 요청 디바이스의 플랫폼에 맞는 결제 검증 클라이언트로 영수증을 검증한다.
+        LocalDateTime processedAt = timeProvider.now();
+        PaymentVerificationPort paymentClient = resolvePaymentClient(memberId, request.deviceId());
+        boolean validPayment;
+        String verificationFailReason = "";
+        try {
+            validPayment = paymentClient.verify(request.paymentId());
+            if (!validPayment) {
+                verificationFailReason = buildPaymentVerificationFailReason(
+                    paymentClient,
+                    request.paymentId(),
+                    alarmId,
+                    todayOccurrence.getId(),
+                    "verification returned false"
+                );
+            }
+        } catch (Exception e) {
+            validPayment = false;
+            verificationFailReason = buildPaymentVerificationFailReason(
+                paymentClient,
+                request.paymentId(),
+                alarmId,
+                todayOccurrence.getId(),
+                e.getClass().getSimpleName() + ": " + e.getMessage()
+            );
+        }
 
-        // 5. 알람 자체 삭제
-        alarmRepository.delete(alarm);
+        // 6. 검증 실패도 감사 추적을 위해 실패 결제와 삭제 실패 로그를 저장한 뒤 400으로 응답한다.
+        if (!validPayment) {
+            try {
+                auditLogRecorder.recordPaymentDeleteFailure(
+                    member,
+                    alarm,
+                    request.paymentId(),
+                    processedAt,
+                    verificationFailReason
+                );
+            } catch (DataIntegrityViolationException e) {
+                throw ApplicationException.from(PaymentErrorCode.DUPLICATE_PAYMENT);
+            }
+            throw ApplicationException.from(PaymentErrorCode.PAYMENT_VERIFICATION_FAILED);
+        }
+
+        // 7. 검증 성공 시 결제를 성공으로 기록하고 알람을 소프트 삭제한다.
+        savePaymentOrThrowDuplicate(member, alarm, request.paymentId(), PaymentType.DELETE_ALARM);
+        alarm.softDelete(processedAt);
+
+        alarmDeleteLogRepository.save(AlarmMapper.mapToPaymentDeleteLogEntity(
+            alarm,
+            member,
+            request.paymentId(),
+            "",
+            processedAt,
+            processedAt
+        ));
+
+        // 8. consume은 외부 플랫폼 후처리이므로 DB 커밋이 성공한 뒤 실행한다.
+        consumePaymentAfterCommit(paymentClient, request.paymentId());
+
+        // 삭제 성공 시 별도 본문 없이 응답한다.
     }
 
-    // TODO: 사용자가 알람이 울리는 날 알람을 끄지 않아 그 다음날로 넘어간 경우에 어떻게 처리할건지
     @Override
-    public void checkinAlarm(Long memberId, Long alarmId, AlarmCheckinRequest request) {
-        // 1. 알람 조회 및 소유자 검증
+    public AlarmCheckinResponse checkinAlarm(Long memberId, Long alarmId, AlarmCheckinRequest request) {
+        // 1. 알람과 회차를 조회하고 요청 사용자가 소유자인지 확인한다.
         AlarmEntity alarm = findAlarmById(alarmId);
-        validAlarmOwner(memberId, alarm.getMember().getId());
+        MemberEntity member = alarm.getMember();
+        validAlarmOwner(memberId, member.getId());
 
-        // 2. 오늘 날짜 기준으로 다음 알람 발생 날짜 계산
-        LocalDate today = LocalDate.now();
-        Set<DayOfWeek> repeatDays = alarm.getRepeatDays().stream()
-            .map(Weekday::getDayOfWeek)
-            .collect(Collectors.toSet());
-
-        // TODO: 요청일보다 이전 날짜에 울려야할 알람을 꺼야하는 경우도 처리해야함(사용자가 알람을 안꺼서)
-        LocalDate targetDate = DateUtil.getNextOccurrenceDate(repeatDays, today);
-
-        // 3. 요청일과 끄려고 하는 날짜가 같은 주인지 검증
-        validSameWeek(targetDate, today);
-
-        // 4. 해당 날짜의 발생 내역이 없으면 생성
         AlarmOccurrenceEntity occurrence = alarmOccurrenceRepository
-            .findByAlarmIdAndDate(alarmId, targetDate)
-            .orElseGet(() -> alarmOccurrenceRepository.save(
-                AlarmMapper.mapToAlarmOccurrenceForDate(alarm, targetDate)));
+            .findByIdAndAlarmId(request.occurrenceId(), alarmId)
+            .orElseThrow(() -> ApplicationException.from(ALARM_OCCURRENCE_NOT_FOUND));
 
-        // 5. 이미 끄기/체크인 처리되었으면 예외
-        if (occurrence.getDeactivateType() != DeactivateType.NONE) {
+        // 2. 이미 처리된 회차는 다시 체크인할 수 없다.
+        if (occurrence.getStatus() != OccurrenceStatus.SCHEDULED
+            && occurrence.getStatus() != OccurrenceStatus.RINGING) {
             throw ApplicationException.from(ALREADY_DEACTIVATED);
         }
 
-        // 6. 위치 반경 내 도달했는지 검증
+        // 3. 위치 인증은 예정 시각 3시간 전부터만 허용한다.
+        LocalDateTime processedAt = timeProvider.now();
+        LocalDateTime checkinAvailableAt = occurrence.getScheduledAt().minusHours(3);
+        if (processedAt.isBefore(checkinAvailableAt)) {
+            throw ApplicationException.from(CHECKIN_NOT_YET_AVAILABLE);
+        }
+
+        // 4. 사용자가 알람 목적지 반경 50m 안에 있는지 검증한다.
         boolean isInRange = isWithinDistance(
             alarm.getLatitude(), alarm.getLongitude(),
             request.latitude(), request.longitude(), CHECKIN_RADIUS_METERS);
@@ -252,27 +293,154 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
             throw ApplicationException.from(CHECKIN_OUT_OF_RANGE);
         }
 
-        // 7. 체크인 처리
-        occurrence.checkin(LocalDateTime.now());
+        // 5. 체크인 완료 시각을 기록하고 회차 상태를 CHECKIN으로 전환한다.
+        occurrence.checkin(processedAt);
+
+        // 6. 클라이언트 동기화를 위해 다음 예정 회차를 함께 조회한다.
+        AlarmOccurrenceEntity nextOccurrence = alarmOccurrenceRepository
+            .findNextScheduledByAlarmIds(List.of(alarmId), OccurrenceStatus.SCHEDULED, processedAt)
+            .stream()
+            .findFirst()
+            .orElse(null);
+
+        // 7. 체크인 로그는 본 처리와 분리해 커밋 후 별도 트랜잭션에서 best-effort로 저장한다.
+        eventPublisher.publishEvent(new AlarmCheckinCompletedEvent(
+            occurrence.getId(),
+            member.getId(),
+            request.deviceId(),
+            processedAt,
+            processedAt
+        ));
+
+        // 8. 다음 회차 정보를 포함한 응답을 반환한다.
+        return AlarmMapper.mapToAlarmCheckinResponse(alarm, nextOccurrence);
     }
 
     @Override
-    public void ringAlarm(Long memberId, Long alarmId) {
+    public AlarmPaymentResponse deactivateByPayment(Long memberId, Long alarmId, AlarmPaymentRequest request) {
+        // 1. 알람을 조회하고 요청자가 알람 소유자인지 검증한다.
+        AlarmEntity alarm = findAlarmById(alarmId);
+        MemberEntity member = alarm.getMember();
+        validAlarmOwner(memberId, member.getId());
+
+        // 2. 요청한 알람 회차가 해당 알람에 속하는지 확인한다.
+        AlarmOccurrenceEntity occurrence = alarmOccurrenceRepository
+            .findByIdAndAlarmId(request.occurrenceId(), alarmId)
+            .orElseThrow(() -> ApplicationException.from(ALARM_OCCURRENCE_NOT_FOUND));
+
+        // 3. 이미 처리된 회차는 중복 비활성화하지 않는다.
+        if (occurrence.getStatus() != OccurrenceStatus.SCHEDULED
+            && occurrence.getStatus() != OccurrenceStatus.RINGING) {
+            throw ApplicationException.from(ALREADY_DEACTIVATED);
+        }
+
+        // 4. 결제 비활성화는 알람 예정 시각 3시간 전부터만 허용한다.
+        LocalDateTime processedAt = timeProvider.now();
+        LocalDateTime paymentAvailableAt = occurrence.getScheduledAt().minusHours(3);
+        if (processedAt.isBefore(paymentAvailableAt)) {
+            throw ApplicationException.from(PaymentErrorCode.PAYMENT_NOT_YET_AVAILABLE);
+        }
+
+        // 5. 같은 플랫폼 결제 ID가 이미 처리됐다면 재사용을 막는다.
+        if (paymentRepository.existsByPaymentId(request.paymentId())) {
+            throw ApplicationException.from(PaymentErrorCode.DUPLICATE_PAYMENT);
+        }
+
+        // 6. 요청 디바이스의 플랫폼에 맞는 결제 검증 클라이언트로 영수증을 검증한다.
+        PaymentVerificationPort paymentClient = resolvePaymentClient(memberId, request.deviceId());
+        boolean validPayment;
+        String verificationFailReason = "";
+        try {
+            validPayment = paymentClient.verify(request.paymentId());
+            if (!validPayment) {
+                verificationFailReason = buildPaymentVerificationFailReason(
+                    paymentClient,
+                    request.paymentId(),
+                    alarmId,
+                    occurrence.getId(),
+                    "verification returned false"
+                );
+            }
+        } catch (Exception e) {
+            validPayment = false;
+            verificationFailReason = buildPaymentVerificationFailReason(
+                paymentClient,
+                request.paymentId(),
+                alarmId,
+                occurrence.getId(),
+                e.getClass().getSimpleName() + ": " + e.getMessage()
+            );
+        }
+
+        // 7. 검증 실패도 감사 추적을 위해 실패 결제와 상세 실패 로그를 저장한 뒤 400으로 응답한다.
+        if (!validPayment) {
+            try {
+                auditLogRecorder.recordPaymentDeactivationFailure(
+                    member,
+                    alarm,
+                    occurrence,
+                    request.paymentId(),
+                    request.deviceId(),
+                    processedAt,
+                    verificationFailReason
+                );
+            } catch (DataIntegrityViolationException e) {
+                throw ApplicationException.from(PaymentErrorCode.DUPLICATE_PAYMENT);
+            }
+            throw ApplicationException.from(PaymentErrorCode.PAYMENT_VERIFICATION_FAILED);
+        }
+
+        // 8. 검증 성공 시 결제를 성공으로 기록하고 알람 회차를 PAYMENT 상태로 비활성화한다.
+        savePaymentOrThrowDuplicate(member, alarm, request.paymentId(), PaymentType.STOP_ALARM);
+        occurrence.deactivateByPayment(processedAt);
+
+        // 9. 클라이언트 동기화와 운영 추적을 위해 성공 로그를 남긴다.
+        alarmDeactivationLogRepository.save(AlarmMapper.mapToPaymentDeactivationLogEntity(
+            occurrence,
+            member,
+            request.paymentId(),
+            request.deviceId(),
+            processedAt,
+            processedAt,
+            DeactivationResult.SUCCESS,
+            ""
+        ));
+
+        // 10. consume은 외부 플랫폼 후처리이므로 DB 커밋이 성공한 뒤 실행한다.
+        consumePaymentAfterCommit(paymentClient, request.paymentId());
+
+        // 11. 다음 예약 회차를 함께 내려 클라이언트가 로컬 알람을 재동기화하게 한다.
+        AlarmOccurrenceEntity nextOccurrence = alarmOccurrenceRepository
+            .findNextScheduledByAlarmIds(List.of(alarmId), OccurrenceStatus.SCHEDULED, processedAt)
+            .stream()
+            .findFirst()
+            .orElse(null);
+
+        return AlarmMapper.mapToAlarmPaymentResponse(alarm, processedAt, nextOccurrence);
+    }
+
+    @Override
+    public void ringAlarm(Long memberId, Long alarmId, String deviceId) {
         AlarmEntity alarm = findAlarmById(alarmId);
         validAlarmOwner(memberId, alarm.getMember().getId());
 
-        // 아직 비활성화되지 않은 알람 발생 이력 중 가장 최근 것을 가져옴.
+        // 아직 처리되지 않은 알람 발생 이력 중 가장 최근 것을 가져옴.
         AlarmOccurrenceEntity occurrence = alarmOccurrenceRepository
-            .findTopByAlarmIdAndDeactivateTypeInOrderByDateDescTimeDesc(
+            .findTopByAlarmIdAndStatusInOrderByOccurrenceDateDescOccurrenceTimeDesc(
                 alarmId,
-                List.of(DeactivateType.NONE)
+                List.of(OccurrenceStatus.SCHEDULED, OccurrenceStatus.RINGING)
             )
             .orElseThrow(() -> ApplicationException.from(ALARM_OCCURRENCE_NOT_FOUND));
 
         // 아직 알람이 울릴 시간이 아니라면 예외 발생
-        LocalDateTime now = LocalDateTime.now();
-        LocalDateTime scheduledDateTime = LocalDateTime.of(occurrence.getDate(), occurrence.getTime());
-        if (now.isBefore(scheduledDateTime)) {
+        ZoneId memberZone = resolveMemberZone(memberId, deviceId);
+        LocalDateTime now = timeProvider.now();
+        if (!AlarmScheduleCalculator.isDue(
+            occurrence.getOccurrenceDate(),
+            occurrence.getOccurrenceTime(),
+            memberZone,
+            timeProvider.instant()
+        )) {
             throw ApplicationException.from(NOT_ALARM_TIME);
         }
 
@@ -296,21 +464,21 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
     /**
      * 위치 인증 반경 내 도착 여부 계산
      *
-     * @param lat1 기준 위도 (알람 설정 위치)
-     * @param lon1 기준 경도
-     * @param lat2 사용자 위도
-     * @param lon2 사용자 경도
+     * @param targetLat 기준 위도 (알람 설정 위치)
+     * @param targetLon 기준 경도
+     * @param reqLat 사용자 위도
+     * @param reqLon 사용자 경도
      * @param radiusMeters 반경(m)
      * @return true if within radius
      */
-    private boolean isWithinDistance(double lat1, double lon1, double lat2, double lon2, double radiusMeters) {
+    private boolean isWithinDistance(double targetLat, double targetLon, double reqLat, double reqLon, double radiusMeters) {
         double earthRadius = 6371000; // meters
 
-        double dLat = Math.toRadians(lat2 - lat1);
-        double dLon = Math.toRadians(lon2 - lon1);
+        double dLat = Math.toRadians(reqLat - targetLat);
+        double dLon = Math.toRadians(reqLon - targetLon);
 
         double a = Math.sin(dLat / 2) * Math.sin(dLat / 2)
-            + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
+            + Math.cos(Math.toRadians(targetLat)) * Math.cos(Math.toRadians(reqLat))
             * Math.sin(dLon / 2) * Math.sin(dLon / 2);
 
         double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
@@ -318,40 +486,6 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
         double distance = earthRadius * c;
 
         return distance <= radiusMeters;
-    }
-
-    private void logDeleteReason(String alarmPurpose, String reason) {
-        try {
-            // 1. Google Sheets API 클라이언트 생성
-            Sheets sheets = new Sheets.Builder(
-                GoogleNetHttpTransport.newTrustedTransport(),
-                JacksonFactory.getDefaultInstance(),
-                new HttpCredentialsAdapter(
-                    ServiceAccountCredentials.fromStream(
-                        new ClassPathResource(credentialsPath).getInputStream() // classpath 리소스 처리
-                    ).createScoped(Collections.singleton(SheetsScopes.SPREADSHEETS))
-                )
-            )
-                .setApplicationName("눈 떠!")
-                .build();
-
-            // 2. 기록할 값 구성
-            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
-            String formattedDateTime = LocalDateTime.now().format(formatter);
-
-            ValueRange body = new ValueRange().setValues(
-                List.of(List.of(alarmPurpose, reason, formattedDateTime))
-            );
-
-            // 3. 스프레드시트에 행 추가 (append 방식)
-            sheets.spreadsheets().values()
-                .append(spreadsheetsId, sheetRange, body)
-                .setValueInputOption("RAW")
-                .execute();
-
-        } catch (Exception e) {
-            log.warn("Failed to log delete reason", e);
-        }
     }
 
     private MemberEntity findMemberById(Long memberId) {
@@ -364,10 +498,79 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
             .orElseThrow(() -> ApplicationException.from(ALARM_NOT_FOUND));
     }
 
-    private static void validSameWeek(LocalDate offTargetDate, LocalDate clientDate) {
-        if (!DateUtil.isSameWeek(offTargetDate, clientDate)) {
-            throw ApplicationException.from(NEXT_WEEK_ALARM_DEACTIVATION_NOT_ALLOWED);
+    private PaymentVerificationPort resolvePaymentClient(Long memberId, String deviceId) {
+        MemberDeviceEntity device = memberDeviceRepository.findByMember_IdAndDeviceId(memberId, deviceId)
+            .orElseThrow(() -> ApplicationException.from(DeviceErrorCode.DEVICE_NOT_FOUND));
+
+        String platform = device.getPlatform().toUpperCase(Locale.ROOT);
+
+        return paymentVerificationPorts.stream()
+            .filter(port -> port.supportedPlatform().equals(platform))
+            .findFirst()
+            .orElseThrow(() -> ApplicationException.from(CommonErrorCode.BAD_REQUEST));
+    }
+
+    private ZoneId resolveMemberZone(Long memberId, String deviceId) {
+        return memberDeviceRepository.findByMember_IdAndDeviceId(memberId, deviceId)
+            .map(MemberDeviceEntity::getTimeZone)
+            .map(AlarmScheduleCalculator::resolveZone)
+            .orElse(AlarmScheduleCalculator.DEFAULT_ZONE);
+    }
+
+    private String buildPaymentVerificationFailReason(
+        PaymentVerificationPort paymentClient,
+        String paymentId,
+        Long alarmId,
+        Long occurrenceId,
+        String reason
+    ) {
+        return "PAYMENT_VERIFICATION_FAILED"
+            + " platform=" + paymentClient.supportedPlatform()
+            + ", paymentId=" + paymentId
+            + ", alarmId=" + alarmId
+            + ", occurrenceId=" + occurrenceId
+            + ", reason=" + reason;
+    }
+
+    private void savePaymentOrThrowDuplicate(
+        MemberEntity member,
+        AlarmEntity alarm,
+        String paymentId,
+        PaymentType paymentType
+    ) {
+        try {
+            paymentRepository.saveAndFlush(PaymentMapper.mapToPaymentEntity(
+                member,
+                alarm,
+                paymentId,
+                paymentType,
+                PaymentStatus.SUCCESS
+            ));
+        } catch (DataIntegrityViolationException e) {
+            throw ApplicationException.from(PaymentErrorCode.DUPLICATE_PAYMENT);
         }
+    }
+
+    private void consumePaymentAfterCommit(PaymentVerificationPort paymentClient, String paymentId) {
+        Runnable consume = () -> {
+            try {
+                paymentClient.consume(paymentId);
+            } catch (Exception e) {
+                log.warn("Failed to consume payment. paymentId={}", paymentId, e);
+            }
+        };
+
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            consume.run();
+            return;
+        }
+
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                consume.run();
+            }
+        });
     }
 
     private static void validAlarmOwner(Long reqMemberId, Long alarmMemberId) {
@@ -376,12 +579,4 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
         }
     }
 
-    private static void validClockSkew(LocalDateTime clientNow, LocalDateTime serverNow) {
-        LocalDate clientDate = clientNow.toLocalDate();
-        LocalDate serverDate = serverNow.toLocalDate();
-
-        if (!clientDate.equals(serverDate)) {
-            throw ApplicationException.from(INVALID_CLIENT_DATE);
-        }
-    }
 }

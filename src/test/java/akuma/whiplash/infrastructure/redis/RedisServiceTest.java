@@ -2,9 +2,12 @@ package akuma.whiplash.infrastructure.redis;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.junit.jupiter.api.Assertions.*;
 
 import akuma.whiplash.common.config.RedisContainerInitializer;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -30,6 +33,7 @@ class RedisServiceTest {
     @Autowired
     private RedisConnectionFactory connectionFactory;
 
+    @BeforeEach
     @AfterEach
     void clean() {
         try (RedisConnection conn = connectionFactory.getConnection()) {
@@ -44,7 +48,7 @@ class RedisServiceTest {
         @Test
         @DisplayName("성공: 새로운 토큰을 저장한다")
         void success_saveNewToken() {
-            Long memberId = 1L;
+            Long memberId = 101L;
             String deviceId = "deviceA";
             String token = "tokenA";
 
@@ -57,7 +61,7 @@ class RedisServiceTest {
         @Test
         @DisplayName("성공: 다른 토큰으로 교체하면 이전 토큰이 제거된다")
         void success_replaceToken() {
-            Long memberId = 1L;
+            Long memberId = 102L;
             String deviceId = "deviceB";
             redisService.upsertFcmToken(memberId, deviceId, "oldToken");
 
@@ -81,6 +85,43 @@ class RedisServiceTest {
         void fail_tokenNull() {
             assertThatThrownBy(() -> redisService.upsertFcmToken(1L, "device", null))
                 .isInstanceOf(IllegalArgumentException.class);
+        }
+
+        @Test
+        @DisplayName("성공: 동일 deviceId에 동시 요청이 와도 tokenCount가 1이다")
+        void success_concurrentUpsertKeepsOneToken() throws InterruptedException {
+            // given
+            Long memberId = 103L;
+            String deviceId = "shared-device";
+            int threadCount = 10;
+
+            ExecutorService executor = Executors.newFixedThreadPool(threadCount);
+            CountDownLatch ready = new CountDownLatch(threadCount);
+            CountDownLatch start = new CountDownLatch(1);
+            CountDownLatch done = new CountDownLatch(threadCount);
+
+            for (int i = 0; i < threadCount; i++) {
+                final String token = "token-" + i;
+                executor.submit(() -> {
+                    ready.countDown();
+                    try {
+                        start.await();
+                        redisService.upsertFcmToken(memberId, deviceId, token);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                    } finally {
+                        done.countDown();
+                    }
+                });
+            }
+
+            ready.await();
+            start.countDown();
+            done.await();
+            executor.shutdown();
+
+            // then
+            assertThat(redisService.getFcmTokens(memberId)).hasSize(1);
         }
     }
 }

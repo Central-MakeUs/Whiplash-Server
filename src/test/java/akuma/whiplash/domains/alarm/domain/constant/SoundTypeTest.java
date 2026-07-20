@@ -12,46 +12,46 @@ class SoundTypeTest {
 
     @ParameterizedTest
     @CsvSource({
-        "소리 없음,NONE",
-        "알람 소리1,ONE",
-        "알람 소리2,TWO",
-        "알람 소리3,THREE",
-        "알람 소리4,FOUR"
+        "VIBRATION_ONLY,VIBRATION_ONLY",
+        "KARINA_SCOLDING,KARINA_SCOLDING",
+        "WAKE_AND_MOVE,WAKE_AND_MOVE",
+        "KIMDUHAN_WAKE_UP,KIMDUHAN_WAKE_UP",
+        "LIFE_WARNING,LIFE_WARNING"
     })
-    @DisplayName("설명과 일치하는 소리 유형을 반환한다")
-    void returnsMatchingSoundType(String description, SoundType expected) {
+    @DisplayName("코드와 일치하는 소리 유형을 반환한다")
+    void returnsMatchingSoundType(String code, SoundType expected) {
         // given
 
         // when
-        SoundType soundType = SoundType.from(description);
+        SoundType soundType = SoundType.from(code);
 
         // then
         assertThat(soundType).isEqualTo(expected);
     }
 
     @Test
-    @DisplayName("존재하지 않는 설명을 입력하면 NONE으로 매핑된다")
-    void returnsNoneWhenDescriptionInvalid() {
+    @DisplayName("존재하지 않는 코드를 입력하면 진동 모드로 매핑된다")
+    void returnsVibrationOnlyWhenCodeInvalid() {
         // given
-        String description = "잘못된 소리";
+        String code = "INVALID_SOUND";
 
         // when
-        SoundType soundType = SoundType.from(description);
+        SoundType soundType = SoundType.from(code);
 
         // then
-        assertThat(soundType).isEqualTo(SoundType.NONE);
+        assertThat(soundType).isEqualTo(SoundType.VIBRATION_ONLY);
     }
 
     @Test
-    @DisplayName("null을 입력하면 NONE으로 매핑된다")
-    void returnsNoneWhenDescriptionIsNull() {
+    @DisplayName("null을 입력하면 진동 모드로 매핑된다")
+    void returnsVibrationOnlyWhenCodeIsNull() {
         // given
-        String description = null;
+        String code = null;
 
         // when
-        SoundType soundType = SoundType.from(description);
+        SoundType soundType = SoundType.from(code);
 
         // then
-        assertThat(soundType).isEqualTo(SoundType.NONE);
+        assertThat(soundType).isEqualTo(SoundType.VIBRATION_ONLY);
     }
 }

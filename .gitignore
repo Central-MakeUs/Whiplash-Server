@@ -36,7 +36,18 @@ out/
 ### VS Code ###
 .vscode/
 
+# 환경 변수
 env.properties
 env-*.properties
 google.json
 whiplash-firebase-key.json
+
+# DB 스크립트
+src/main/resources/db/
+
+# log
+logs/
+
+# 문서
+docs/
+.DS_Store

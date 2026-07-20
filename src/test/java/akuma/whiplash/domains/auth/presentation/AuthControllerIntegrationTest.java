@@ -1,20 +1,23 @@
 package akuma.whiplash.domains.auth.presentation;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.startsWith;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import akuma.whiplash.common.config.IntegrationTest;
 import akuma.whiplash.common.fixture.MemberFixture;
-import akuma.whiplash.domains.auth.application.dto.request.RegisterFcmTokenRequest;
+import akuma.whiplash.domains.auth.application.dto.request.SocialLoginRequest;
 import akuma.whiplash.domains.auth.exception.AuthErrorCode;
+import akuma.whiplash.domains.member.domain.contants.SocialType;
 import akuma.whiplash.domains.member.persistence.entity.MemberEntity;
+import akuma.whiplash.domains.member.persistence.entity.MemberDeviceEntity;
+import akuma.whiplash.domains.member.persistence.repository.MemberDeviceRepository;
 import akuma.whiplash.domains.member.persistence.repository.MemberRepository;
 import akuma.whiplash.global.config.security.jwt.JwtProvider;
 import akuma.whiplash.infrastructure.redis.RedisRepository;
 import akuma.whiplash.infrastructure.redis.RedisService;
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
@@ -24,6 +27,8 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Date;
 import javax.crypto.SecretKey;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -34,16 +39,19 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 @DisplayName("AuthController Integration Test")
 @IntegrationTest
 @AutoConfigureMockMvc
+@Transactional(propagation = Propagation.NOT_SUPPORTED) // Redis 트랜잭션 이슈 해결을 위해 사용
 class AuthControllerIntegrationTest {
 
     @Autowired private MockMvc mockMvc;
     @Autowired private JwtProvider jwtProvider;
     @Autowired private MemberRepository memberRepository;
+    @Autowired private MemberDeviceRepository memberDeviceRepository;
     @Autowired private RedisRepository redisRepository;
     @Autowired private RedisService redisService;
     @Autowired private ObjectMapper objectMapper;
@@ -51,25 +59,48 @@ class AuthControllerIntegrationTest {
     @Value("${jwt.secret-key}")
     private String secret;
 
-    private static final String BASE = "/api/auth";
+    private static final String BASE = "/api/v1/auth";
     private static final String DEVICE = "device";
+
+    @BeforeEach
+    void setUp() {
+        cleanup();
+    }
+
+    @AfterEach
+    void tearDown() {
+        cleanup();
+    }
+
+    private void cleanup() {
+        memberDeviceRepository.deleteAll();
+        memberRepository.deleteAll();
+    }
 
     @Nested
     @DisplayName("[POST] /api/auth/logout - 로그아웃")
     class LogoutTest {
 
         @Test
-        @DisplayName("성공: 리프레시 토큰과 FCM 토큰을 삭제한다")
+        @DisplayName("성공: 액세스 토큰으로 현재 디바이스의 리프레시 토큰과 FCM 토큰을 삭제한다")
         void success() throws Exception {
             // given
-            MemberEntity member = memberRepository.save(MemberFixture.MEMBER_1.toEntity());
-            String deviceId = "device-success";
-            String refreshToken = jwtProvider.generateRefreshToken(member.getId(), deviceId, member.getRole());
+            MemberEntity member = memberRepository.save(MemberEntity.builder()
+                .provider(SocialType.MOCK)
+                .providerUserId("123456789")
+                .email("kmh@gmail.com")
+                .nickname("김민형")
+                .role(MemberFixture.MEMBER_1.getRole())
+                .status(MemberFixture.MEMBER_1.getStatus())
+                .build());
+            String deviceId = "device-logout-success";
+            String accessToken = jwtProvider.generateAccessToken(member.getId(), member.getRole(), deviceId);
+            jwtProvider.generateRefreshToken(member.getId(), deviceId, member.getRole());
             redisService.upsertFcmToken(member.getId(), deviceId, "fcmToken");
 
             // when
-            mockMvc.perform(post("/api/auth/logout")
-                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + refreshToken))
+            mockMvc.perform(post(BASE + "/logout")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
                 .andExpect(status().isOk());
 
             // then
@@ -83,15 +114,11 @@ class AuthControllerIntegrationTest {
             // given
             String invalidToken = "invalid.token.value";
 
-            // when
-            MvcResult result = mockMvc.perform(post("/api/auth/logout")
+            // when & then
+            mockMvc.perform(post(BASE + "/logout")
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + invalidToken))
                 .andExpect(status().isUnauthorized())
-                .andReturn();
-
-            // then
-            JsonNode response = objectMapper.readTree(result.getResponse().getContentAsString());
-            assertThat(response.get("code").asText()).isEqualTo("AUTH_102");
+                .andExpect(jsonPath("$.code").value(AuthErrorCode.INVALID_TOKEN.getCustomCode()));
         }
 
         @Test
@@ -100,11 +127,11 @@ class AuthControllerIntegrationTest {
             // given
             MemberEntity member = memberRepository.save(MemberFixture.MEMBER_2.toEntity());
             String deviceId = "device-expired";
-            String secret = (String) ReflectionTestUtils.getField(jwtProvider, "secret");
-            SecretKey key = Keys.hmacShaKeyFor(Decoders.BASE64.decode(secret));
+            String secretKeyStr = (String) ReflectionTestUtils.getField(jwtProvider, "secret");
+            SecretKey key = Keys.hmacShaKeyFor(Decoders.BASE64.decode(secretKeyStr));
             String expiredToken = Jwts.builder()
                 .claim("role", member.getRole())
-                .claim("type", "REFRESH")
+                .claim("type", "ACCESS")
                 .claim("deviceId", deviceId)
                 .setSubject(member.getId().toString())
                 .setExpiration(Date.from(Instant.now().minusSeconds(60)))
@@ -112,63 +139,39 @@ class AuthControllerIntegrationTest {
                 .compact();
             redisRepository.setValues("REFRESH:" + member.getId() + ":" + deviceId, expiredToken, Duration.ofMinutes(60));
 
-            // when
-            MvcResult result = mockMvc.perform(post("/api/auth/logout")
+            // when & then
+            mockMvc.perform(post(BASE + "/logout")
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + expiredToken))
                 .andExpect(status().isUnauthorized())
-                .andReturn();
-
-            // then
-            JsonNode response = objectMapper.readTree(result.getResponse().getContentAsString());
-            assertThat(response.get("code").asText()).isEqualTo("AUTH_103");
+                .andExpect(jsonPath("$.code").value(AuthErrorCode.TOKEN_EXPIRED.getCustomCode()));
         }
 
         @Test
-        @DisplayName("실패: 토큰이 저장되어 있지 않으면 401와 에러 코드를 반환한다")
-        void fail_tokenNotFound() throws Exception {
+        @DisplayName("실패: 리프레시 토큰으로 요청하면 401과 에러 코드를 반환한다")
+        void fail_refreshToken() throws Exception {
             // given
             MemberEntity member = memberRepository.save(MemberFixture.MEMBER_3.toEntity());
-            String deviceId = "device-notfound";
+            String deviceId = "device-refresh-token";
             String refreshToken = jwtProvider.generateRefreshToken(member.getId(), deviceId, member.getRole());
-            redisRepository.deleteValues("REFRESH:" + member.getId() + ":" + deviceId);
 
-            // when
-            MvcResult result = mockMvc.perform(post("/api/auth/logout")
+            // when & then
+            mockMvc.perform(post(BASE + "/logout")
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + refreshToken))
                 .andExpect(status().isUnauthorized())
-                .andReturn();
-
-            // then
-            JsonNode response = objectMapper.readTree(result.getResponse().getContentAsString());
-            assertThat(response.get("code").asText()).isEqualTo("AUTH_102");
+                .andExpect(jsonPath("$.code").value(AuthErrorCode.INVALID_TOKEN.getCustomCode()));
         }
     }
 
     @Nested
-    @DisplayName("[POST] /api/auth/reissue - 토큰 재발급")
+    @DisplayName("[POST] /api/auth/token/reissue - 토큰 재발급")
     class ReissueTokenTest {
-
-/*        @Test
-        @DisplayName("성공: 200 OK와 새로운 토큰을 반환한다")
-        void success() throws Exception {
-            // given
-            MemberEntity member = memberRepository.save(MemberFixture.MEMBER_1.toEntity());
-            String deviceId = "device-1";
-
-            String refreshToken = jwtProvider.generateRefreshToken(member.getId(), deviceId, member.getRole());
-
-            // when & then
-            mockMvc.perform(post("/api/auth/reissue")
-                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + refreshToken))
-                .andExpect(status().isOk());
-        }*/
 
         @Test
         @DisplayName("실패: 토큰이 유효하지 않으면 401과 에러 코드를 반환한다")
         void fail_invalidToken() throws Exception {
             // when & then
-            mockMvc.perform(post(BASE + "/reissue")
-                    .header("Authorization", "Bearer invalid"))
+            mockMvc.perform(post(BASE + "/token/reissue")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer invalid"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value(AuthErrorCode.INVALID_TOKEN.getCustomCode()));
         }
@@ -182,8 +185,8 @@ class AuthControllerIntegrationTest {
             redisRepository.deleteValues("REFRESH:" + member.getId() + ":" + DEVICE);
 
             // when & then
-            mockMvc.perform(post(BASE + "/reissue")
-                    .header("Authorization", "Bearer " + refreshToken))
+            mockMvc.perform(post(BASE + "/token/reissue")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + refreshToken))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value(AuthErrorCode.INVALID_TOKEN.getCustomCode()));
         }
@@ -205,63 +208,132 @@ class AuthControllerIntegrationTest {
             redisRepository.setValues("REFRESH:" + member.getId() + ":" + DEVICE, expiredToken, Duration.ofMinutes(5));
 
             // when & then
-            mockMvc.perform(post(BASE + "/reissue")
-                    .header("Authorization", "Bearer " + expiredToken))
+            mockMvc.perform(post(BASE + "/token/reissue")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + expiredToken))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value(AuthErrorCode.TOKEN_EXPIRED.getCustomCode()));
         }
     }
 
     @Nested
-    @DisplayName("[POST] /api/auth/fcm-token - FCM 토큰 등록")
-    class RegisterFcmTokenTest {
+    @DisplayName("[POST] /api/auth/social-login - 소셜 로그인")
+    class SocialLoginTest {
 
         @Test
-        @DisplayName("성공: FCM 토큰을 등록하면 Redis에 저장된다")
+        @DisplayName("성공: MOCK provider 로그인 시 DB/Redis에 로그인 데이터가 반영된다")
         void success() throws Exception {
             // given
-            MemberEntity member = memberRepository.save(MemberFixture.MEMBER_1.toEntity());
-            RegisterFcmTokenRequest request = new RegisterFcmTokenRequest("token-abc");
-            String accessToken = jwtProvider.generateAccessToken(member.getId(), member.getRole(), "device-1");
+            String deviceId = "device-social-success";
+            String fcmToken = "fcm-social-success";
+            SocialLoginRequest request = new SocialLoginRequest(
+                "MOCK",
+                "provider-access-token",
+                deviceId,
+                "ANDROID",
+                fcmToken,
+                "1.0.0",
+                "14",
+                "Asia/Seoul"
+            );
 
             // when
-            mockMvc.perform(post("/api/auth/fcm-token")
-                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+            mockMvc.perform(post(BASE + "/social-login")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.accessToken", startsWith("Bearer ")))
+                .andExpect(jsonPath("$.result.refreshToken", startsWith("Bearer ")))
+                .andExpect(jsonPath("$.result.member.provider").value("MOCK"))
+                .andExpect(jsonPath("$.result.member.nickname").value("김민형"))
+                .andExpect(jsonPath("$.result.member.email").value("kmh@gmail.com"))
+                .andExpect(jsonPath("$.result.member.isNewMember").value(true))
+                .andExpect(jsonPath("$.result.member.status").value("ACTIVE"));
+
+            // then
+            MemberEntity member = memberRepository.findByProviderAndProviderUserId(SocialType.MOCK, "123456789")
+                .orElseThrow();
+            assertThat(redisRepository.getValues("REFRESH:" + member.getId() + ":" + deviceId)).isPresent();
+            assertThat(redisService.getFcmTokenByDevice(deviceId)).isEqualTo(fcmToken);
+            assertThat(redisService.getFcmTokens(member.getId())).contains(fcmToken);
+
+            MemberDeviceEntity memberDevice = memberDeviceRepository.findByMember_IdAndDeviceId(member.getId(), deviceId)
+                .orElseThrow();
+            assertThat(memberDevice.isLoggedIn()).isTrue();
+            assertThat(memberDevice.getPlatform()).isEqualTo("ANDROID");
+            assertThat(memberDevice.getFcmToken()).isEqualTo(fcmToken);
+            assertThat(memberDevice.getTimeZone()).isEqualTo("Asia/Seoul");
+        }
+
+        @Test
+        @DisplayName("성공: 기존 기기로 재로그인하면 timeZone이 새 값으로 갱신된다")
+        void success_updateTimeZoneOnExistingDevice() throws Exception {
+            // given
+            String deviceId = "device-social-existing";
+            MemberEntity member = memberRepository.save(MemberEntity.builder()
+                .provider(SocialType.MOCK)
+                .providerUserId("123456789")
+                .email("kmh@gmail.com")
+                .nickname("김민형")
+                .role(MemberFixture.MEMBER_1.getRole())
+                .status(MemberFixture.MEMBER_1.getStatus())
+                .build());
+            memberDeviceRepository.save(MemberDeviceEntity.builder()
+                .member(member)
+                .deviceId(deviceId)
+                .platform("ANDROID")
+                .fcmToken("old-fcm-token")
+                .isLoggedIn(false)
+                .appVersion("1.0.0")
+                .osVersion("14")
+                .timeZone("Asia/Seoul")
+                .build());
+
+            SocialLoginRequest request = new SocialLoginRequest(
+                "MOCK",
+                "provider-access-token",
+                deviceId,
+                "IOS",
+                "new-fcm-token",
+                "2.0.0",
+                "18",
+                "America/New_York"
+            );
+
+            // when
+            mockMvc.perform(post(BASE + "/social-login")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk());
 
             // then
-            assertThat(redisService.getFcmTokens(member.getId())).contains("token-abc");
+            MemberDeviceEntity memberDevice = memberDeviceRepository.findByMember_IdAndDeviceId(member.getId(), deviceId)
+                .orElseThrow();
+            assertThat(memberDevice.isLoggedIn()).isTrue();
+            assertThat(memberDevice.getPlatform()).isEqualTo("IOS");
+            assertThat(memberDevice.getFcmToken()).isEqualTo("new-fcm-token");
+            assertThat(memberDevice.getTimeZone()).isEqualTo("America/New_York");
         }
 
         @Test
-        @DisplayName("실패: FCM 토큰이 비어 있으면 400을 반환한다")
-        void fail_blankToken() throws Exception {
+        @DisplayName("실패: timeZone이 IANA Zone ID가 아니면 400을 반환한다")
+        void fail_invalidTimeZone() throws Exception {
             // given
-            MemberEntity member = memberRepository.save(MemberFixture.MEMBER_2.toEntity());
-            RegisterFcmTokenRequest request = new RegisterFcmTokenRequest("");
-            String accessToken = jwtProvider.generateAccessToken(member.getId(), member.getRole(), "device-2");
+            SocialLoginRequest request = new SocialLoginRequest(
+                "MOCK",
+                "provider-access-token",
+                "device-invalid-time-zone",
+                "ANDROID",
+                "fcm-token",
+                "1.0.0",
+                "14",
+                "UTC+9"
+            );
 
             // when & then
-            mockMvc.perform(post("/api/auth/fcm-token")
-                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+            mockMvc.perform(post(BASE + "/social-login")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest());
-        }
-
-        @Test
-        @DisplayName("실패: 인증 정보가 없으면 401을 반환한다")
-        void fail_unauthorized() throws Exception {
-            // given
-            RegisterFcmTokenRequest request = new RegisterFcmTokenRequest("token-xyz");
-
-            // when & then
-            mockMvc.perform(post("/api/auth/fcm-token")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isUnauthorized());
         }
     }
 }
