@@ -116,10 +116,14 @@ pipeline {
                                                     "cd /opt/db/scripts && ./deploy.sh '$SHORT_SHA' '$IMAGE_NAME' qa"
                                             '''
                                         } else {
-                                            // Production은 기존 서버 스크립트 전환 전까지 현 호출 규약을 유지한다.
-                                            sh """
-                                                ssh -p ${WAS_SSH_PORT} -o StrictHostKeyChecking=no ${WAS_USERNAME}@${WAS_HOST} 'cd /opt/app/scripts && ./deploy.sh "${env.SHORT_SHA}" "${IMAGE_NAME}" "${DOCKER_USER}" "${DOCKER_PASS}" prod'
-                                            """
+                                            // Production도 QA와 동일하게 credential을 표준 입력으로만 전달한다.
+                                            // Jenkins agent의 known_hosts에 Prod WAS host key가 등록돼 있어야 한다.
+                                            sh '''
+                                                printf '%s\\n%s\\n' "$DOCKER_USER" "$DOCKER_PASS" | \\
+                                                  ssh -p "$WAS_SSH_PORT" -o StrictHostKeyChecking=yes \\
+                                                    "$WAS_USERNAME@$WAS_HOST" \\
+                                                    "cd /opt/app/scripts && ./deploy.sh '$SHORT_SHA' '$IMAGE_NAME' prod"
+                                            '''
                                         }
                                     }
                                 }
