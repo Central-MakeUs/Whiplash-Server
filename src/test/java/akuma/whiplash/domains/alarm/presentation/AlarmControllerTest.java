@@ -18,10 +18,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import akuma.whiplash.common.fixture.AlarmFixture;
 import akuma.whiplash.common.fixture.MemberFixture;
+import akuma.whiplash.domains.alarm.application.dto.request.AlarmAdSessionCreateRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmCheckinRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmDeleteByAdRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmDeleteByPaymentRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmRegisterRequest;
+import akuma.whiplash.domains.alarm.application.dto.response.AlarmAdSessionCreateResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmDeleteMethodResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmPreviewDto;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmSyncItemDto;
@@ -482,6 +484,33 @@ class AlarmControllerTest {
     }
 
     @Nested
+    @DisplayName("[POST] /api/v1/alarms/{alarmId}/ad-session - 광고 삭제 세션 발급")
+    class CreateAdSessionTest {
+
+        @Test
+        @DisplayName("성공: 광고 삭제 세션 발급 요청이 성공하면 200을 반환한다")
+        void success() throws Exception {
+            // given
+            AlarmAdSessionCreateRequest request = new AlarmAdSessionCreateRequest("device-uuid");
+            AlarmAdSessionCreateResponse response = new AlarmAdSessionCreateResponse(
+                "ad-session-id",
+                LocalDateTime.of(2026, 7, 8, 10, 10)
+            );
+            setSecurityContext(buildContext(MEMBER_5));
+            when(alarmUseCase.createAdSession(eq(MEMBER_5.getId()), eq(1L), any(AlarmAdSessionCreateRequest.class)))
+                .thenReturn(response);
+
+            // when & then
+            mockMvc.perform(post(BASE + "/{alarmId}/ad-session", 1L)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.adSessionId").value(response.adSessionId()))
+                .andExpect(jsonPath("$.result.expiresAt").value("2026-07-08T10:10:00"));
+        }
+    }
+
+    @Nested
     @DisplayName("[POST] /api/v1/alarms/{alarmId}/delete/ad - 광고 시청으로 알람 삭제")
     class RemoveAlarmByAdTest {
 
@@ -489,7 +518,7 @@ class AlarmControllerTest {
         @DisplayName("성공: 광고 삭제 요청이 성공하면 200을 반환한다")
         void success() throws Exception {
             // given
-            AlarmDeleteByAdRequest request = new AlarmDeleteByAdRequest("device-uuid", "ad-proof-token");
+            AlarmDeleteByAdRequest request = new AlarmDeleteByAdRequest("device-uuid", "ad-session-id");
             setSecurityContext(buildContext(MEMBER_5));
 
             // when & then
@@ -504,8 +533,8 @@ class AlarmControllerTest {
         }
 
         @Test
-        @DisplayName("실패: 광고 증빙 토큰이 비어 있으면 400을 반환한다")
-        void fail_adProofTokenBlank() throws Exception {
+        @DisplayName("실패: 광고 세션 ID가 비어 있으면 400을 반환한다")
+        void fail_adSessionIdBlank() throws Exception {
             // given
             AlarmDeleteByAdRequest request = new AlarmDeleteByAdRequest("device-uuid", "");
             setSecurityContext(buildContext(MEMBER_8));
@@ -521,7 +550,7 @@ class AlarmControllerTest {
         @DisplayName("실패: 결제 삭제가 필요한 알람이면 400과 에러 코드를 반환한다")
         void fail_alarmDeleteRequiresPayment() throws Exception {
             // given
-            AlarmDeleteByAdRequest request = new AlarmDeleteByAdRequest("device-uuid", "ad-proof-token");
+            AlarmDeleteByAdRequest request = new AlarmDeleteByAdRequest("device-uuid", "ad-session-id");
             setSecurityContext(buildContext(MEMBER_8));
             doThrow(ApplicationException.from(AlarmErrorCode.ALARM_DELETE_REQUIRES_PAYMENT))
                 .when(alarmUseCase).removeAlarmByAd(anyLong(), anyLong(), any(AlarmDeleteByAdRequest.class));
@@ -539,7 +568,7 @@ class AlarmControllerTest {
         @DisplayName("실패: 소유자가 아니면 403을 반환한다")
         void fail_permissionDenied() throws Exception {
             // given
-            AlarmDeleteByAdRequest request = new AlarmDeleteByAdRequest("device-uuid", "ad-proof-token");
+            AlarmDeleteByAdRequest request = new AlarmDeleteByAdRequest("device-uuid", "ad-session-id");
             setSecurityContext(buildContext(MEMBER_7));
             doThrow(ApplicationException.from(AuthErrorCode.PERMISSION_DENIED))
                 .when(alarmUseCase).removeAlarmByAd(anyLong(), anyLong(), any(AlarmDeleteByAdRequest.class));
@@ -555,7 +584,7 @@ class AlarmControllerTest {
         @DisplayName("실패: 알람이 존재하지 않으면 404를 반환한다")
         void fail_alarmNotFound() throws Exception {
             // given
-            AlarmDeleteByAdRequest request = new AlarmDeleteByAdRequest("device-uuid", "ad-proof-token");
+            AlarmDeleteByAdRequest request = new AlarmDeleteByAdRequest("device-uuid", "ad-session-id");
             setSecurityContext(buildContext(MEMBER_6));
             doThrow(ApplicationException.from(AlarmErrorCode.ALARM_NOT_FOUND))
                 .when(alarmUseCase).removeAlarmByAd(anyLong(), anyLong(), any(AlarmDeleteByAdRequest.class));

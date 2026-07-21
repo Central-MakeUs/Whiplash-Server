@@ -42,9 +42,6 @@ env-*.properties
 google.json
 whiplash-firebase-key.json
 
-# DB 스크립트
-src/main/resources/db/
-
 # log
 logs/
 

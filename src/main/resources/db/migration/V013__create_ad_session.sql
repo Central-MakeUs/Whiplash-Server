@@ -1,0 +1,28 @@
+CREATE TABLE ad_session
+(
+    id                       BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '광고 세션 ID | 광고 세션을 식별하는 내부 PK',
+    ad_session_id            VARCHAR(64)  NOT NULL COMMENT '광고 세션 공개 ID | 클라이언트와 콜백에서 사용하는 공개 세션 식별자',
+    member_id                BIGINT       NOT NULL COMMENT '회원 ID | 광고 세션을 생성한 회원의 ID',
+    alarm_id                 BIGINT       NOT NULL COMMENT '알람 ID | 광고 보상 적용 대상 알람의 ID',
+    device_id                VARCHAR(255) NOT NULL COMMENT '기기 ID | 광고를 요청한 클라이언트 기기 식별자',
+    purpose                  VARCHAR(50)  NOT NULL COMMENT '광고 목적 | 광고 시청으로 수행하려는 기능 목적',
+    status                   VARCHAR(30)  NOT NULL COMMENT '광고 세션 상태 | ISSUED, VERIFIED, CONSUMED, EXPIRED 등 세션 상태',
+    expires_at               DATETIME(6)  NOT NULL COMMENT '만료 시각 | 광고 세션을 사용할 수 있는 만료 시각',
+    verified_at              DATETIME(6)  NULL COMMENT '검증 시각 | 광고 보상 콜백 검증이 완료된 시각',
+    consumed_at              DATETIME(6)  NULL COMMENT '사용 시각 | 광고 보상이 실제 기능에 사용된 시각',
+    transaction_id           VARCHAR(128) NULL COMMENT '광고 트랜잭션 ID | 광고 플랫폼에서 전달한 거래 식별자',
+    ad_unit_id               VARCHAR(255) NULL COMMENT '광고 단위 ID | 광고 플랫폼의 광고 단위 식별자',
+    reward_amount            INT          NULL COMMENT '광고 보상 수량 | 광고 플랫폼에서 전달한 보상 수량',
+    reward_item              VARCHAR(100) NULL COMMENT '광고 보상 항목 | 광고 플랫폼에서 전달한 보상 항목명',
+    raw_callback_received_at DATETIME(6)  NULL COMMENT '원본 콜백 수신 시각 | 광고 플랫폼 콜백을 최초 수신한 시각',
+    created_at               DATETIME(6)  NOT NULL COMMENT '생성 시각 | 데이터가 최초 생성된 시각',
+    updated_at               DATETIME(6)  NOT NULL COMMENT '수정 시각 | 데이터가 마지막으로 수정된 시각',
+    CONSTRAINT uk_ad_session_ad_session_id UNIQUE (ad_session_id),
+    CONSTRAINT uk_ad_session_transaction_id UNIQUE (transaction_id),
+    KEY idx_ad_session_member_alarm_status (member_id, alarm_id, status),
+    KEY idx_ad_session_expires_at (expires_at),
+    KEY idx_ad_session_purpose_status (purpose, status),
+    KEY idx_ad_session_alarm_id (alarm_id),
+    CONSTRAINT fk_ad_session_member FOREIGN KEY (member_id) REFERENCES member (id),
+    CONSTRAINT fk_ad_session_alarm FOREIGN KEY (alarm_id) REFERENCES alarm (id)
+) COMMENT='광고 세션';

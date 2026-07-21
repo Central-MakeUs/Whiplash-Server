@@ -4,9 +4,9 @@ import akuma.whiplash.domains.alarm.application.dto.request.AlarmRegisterRequest
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmCheckinResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmDeleteMethodResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmPaymentResponse;
+import akuma.whiplash.domains.alarm.application.dto.response.AlarmAdSessionCreateResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmSyncItemDto;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmSyncResponse;
-import akuma.whiplash.domains.alarm.application.dto.response.CreateAlarmOccurrenceResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.CreateAlarmResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.NextOccurrenceResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmPreviewDto;
@@ -19,15 +19,13 @@ import akuma.whiplash.domains.alarm.domain.constant.OccurrenceStatus;
 import akuma.whiplash.domains.alarm.domain.constant.SoundType;
 import akuma.whiplash.domains.alarm.domain.constant.Weekday;
 import akuma.whiplash.domains.alarm.domain.util.AlarmScheduleCalculator;
-import akuma.whiplash.domains.alarm.exception.AlarmErrorCode;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmDeleteLogEntity;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmEntity;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmDeactivationLogEntity;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmOccurrenceEntity;
+import akuma.whiplash.domains.ad.persistence.entity.AdSessionEntity;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmRingingLogEntity;
 import akuma.whiplash.domains.member.persistence.entity.MemberEntity;
-import akuma.whiplash.global.exception.ApplicationException;
-import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -101,30 +99,6 @@ public class AlarmMapper {
             .build();
     }
 
-    public static AlarmOccurrenceEntity mapToTodayFirstAlarmOccurrenceEntity(AlarmEntity alarmEntity, LocalDate today) {
-        DayOfWeek todayDayOfWeek = today.getDayOfWeek();
-
-        boolean isTodayAlarmDay = alarmEntity.getRepeatDays().stream()
-            .anyMatch(weekday -> weekday.getDayOfWeek() == todayDayOfWeek);
-
-        if (!isTodayAlarmDay) {
-            throw ApplicationException.from(AlarmErrorCode.TODAY_IS_NOT_ALARM_DAY); // 오늘은 울릴 날이 아님
-        }
-
-        return AlarmOccurrenceEntity.builder()
-            .alarm(alarmEntity)
-            .occurrenceDate(today)
-            .occurrenceTime(alarmEntity.getTime())
-            .scheduledAt(LocalDateTime.of(today, alarmEntity.getTime()))
-            .status(OccurrenceStatus.RINGING)
-            .checkinTime(null)
-            .alarmRinging(true)
-            .deactivatedAt(null)
-            .ringingCount(1)
-            .reminderSent(false)
-            .build();
-    }
-
     public static AlarmOccurrenceEntity mapToAlarmOccurrenceForDate(AlarmEntity alarm, LocalDate date) {
         return mapToAlarmOccurrenceForDate(alarm, alarm.getTime(), date);
     }
@@ -162,12 +136,6 @@ public class AlarmMapper {
             .alarmOccurrence(occurrence)
             .ringIndex(ringIndex)
             .ringedAt(ringedAt)
-            .build();
-    }
-
-    public static CreateAlarmOccurrenceResponse mapToCreateAlarmOccurrenceResponse(Long occurrenceId) {
-        return CreateAlarmOccurrenceResponse.builder()
-            .occurrenceId(occurrenceId)
             .build();
     }
 
@@ -282,7 +250,7 @@ public class AlarmMapper {
     public static AlarmDeleteLogEntity mapToAdDeleteLogEntity(
         AlarmEntity alarm,
         MemberEntity member,
-        String adProofToken,
+        String adSessionId,
         LocalDateTime requestedAt,
         LocalDateTime deletedAt
     ) {
@@ -291,9 +259,16 @@ public class AlarmMapper {
             .member(member)
             .deleteType(DeleteType.AD)
             .reason("")
-            .adProofToken(adProofToken)
+            .adProofToken(adSessionId)
             .requestedAt(requestedAt)
             .deletedAt(deletedAt)
+            .build();
+    }
+
+    public static AlarmAdSessionCreateResponse mapToAlarmAdSessionCreateResponse(AdSessionEntity adSession) {
+        return AlarmAdSessionCreateResponse.builder()
+            .adSessionId(adSession.getAdSessionId())
+            .expiresAt(adSession.getExpiresAt())
             .build();
     }
 

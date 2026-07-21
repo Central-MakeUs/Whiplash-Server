@@ -56,6 +56,9 @@ public class RequestMatcherHolder {
         new RequestInfo(PUT, "/api/v1/alarms/**",USER),
         new RequestInfo(DELETE, "/api/v1/alarms/**",USER),
 
+        // admob
+        new RequestInfo(GET, "/api/v1/ads/rewards/callback/admob", null),
+
         // member
         new RequestInfo(GET, "/api/v1/members/**", USER),
         new RequestInfo(POST, "/api/v1/members/**", USER),

@@ -10,7 +10,6 @@ import org.springframework.http.HttpStatus;
 public enum AlarmErrorCode implements BaseErrorCode {
 
     TODAY_IS_NOT_ALARM_DAY(HttpStatus.BAD_REQUEST, "ALARM_001", "오늘은 알람이 울리는 날이 아닙니다."),
-    ALREADY_OCCURRED_EXISTS(HttpStatus.BAD_REQUEST, "ALARM_002", "알람 발생 내역이 이미 생성돼 있습니다."),
     ALREADY_DEACTIVATED(HttpStatus.BAD_REQUEST, "ALARM_003", "이미 오늘은 비활성화된 알람입니다."),
     REPEAT_DAYS_NOT_CONFIG(HttpStatus.BAD_REQUEST, "ALARM_005", "반복 요일이 설정되지 않았습니다."),
     ALARM_DELETE_REQUIRES_PAYMENT(HttpStatus.BAD_REQUEST, "ALARM_007", "결제 삭제가 필요한 알람입니다."),

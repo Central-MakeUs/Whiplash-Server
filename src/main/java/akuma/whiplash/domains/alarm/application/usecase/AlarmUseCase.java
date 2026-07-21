@@ -1,15 +1,16 @@
 package akuma.whiplash.domains.alarm.application.usecase;
 
+import akuma.whiplash.domains.alarm.application.dto.request.AlarmAdSessionCreateRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmCheckinRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmDeleteByAdRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmDeleteByPaymentRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmPaymentRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmRegisterRequest;
+import akuma.whiplash.domains.alarm.application.dto.response.AlarmAdSessionCreateResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmCheckinResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmDeleteMethodResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmPaymentResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmSyncResponse;
-import akuma.whiplash.domains.alarm.application.dto.response.CreateAlarmOccurrenceResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.CreateAlarmResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.GetAlarmsResponse;
 import akuma.whiplash.domains.alarm.domain.service.AlarmCommandService;
@@ -28,12 +29,12 @@ public class AlarmUseCase {
         return alarmCommandService.createAlarm(request, memberId, deviceId);
     }
 
-    public CreateAlarmOccurrenceResponse createAlarmOccurrence(Long memberId, Long alarmId) {
-        return alarmCommandService.createAlarmOccurrence(memberId, alarmId);
-    }
-
     public void removeAlarmByPayment(Long memberId, Long alarmId, AlarmDeleteByPaymentRequest request) {
         alarmCommandService.removeAlarmByPayment(memberId, alarmId, request);
+    }
+
+    public AlarmAdSessionCreateResponse createAdSession(Long memberId, Long alarmId, AlarmAdSessionCreateRequest request) {
+        return alarmCommandService.createAdSession(memberId, alarmId, request);
     }
 
     public void removeAlarmByAd(Long memberId, Long alarmId, AlarmDeleteByAdRequest request) {
