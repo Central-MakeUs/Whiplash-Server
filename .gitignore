@@ -45,6 +45,8 @@ whiplash-firebase-key.json
 # log
 logs/
 
-# 문서
-docs/
+# 로컬 전용 문서
+/docs/*
+!/docs/README.md
+/CONTEXT.local.md
 .DS_Store

@@ -1,7 +1,7 @@
 ---
 name: create-domain-layer
 description: >
-  Whiplash 프로젝트에서 새 도메인 생성, 레이어 추가(Entity/Repository/Service/UseCase/Controller) 시 사용.
+  Time Bomb Server에서 새 도메인 생성, 레이어 추가(Entity/Repository/Service/UseCase/Controller) 시 사용.
   "도메인 만들어줘", "레이어 추가해줘", "UseCase 만들어줘", "Service 구현해줘", "Controller 추가해줘" 요청 시 반드시 참고.
 ---
 

@@ -37,7 +37,7 @@ Java 17 + Spring Boot 3.5 + JPA + Redis 환경 기준으로 리뷰합니다.
 - `new ArrayList<>()` 를 반복 생성하는가? → 한 번만 생성 후 재사용
 - 불필요한 `Optional` 중첩이 있는가?
 
-**Whiplash 특이사항**
+**Time Bomb Server 특이사항**
 - 알람 삭제 실패 감사 로그는 `AuditLogRecorder`가 DB에 저장한다. 실패 로그 저장이 트랜잭션 범위를 불필요하게 늘리지 않는지 확인
 - `NicknameGenerator`: `new Random()` 을 매 호출마다 생성 → static 필드로 이동 권장
 
@@ -72,7 +72,7 @@ Java 17 + Spring Boot 3.5 + JPA + Redis 환경 기준으로 리뷰합니다.
 - 루프 안에서 Redis 개별 호출 반복: 파이프라인 또는 Lua 스크립트 권장
 - TTL 없는 키 저장: 메모리 누수 가능성 확인
 
-**Whiplash 특이사항**
+**Time Bomb Server 특이사항**
 - `RedisRepositoryImpl.getKeys()`: `redisTemplate.keys()` 사용 중 → 대용량 환경에서 주의
 - `RedisService`: UPSERT/REMOVE는 Lua 스크립트로 원자 처리 (현재 구현 적절)
 

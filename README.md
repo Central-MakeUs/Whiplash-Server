@@ -1,4 +1,7 @@
-# 눈 떠! <img width="100" height="100" align="left" alt="눈 떠! 로고" src="https://github.com/user-attachments/assets/cd4ff61c-2f86-4ab1-8621-6d80d9ea50c6" />
+# Time Bomb <img width="100" height="100" align="left" alt="눈 떠! 이전 로고" src="https://github.com/user-attachments/assets/cd4ff61c-2f86-4ab1-8621-6d80d9ea50c6" />
+
+> 현재 제품명은 `Time Bomb`입니다. `Whiplash`와 `눈 떠!`는 이전 제품명이며, 기존 스토어 링크와 기술 식별자에는 이전 이름이 남아 있을 수 있습니다.
+
 [![App Store](https://img.shields.io/badge/App%20Store-Download-blue?logo=apple&logoColor=white)](https://apps.apple.com/kr/app/눈-떠-목표-장소-도착-인증-알람/id6753883773)
 [![Google Play](https://img.shields.io/badge/Google%20Play-Download-green?logo=googleplay&logoColor=white)](https://play.google.com/store/apps/details?id=com.whiplash.akuma&hl=ko)
 

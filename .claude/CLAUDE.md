@@ -1,28 +1,24 @@
-# Whiplash
+# Time Bomb Server - Claude Adapter
 
-## 스택
-Java 17, Spring Boot 3.5, MySQL 8, Redis 7.2, Firebase FCM
+이 파일은 Claude 전용 진입점이다. 프로젝트 규칙을 별도로 정의하지 않는다.
 
-## 도메인
-alarm / auth / member / place
+## 작업 시작 시 읽기
 
-## 절대 규칙
-- 예외: `ApplicationException.from(ErrorCode)` 만
-- HttpStatus: 400/401/403/404/409 만
-- 응답: `ApplicationResponse<T>` 필수
-- 레이어: `presentation → application → domain → persistence`
-- 메서드: Service=`getXxx/createXxx/removeXxx/modifyXxx` / Repository=`findBy/insertXxx/deleteXxx/updateXxx`
+1. 루트 `AGENTS.md`: 저장소 공통 규칙과 문서 라우팅의 단일 원본
+2. 루트 `CONTEXT.md`: 현재 제품명과 공개 가능한 공통 용어
+3. `docs/README.md`: 작업 종류별 문서 선택 방법
+4. 작업과 관련된 코드, 테스트, ADR, history 문서
 
-## 커맨드
-```
-./gradlew test
-./gradlew bootRun --args='--spring.profiles.active=local'
-docker-compose up -d
-```
+## 우선순위
 
-## 참조
-- 규칙 전체: `.claude/rules/RULES.md`
-- 도메인 패턴: `.claude/skills/create-domain-layer/SKILL.md`
-- 테스트 패턴: `.claude/skills/write-test-code/SKILL.md`
-- ErrorCode: `.claude/skills/handle-exception/SKILL.md`
-- 환경/인프라: `.claude/skills/ask-env/SKILL.md`
+- `.claude`의 지침, skill, agent가 루트 `AGENTS.md`와 충돌하면 `AGENTS.md`를 따른다.
+- 제품명과 도메인 용어가 충돌하면 `CONTEXT.md`를 따른다.
+- 실제 코드와 문서가 충돌하면 임의로 수정하지 말고 차이를 보고한다.
+
+## Claude 전용 자산
+
+- 반복 작업: `.claude/skills/`
+- 리뷰 역할: `.claude/agents/`
+- 자동 검사: `.claude/hooks/`, `.claude/settings.json`
+
+이 자산은 도구별 실행 방법만 제공하며 공통 개발 규칙의 단일 원본이 아니다.

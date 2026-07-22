@@ -32,6 +32,7 @@ description: 이 저장소에서 큰 기능 설계나 정책 변경을 시작하
 /
 ├── CONTEXT.md
 ├── docs/
+│   ├── README.md
 │   ├── adr/
 │   └── history/
 └── src/
@@ -50,10 +51,12 @@ description: 이 저장소에서 큰 기능 설계나 정책 변경을 시작하
 
 ## CONTEXT.md에 남길 것
 
-- Whiplash에서 쓰는 핵심 도메인 용어와 한 문장 정의
+- Time Bomb에서 쓰는 핵심 도메인 용어와 한 문장 정의
 - 비슷하지만 다른 용어의 차이
 - 사용자나 클라이언트가 쓰는 표현과 서버 코드 용어의 매핑
-- 여러 기능에서 반복해서 참조되는 정책의 짧은 요약
+- 공개 저장소에 노출되어도 괜찮은 최소 제품 맥락
+
+상세 비즈니스 정책, 데이터 구조, 임계값, 방어 로직과 인프라 구성은 `CONTEXT.md`가 아니라 Git에서 제외된 관련 `docs/` 문서에 둔다.
 
 구현 절차, 상세 API 스펙, 일회성 작업 TODO는 `CONTEXT.md`가 아니라 `docs/history/0001-feature-slug/PLAN.md`에 둔다.
 

@@ -27,7 +27,7 @@ description: 사용자가 "grill me", "나한테 질문해줘", "요구사항을
 사용자가 계획이나 설계를 제시하면 아래 중 저장소에서 확인 가능한 사실을 먼저 탐색한다.
 
 - 기존 API, DTO, ErrorCode, controller, use case, service
-- 관련 `docs/*/PLAN.md`
+- 관련 `docs/history/*/PLAN.md`
 - 테스트 패턴과 fixture
 - Redis, FCM, 결제, 장소 검색 같은 외부 연동 지점
 

@@ -10,7 +10,7 @@ description: 이 저장소에서 controller, service, repository, Redis, integra
 ## 목적
 
 - 기능 추가나 버그 수정을 테스트로 먼저 고정한다.
-- Whiplash 테스트 컨벤션에 맞는 테스트를 작성한다.
+- Time Bomb Server 테스트 컨벤션에 맞는 테스트를 작성한다.
 - 실패 테스트를 green으로 만든 뒤 중복과 구조를 정리한다.
 
 ## TDD 진행 순서

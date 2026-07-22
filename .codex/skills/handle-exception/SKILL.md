@@ -10,7 +10,7 @@ description: 이 저장소에서 ErrorCode enum을 추가/수정하거나, 예�
 ## ErrorCode 포맷
 
 ```java
-NAME(HttpStatus.STATUS, "DOMAIN_x001", "~입니다."),
+NAME(HttpStatus.STATUS, "DOMAIN_001", "~입니다."),
 ```
 
 허용 상태 코드는 아래와 같다.
@@ -30,6 +30,8 @@ NAME(HttpStatus.STATUS, "DOMAIN_x001", "~입니다."),
 | `DOMAIN_301~399` | 403 Forbidden |
 | `DOMAIN_401~499` | 404 Not Found |
 | `DOMAIN_901~999` | 409 Conflict |
+
+이미 외부 계약으로 사용 중인 ErrorCode는 범위가 다르더라도 형식 통일만을 위해 번호를 바꾸지 않는다. 포맷과 번호 정책의 단일 원본은 루트 `AGENTS.md`다.
 
 ## 예외 발생 방식
 

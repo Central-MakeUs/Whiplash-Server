@@ -53,9 +53,9 @@ description: 이 저장소에서 신규 기능 개발, 기능 수정, PRD 작성
 | 내부 마이크로서비스 | `p95 < 100ms` | 서비스 간 호출은 더 엄격하게 관리 |
 | 분석 파이프라인 | `p95 < 5s` | 응답을 기다리는 사용자가 없거나 적음 |
 
-Whiplash에서 별도 근거가 없으면 사용자-facing REST API는 `p95 < 500ms`를 기본 초안으로 두고, 알람/결제/장소 검색처럼 사용자 경험에 민감한 흐름은 더 엄격한 목표가 필요한지 질문한다.
+Time Bomb Server에서 별도 근거가 없으면 사용자-facing REST API는 `p95 < 500ms`를 기본 초안으로 두고, 알람/결제/장소 검색처럼 사용자 경험에 민감한 흐름은 더 엄격한 목표가 필요한지 질문한다.
 
-## Whiplash 기준 관측 후보
+## Time Bomb Server 기준 관측 후보
 
 - HTTP API latency/error: Actuator의 `http.server.requests`
 - scheduler 처리 시간: Micrometer `Timer`
