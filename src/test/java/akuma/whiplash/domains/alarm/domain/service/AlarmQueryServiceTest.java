@@ -9,6 +9,7 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 
 import akuma.whiplash.common.fixture.AlarmFixture;
 import akuma.whiplash.common.fixture.MemberFixture;
@@ -58,6 +59,7 @@ class AlarmQueryServiceTest {
     @Mock private MemberRepository memberRepository;
     @Mock private MemberDeviceRepository memberDeviceRepository;
     @Mock private TimeProvider timeProvider;
+    @Mock private AlarmLocationCacheService alarmLocationCacheService;
 
     @InjectMocks private AlarmQueryServiceImpl alarmQueryService;
 
@@ -103,6 +105,29 @@ class AlarmQueryServiceTest {
                 .isEqualTo(LocalDate.of(2026, 5, 4));
             assertThat(result.alarms().get(0).nextOccurrence().scheduledTime()).isEqualTo("06:40");
             assertThat(result.alarms().get(0).nextOccurrence().scheduledAtUtc()).isEqualTo("2026-05-03T21:40:00Z");
+        }
+
+        @Test
+        @DisplayName("성공: 주소 캐시가 없는 Google 장소는 응답 전에 Place ID로 갱신한다")
+        void success_refreshMissingGooglePlaceAddress() {
+            // given
+            MemberEntity member = MemberFixture.MEMBER_11.toMockEntity();
+            AlarmEntity alarm = AlarmFixture.ALARM_11.toMockEntity();
+            alarm.updateGooglePlaceLocation("google-place-id", null, 37.4968, 127.0137, FIXED_NOW.minusDays(29));
+            given(memberRepository.findById(member.getId())).willReturn(Optional.of(member));
+            given(alarmRepository.findAllByMemberIdAndStatusNot(member.getId(), AlarmStatus.DELETED))
+                .willReturn(List.of(alarm));
+            given(alarmLocationCacheService.canRefreshGoogleLocationCache(alarm)).willReturn(true);
+            given(alarmOccurrenceRepository.findLatestProcessedByAlarmIds(anyList(), anyList()))
+                .willReturn(List.of());
+            given(alarmOccurrenceRepository.findByAlarmIdsAndOccurrenceDates(anyList(), anyList()))
+                .willReturn(List.of());
+
+            // when
+            alarmQueryService.getAlarms(member.getId(), REQUEST_DEVICE_ID);
+
+            // then
+            verify(alarmLocationCacheService).refreshGoogleLocationCache(alarm);
         }
 
         @Test

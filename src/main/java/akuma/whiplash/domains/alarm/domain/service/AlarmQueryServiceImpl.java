@@ -58,6 +58,7 @@ public class AlarmQueryServiceImpl implements AlarmQueryService {
     private final MemberRepository memberRepository;
     private final MemberDeviceRepository memberDeviceRepository;
     private final TimeProvider timeProvider;
+    private final AlarmLocationCacheService alarmLocationCacheService;
 
     @Override
     public GetAlarmsResponse getAlarms(Long memberId, String deviceId) {
@@ -66,6 +67,8 @@ public class AlarmQueryServiceImpl implements AlarmQueryService {
 
         ZoneId memberZone = resolveMemberZone(memberId, deviceId);
         List<AlarmEntity> alarms = alarmRepository.findAllByMemberIdAndStatusNot(memberId, AlarmStatus.DELETED);
+
+        refreshMissingGooglePlaceAddresses(alarms);
 
         if (alarms.isEmpty()) {
             return GetAlarmsResponse.builder()
@@ -229,5 +232,12 @@ public class AlarmQueryServiceImpl implements AlarmQueryService {
             .map(MemberDeviceEntity::getTimeZone)
             .map(AlarmScheduleCalculator::resolveZone)
             .orElse(AlarmScheduleCalculator.DEFAULT_ZONE);
+    }
+
+    private void refreshMissingGooglePlaceAddresses(List<AlarmEntity> alarms) {
+        alarms.stream()
+            .filter(alarm -> alarm.getAddress() == null)
+            .filter(alarmLocationCacheService::canRefreshGoogleLocationCache)
+            .forEach(alarmLocationCacheService::refreshGoogleLocationCache);
     }
 }

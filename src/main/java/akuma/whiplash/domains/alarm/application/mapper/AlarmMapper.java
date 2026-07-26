@@ -14,6 +14,7 @@ import akuma.whiplash.domains.alarm.domain.constant.AlarmDeleteMethod;
 import akuma.whiplash.domains.alarm.domain.constant.DeactivateType;
 import akuma.whiplash.domains.alarm.domain.constant.DeactivationResult;
 import akuma.whiplash.domains.alarm.domain.constant.AlarmStatus;
+import akuma.whiplash.domains.alarm.domain.constant.LocationSource;
 import akuma.whiplash.domains.alarm.domain.constant.DeleteType;
 import akuma.whiplash.domains.alarm.domain.constant.OccurrenceStatus;
 import akuma.whiplash.domains.alarm.domain.constant.SoundType;
@@ -41,7 +42,11 @@ public class AlarmMapper {
         throw new IllegalArgumentException();
     }
 
-    public static AlarmEntity mapToAlarmEntity(AlarmRegisterRequest request, MemberEntity memberEntity) {
+    public static AlarmEntity mapToAlarmEntity(
+        AlarmRegisterRequest request,
+        MemberEntity memberEntity,
+        LocalDateTime locationCachedAt
+    ) {
         return AlarmEntity.builder()
             .member(memberEntity)
             .alarmPurpose(request.alarmPurpose())
@@ -51,6 +56,9 @@ public class AlarmMapper {
             .latitude(request.place().latitude())
             .longitude(request.place().longitude())
             .address(request.place().address())
+            .locationSource(LocationSource.GOOGLE_PLACE)
+            .googlePlaceId(request.place().googlePlaceId())
+            .locationCachedAt(locationCachedAt)
             .status(AlarmStatus.ACTIVE)
             .build();
     }
