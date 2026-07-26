@@ -151,7 +151,8 @@ public class AlarmController {
             ALARM_OCCURRENCE_NOT_FOUND,
             CHECKIN_OUT_OF_RANGE,
             ALREADY_DEACTIVATED,
-            CHECKIN_NOT_YET_AVAILABLE
+            CHECKIN_NOT_YET_AVAILABLE,
+            ALARM_LOCATION_RESELECTION_REQUIRED
         },
         authErrorCodes = {PERMISSION_DENIED}
     )

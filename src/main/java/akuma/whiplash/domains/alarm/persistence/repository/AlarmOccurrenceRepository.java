@@ -90,7 +90,7 @@ public interface AlarmOccurrenceRepository extends JpaRepository<AlarmOccurrence
     void deleteByMemberId(@Param("memberId") Long memberId);
 
     @Query("""
-    SELECT new akuma.whiplash.domains.alarm.application.dto.etc.OccurrencePushInfo(o.id, m.id, a.address)
+    SELECT new akuma.whiplash.domains.alarm.application.dto.etc.OccurrencePushInfo(o.id, m.id, a.id, a.address)
     FROM AlarmOccurrenceEntity o
     JOIN o.alarm a
     JOIN a.member m
@@ -107,7 +107,7 @@ public interface AlarmOccurrenceRepository extends JpaRepository<AlarmOccurrence
     );
 
     @Query("""
-    SELECT new akuma.whiplash.domains.alarm.application.dto.etc.OccurrencePushInfo(o.id, m.id, a.address)
+    SELECT new akuma.whiplash.domains.alarm.application.dto.etc.OccurrencePushInfo(o.id, m.id, a.id, a.address)
     FROM AlarmOccurrenceEntity o
     JOIN o.alarm a
     JOIN a.member m
@@ -123,7 +123,7 @@ public interface AlarmOccurrenceRepository extends JpaRepository<AlarmOccurrence
     );
 
     @Query("""
-    SELECT new akuma.whiplash.domains.alarm.application.dto.etc.OccurrencePushInfo(o.id, m.id, a.address)
+    SELECT new akuma.whiplash.domains.alarm.application.dto.etc.OccurrencePushInfo(o.id, m.id, a.id, a.address)
     FROM AlarmOccurrenceEntity o
     JOIN o.alarm a
     JOIN a.member m
@@ -139,7 +139,7 @@ public interface AlarmOccurrenceRepository extends JpaRepository<AlarmOccurrence
     );
 
     @Query("""
-    SELECT new akuma.whiplash.domains.alarm.application.dto.etc.OccurrencePushInfo(o.id, m.id, a.address)
+    SELECT new akuma.whiplash.domains.alarm.application.dto.etc.OccurrencePushInfo(o.id, m.id, a.id, a.address)
     FROM AlarmOccurrenceEntity o
     JOIN o.alarm a
     JOIN a.member m

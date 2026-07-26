@@ -29,6 +29,7 @@ import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -58,6 +59,7 @@ public class AlarmQueryServiceImpl implements AlarmQueryService {
     private final MemberRepository memberRepository;
     private final MemberDeviceRepository memberDeviceRepository;
     private final TimeProvider timeProvider;
+    private final AlarmLocationCacheService alarmLocationCacheService;
 
     @Override
     public GetAlarmsResponse getAlarms(Long memberId, String deviceId) {
@@ -66,6 +68,8 @@ public class AlarmQueryServiceImpl implements AlarmQueryService {
 
         ZoneId memberZone = resolveMemberZone(memberId, deviceId);
         List<AlarmEntity> alarms = alarmRepository.findAllByMemberIdAndStatusNot(memberId, AlarmStatus.DELETED);
+
+        refreshMissingGooglePlaceAddresses(alarms);
 
         if (alarms.isEmpty()) {
             return GetAlarmsResponse.builder()
@@ -196,12 +200,31 @@ public class AlarmQueryServiceImpl implements AlarmQueryService {
     }
 
     @Override
+    @Transactional
     public List<OccurrencePushInfo> getPreNotificationTargets(LocalDateTime startInclusive, LocalDateTime endInclusive) {
-        return alarmOccurrenceRepository.findPreNotificationTargetsByScheduledAtBetween(
+        List<OccurrencePushInfo> infos = alarmOccurrenceRepository.findPreNotificationTargetsByScheduledAtBetween(
             startInclusive,
             endInclusive,
             OccurrenceStatus.SCHEDULED
         );
+        if (infos.isEmpty()) {
+            return infos;
+        }
+
+        Map<Long, AlarmEntity> alarmsById = alarmRepository.findAllById(
+                infos.stream().map(OccurrencePushInfo::alarmId).distinct().toList()
+            ).stream()
+            .collect(Collectors.toMap(AlarmEntity::getId, alarm -> alarm));
+
+        refreshMissingGooglePlaceAddresses(new ArrayList<>(alarmsById.values()));
+
+        return infos.stream()
+            .map(info -> {
+                AlarmEntity alarm = alarmsById.get(info.alarmId());
+                String address = alarm == null ? info.address() : alarm.getAddress();
+                return new OccurrencePushInfo(info.occurrenceId(), info.memberId(), info.alarmId(), address);
+            })
+            .toList();
     }
 
     @Override
@@ -229,5 +252,18 @@ public class AlarmQueryServiceImpl implements AlarmQueryService {
             .map(MemberDeviceEntity::getTimeZone)
             .map(AlarmScheduleCalculator::resolveZone)
             .orElse(AlarmScheduleCalculator.DEFAULT_ZONE);
+    }
+
+    private void refreshMissingGooglePlaceAddresses(List<AlarmEntity> alarms) {
+        alarms.stream()
+            .filter(alarm -> !alarmLocationCacheService.hasValidGoogleLocationCache(alarm, timeProvider.now()))
+            .filter(alarmLocationCacheService::canRefreshGoogleLocationCache)
+            .forEach(alarm -> {
+                try {
+                    alarmLocationCacheService.modifyGoogleLocationCache(alarm);
+                } catch (RuntimeException exception) {
+                    log.warn("Google 장소 캐시 갱신에 실패했습니다. alarmId={}", alarm.getId(), exception);
+                }
+            });
     }
 }

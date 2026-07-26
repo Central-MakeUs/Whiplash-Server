@@ -41,7 +41,10 @@ public class ProdArchiveService implements ArchiveService {
             latitude, longitude, address, created_at, updated_at
         )
         SELECT a.id, a.member_id, a.alarm_purpose, a.time, a.repeat_days, a.sound_type,
-               a.latitude, a.longitude, a.address, a.created_at, a.updated_at
+               CASE WHEN a.location_source = 'GOOGLE_PLACE' THEN NULL ELSE a.latitude END,
+               CASE WHEN a.location_source = 'GOOGLE_PLACE' THEN NULL ELSE a.longitude END,
+               CASE WHEN a.location_source = 'GOOGLE_PLACE' THEN NULL ELSE a.address END,
+               a.created_at, a.updated_at
         FROM alarm a
         WHERE a.id = ?
           AND NOT EXISTS (
@@ -56,7 +59,10 @@ public class ProdArchiveService implements ArchiveService {
             latitude, longitude, address, created_at, updated_at
         )
         SELECT a.id, a.member_id, a.alarm_purpose, a.time, a.repeat_days, a.sound_type,
-               a.latitude, a.longitude, a.address, a.created_at, a.updated_at
+               CASE WHEN a.location_source = 'GOOGLE_PLACE' THEN NULL ELSE a.latitude END,
+               CASE WHEN a.location_source = 'GOOGLE_PLACE' THEN NULL ELSE a.longitude END,
+               CASE WHEN a.location_source = 'GOOGLE_PLACE' THEN NULL ELSE a.address END,
+               a.created_at, a.updated_at
         FROM alarm a
         WHERE a.member_id = ?
           AND NOT EXISTS (

@@ -19,6 +19,7 @@ public enum AlarmErrorCode implements BaseErrorCode {
     NOT_ALARM_TIME(HttpStatus.BAD_REQUEST, "ALARM_011", "알람이 울릴 시간이 아닙니다."),
     DUPLICATE_ALARM_PURPOSE(HttpStatus.CONFLICT, "ALARM_012", "같은 이름의 알람이 존재합니다!"),
     CHECKIN_NOT_YET_AVAILABLE(HttpStatus.BAD_REQUEST, "ALARM_013", "아직 위치 인증이 가능한 시간이 아닙니다."),
+    ALARM_LOCATION_RESELECTION_REQUIRED(HttpStatus.BAD_REQUEST, "ALARM_014", "알람 장소 재선택이 필요합니다."),
 
     ALARM_NOT_FOUND(HttpStatus.NOT_FOUND, "ALARM_401", "존재하지 않는 알람입니다."),
     ALARM_OCCURRENCE_NOT_FOUND(HttpStatus.NOT_FOUND, "ALARM_402", "알람 발생 내역이 존재하지 않습니다.")

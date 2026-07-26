@@ -1,7 +1,9 @@
 package akuma.whiplash.domains.alarm.persistence.repository;
 
 import akuma.whiplash.domains.alarm.domain.constant.AlarmStatus;
+import akuma.whiplash.domains.alarm.domain.constant.LocationSource;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmEntity;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.Optional;
@@ -64,6 +66,21 @@ public interface AlarmRepository extends JpaRepository<AlarmEntity, Long> {
         WHERE a.member.id = :memberId
     """)
     void deleteByMemberId(@Param("memberId") Long memberId);
+
+    @Modifying
+    @Query("""
+        UPDATE AlarmEntity a
+        SET a.latitude = NULL,
+            a.longitude = NULL,
+            a.address = NULL,
+            a.locationCachedAt = NULL
+        WHERE a.locationSource = :locationSource
+          AND a.locationCachedAt <= :expiresAt
+    """)
+    int updateLocationCachesBySourceAndCachedAtBefore(
+        @Param("locationSource") LocationSource locationSource,
+        @Param("expiresAt") LocalDateTime expiresAt
+    );
 
     interface AlarmOccurrenceBatchTarget {
         Long getAlarmId();

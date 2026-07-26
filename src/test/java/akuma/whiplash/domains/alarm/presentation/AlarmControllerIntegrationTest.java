@@ -42,6 +42,8 @@ import akuma.whiplash.domains.member.persistence.entity.MemberEntity;
 import akuma.whiplash.domains.member.persistence.repository.MemberDeviceRepository;
 import akuma.whiplash.domains.member.persistence.repository.MemberRepository;
 import akuma.whiplash.domains.payment.persistence.repository.PaymentRepository;
+import akuma.whiplash.domains.place.domain.client.GoogleClient;
+import akuma.whiplash.domains.place.domain.model.SelectedPlaceDetail;
 import akuma.whiplash.global.config.security.jwt.JwtProvider;
 import akuma.whiplash.global.util.date.TimeProvider;
 import akuma.whiplash.infrastructure.payment.PaymentVerificationPort;
@@ -85,6 +87,7 @@ class AlarmControllerIntegrationTest {
     @Autowired private PaymentRepository paymentRepository;
     @MockitoBean private PaymentVerificationPort paymentVerificationPort;
     @MockitoBean private TimeProvider timeProvider;
+    @MockitoBean private GoogleClient googleClient;
 
     private static final String BASE = "/api/v1/alarms";
     private static final LocalDateTime FIXED_NOW = LocalDateTime.of(2026, 5, 4, 11, 0);
@@ -109,6 +112,9 @@ class AlarmControllerIntegrationTest {
         given(timeProvider.now(any(ZoneId.class))).willReturn(FIXED_NOW);
         given(timeProvider.today(any(ZoneId.class))).willReturn(FIXED_NOW.toLocalDate());
         given(timeProvider.instant()).willReturn(FIXED_NOW.atZone(ZoneId.of("Asia/Seoul")).toInstant());
+        given(googleClient.getPlaceDetails(any())).willReturn(new SelectedPlaceDetail(
+            "서울특별시 중구 퇴계로 24", 37.564213, 127.001698, "KR", "google-place-id"
+        ));
     }
 
     private AlarmEntity saveAlarmForToday(MemberEntity member) {
@@ -121,6 +127,7 @@ class AlarmControllerIntegrationTest {
             .latitude(37.5665)
             .longitude(126.9780)
             .address("서울특별시 중구 퇴계로 123")
+            .locationSource(LocationSource.USER_PIN)
             .member(member)
             .build());
     }
@@ -150,6 +157,7 @@ class AlarmControllerIntegrationTest {
             .latitude(37.5665)
             .longitude(126.9780)
             .address("서울특별시 중구 퇴계로 123")
+            .locationSource(LocationSource.USER_PIN)
             .member(member)
             .build());
     }
@@ -196,7 +204,9 @@ class AlarmControllerIntegrationTest {
                 new akuma.whiplash.domains.alarm.application.dto.request.PlaceRequest(
                     "서울특별시 중구 퇴계로 24",
                     37.564213,
-                    127.001698
+                    127.001698,
+                    "google-place-id",
+                    null
                 ),
                 "월요일 점심 알람",
                 LocalTime.of(12, 0),
@@ -232,7 +242,9 @@ class AlarmControllerIntegrationTest {
                 new akuma.whiplash.domains.alarm.application.dto.request.PlaceRequest(
                     fixture.getAddress(),
                     fixture.getLatitude(),
-                    fixture.getLongitude()
+                    fixture.getLongitude(),
+                    "google-place-id",
+                    null
                 ),
                 fixture.getAlarmPurpose(),
                 fixture.getTime(),
@@ -260,7 +272,9 @@ class AlarmControllerIntegrationTest {
                 new akuma.whiplash.domains.alarm.application.dto.request.PlaceRequest(
                     fixture.getAddress(),
                     fixture.getLatitude(),
-                    fixture.getLongitude()
+                    fixture.getLongitude(),
+                    "google-place-id",
+                    null
                 ),
                 fixture.getAlarmPurpose(),
                 fixture.getTime(),

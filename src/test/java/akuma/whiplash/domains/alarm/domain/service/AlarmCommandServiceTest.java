@@ -12,7 +12,9 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 import akuma.whiplash.common.fixture.AlarmOccurrenceFixture;
 import akuma.whiplash.common.fixture.AlarmFixture;
@@ -36,6 +38,7 @@ import akuma.whiplash.domains.alarm.application.dto.response.AlarmPaymentRespons
 import akuma.whiplash.domains.alarm.application.dto.response.CreateAlarmResponse;
 import akuma.whiplash.domains.alarm.application.service.AuditLogRecorder;
 import akuma.whiplash.domains.alarm.domain.constant.AlarmStatus;
+import akuma.whiplash.domains.alarm.domain.constant.LocationSource;
 import akuma.whiplash.domains.alarm.domain.constant.DeleteType;
 import akuma.whiplash.domains.alarm.domain.constant.OccurrenceStatus;
 import akuma.whiplash.domains.alarm.domain.constant.Weekday;
@@ -107,6 +110,8 @@ class AlarmCommandServiceTest {
     private TimeProvider timeProvider;
     @Mock
     private AuditLogRecorder auditLogRecorder;
+    @Mock
+    private AlarmLocationCacheService alarmLocationCacheService;
 
     @InjectMocks
     private AlarmCommandServiceImpl alarmCommandService;
@@ -138,7 +143,9 @@ class AlarmCommandServiceTest {
                 new akuma.whiplash.domains.alarm.application.dto.request.PlaceRequest(
                     fixture.getAddress(),
                     fixture.getLatitude(),
-                    fixture.getLongitude()
+                    fixture.getLongitude(),
+                    "google-place-id",
+                    null
                 ),
                 fixture.getAlarmPurpose(),
                 fixture.getTime(),
@@ -156,6 +163,38 @@ class AlarmCommandServiceTest {
         }
 
         @Test
+        @DisplayName("성공: Google 장소 위치를 요청 값으로 캐시하고 재조회하지 않는다")
+        void success_cacheGooglePlaceLocationWithoutRefresh() {
+            // given
+            MemberEntity member = MemberFixture.MEMBER_5.toMockEntity();
+            AlarmFixture fixture = AlarmFixture.ALARM_05;
+            AlarmRegisterRequest request = new AlarmRegisterRequest(
+                new akuma.whiplash.domains.alarm.application.dto.request.PlaceRequest(
+                    fixture.getAddress(), fixture.getLatitude(), fixture.getLongitude(), "google-place-id", "session-token"
+                ),
+                fixture.getAlarmPurpose(),
+                fixture.getTime(),
+                fixture.getRepeatDays().stream().map(Weekday::name).toList(),
+                fixture.getSoundType().name()
+            );
+            given(memberRepository.findById(member.getId())).willReturn(Optional.of(member));
+
+            // when
+            alarmCommandService.createAlarm(request, member.getId(), "device-uuid");
+
+            // then
+            ArgumentCaptor<AlarmEntity> captor = ArgumentCaptor.forClass(AlarmEntity.class);
+            verify(alarmRepository).save(captor.capture());
+            assertThat(captor.getValue().getLocationSource()).isEqualTo(LocationSource.GOOGLE_PLACE);
+            assertThat(captor.getValue().getGooglePlaceId()).isEqualTo("google-place-id");
+            assertThat(captor.getValue().getAddress()).isEqualTo(fixture.getAddress());
+            assertThat(captor.getValue().getLatitude()).isEqualTo(fixture.getLatitude());
+            assertThat(captor.getValue().getLongitude()).isEqualTo(fixture.getLongitude());
+            assertThat(captor.getValue().getLocationCachedAt()).isEqualTo(FIXED_NOW);
+            verifyNoInteractions(alarmLocationCacheService);
+        }
+
+        @Test
         @DisplayName("성공: 요청 기기 timeZone 기준으로 첫 발생 내역의 예정 시각을 저장한다")
         void success_createFirstOccurrenceByRequestDeviceTimeZone() {
             // given
@@ -165,7 +204,9 @@ class AlarmCommandServiceTest {
                 new akuma.whiplash.domains.alarm.application.dto.request.PlaceRequest(
                     fixture.getAddress(),
                     fixture.getLatitude(),
-                    fixture.getLongitude()
+                    fixture.getLongitude(),
+                    "google-place-id",
+                    null
                 ),
                 fixture.getAlarmPurpose(),
                 fixture.getTime(),
@@ -210,7 +251,9 @@ class AlarmCommandServiceTest {
                 new akuma.whiplash.domains.alarm.application.dto.request.PlaceRequest(
                     fixture.getAddress(),
                     fixture.getLatitude(),
-                    fixture.getLongitude()
+                    fixture.getLongitude(),
+                    "google-place-id",
+                    null
                 ),
                 fixture.getAlarmPurpose(),
                 fixture.getTime(),
@@ -236,7 +279,9 @@ class AlarmCommandServiceTest {
                 new akuma.whiplash.domains.alarm.application.dto.request.PlaceRequest(
                     fixture.getAddress(),
                     fixture.getLatitude(),
-                    fixture.getLongitude()
+                    fixture.getLongitude(),
+                    "google-place-id",
+                    null
                 ),
                 fixture.getAlarmPurpose(),
                 fixture.getTime(),
@@ -296,6 +341,41 @@ class AlarmCommandServiceTest {
             assertThat(response.nextOccurrence()).isNotNull();
             assertThat(response.nextOccurrence().occurrenceId()).isEqualTo(502L);
             verify(eventPublisher).publishEvent(any(AlarmCheckinCompletedEvent.class));
+        }
+
+        @Test
+        @DisplayName("성공: 만료된 Google 장소 캐시는 인증 전에 재조회한다")
+        void success_refreshExpiredGooglePlaceCache() {
+            // given
+            MemberEntity member = MemberFixture.MEMBER_10.toMockEntity();
+            AlarmEntity alarm = buildAlarm(member, AlarmFixture.ALARM_10);
+            alarm.updateGooglePlaceLocation(
+                "google-place-id", alarm.getAddress(), alarm.getLatitude(), alarm.getLongitude(), FIXED_NOW.minusDays(29)
+            );
+            AlarmOccurrenceEntity occurrence = buildOccurrence(alarm, 503L, FIXED_NOW.plusHours(1), OccurrenceStatus.SCHEDULED);
+            given(alarmRepository.findById(alarm.getId())).willReturn(Optional.of(alarm));
+            given(alarmOccurrenceRepository.findByIdAndAlarmId(occurrence.getId(), alarm.getId()))
+                .willReturn(Optional.of(occurrence));
+            given(alarmOccurrenceRepository.findNextScheduledByAlarmIds(
+                eq(List.of(alarm.getId())), eq(OccurrenceStatus.SCHEDULED), any(LocalDateTime.class)
+            )).willReturn(List.of());
+            given(alarmLocationCacheService.hasValidGoogleLocationCache(alarm, FIXED_NOW)).willReturn(false);
+            doAnswer(invocation -> {
+                AlarmEntity target = invocation.getArgument(0);
+                target.updateGooglePlaceLocation(
+                    "google-place-id", "새 장소", 37.5663, 126.9779, FIXED_NOW
+                );
+                return null;
+            }).when(alarmLocationCacheService).modifyGoogleLocationCache(alarm);
+
+            // when
+            alarmCommandService.checkinAlarm(
+                member.getId(), alarm.getId(), buildRequest(occurrence, 37.5663, 126.9779)
+            );
+
+            // then
+            verify(alarmLocationCacheService).modifyGoogleLocationCache(alarm);
+            assertThat(occurrence.getStatus()).isEqualTo(OccurrenceStatus.CHECKIN);
         }
 
         @Test

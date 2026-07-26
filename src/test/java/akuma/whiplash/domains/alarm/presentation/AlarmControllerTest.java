@@ -136,7 +136,9 @@ class AlarmControllerTest {
                 new akuma.whiplash.domains.alarm.application.dto.request.PlaceRequest(
                     fixture.getAddress(),
                     fixture.getLatitude(),
-                    fixture.getLongitude()
+                    fixture.getLongitude(),
+                    "google-place-id",
+                    null
                 ),
                 fixture.getAlarmPurpose(),
                 LocalTime.parse("08:30"),
@@ -170,7 +172,8 @@ class AlarmControllerTest {
                   "place": {
                     "address": "서울시 중구 퇴계로 24",
                     "latitude": 37.564213,
-                    "longitude": 127.001698
+                    "longitude": 127.001698,
+                    "googlePlaceId": "google-place-id"
                   },
                   "alarmPurpose": "도서관 정기 출석 알람",
                   "alarmTime": "24:30",
@@ -204,7 +207,9 @@ class AlarmControllerTest {
                 new akuma.whiplash.domains.alarm.application.dto.request.PlaceRequest(
                     fixture.getAddress(),
                     fixture.getLatitude(),
-                    fixture.getLongitude()
+                    fixture.getLongitude(),
+                    "google-place-id",
+                    null
                 ),
                 fixture.getAlarmPurpose(),
                 fixture.getTime(),
@@ -235,7 +240,9 @@ class AlarmControllerTest {
             new akuma.whiplash.domains.alarm.application.dto.request.PlaceRequest(
                 fixture.getAddress(),
                 fixture.getLatitude(),
-                fixture.getLongitude()
+                fixture.getLongitude(),
+                "google-place-id",
+                null
             ),
             fixture.getAlarmPurpose(),
             fixture.getTime(),
