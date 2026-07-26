@@ -1,7 +1,7 @@
 package akuma.whiplash.infrastructure.firebase;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 
@@ -57,5 +57,11 @@ class FcmServiceTest {
                 .isInstanceOf(RuntimeException.class)
                 .hasMessage("redis error");
         }
+    }
+
+    @Test
+    @DisplayName("성공: 주소가 없으면 일반 사전 알림 문구를 생성한다")
+    void success_returnsGenericPreAlarmBodyWithoutAddress() {
+        assertThat(FcmService.getPreAlarmBody(null)).isEqualTo("1시간 뒤 알람이 울릴 예정이에요!");
     }
 }

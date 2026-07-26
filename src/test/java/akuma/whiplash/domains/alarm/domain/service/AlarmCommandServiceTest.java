@@ -366,7 +366,7 @@ class AlarmCommandServiceTest {
                     "google-place-id", "새 장소", 37.5663, 126.9779, FIXED_NOW
                 );
                 return null;
-            }).when(alarmLocationCacheService).refreshGoogleLocationCache(alarm);
+            }).when(alarmLocationCacheService).modifyGoogleLocationCache(alarm);
 
             // when
             alarmCommandService.checkinAlarm(
@@ -374,7 +374,7 @@ class AlarmCommandServiceTest {
             );
 
             // then
-            verify(alarmLocationCacheService).refreshGoogleLocationCache(alarm);
+            verify(alarmLocationCacheService).modifyGoogleLocationCache(alarm);
             assertThat(occurrence.getStatus()).isEqualTo(OccurrenceStatus.CHECKIN);
         }
 

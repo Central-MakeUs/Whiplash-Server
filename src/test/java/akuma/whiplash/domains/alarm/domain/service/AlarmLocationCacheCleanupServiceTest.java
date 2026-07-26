@@ -8,6 +8,7 @@ import akuma.whiplash.domains.alarm.persistence.repository.AlarmRepository;
 import akuma.whiplash.global.util.date.TimeProvider;
 import java.time.LocalDateTime;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -25,19 +26,24 @@ class AlarmLocationCacheCleanupServiceTest {
     @InjectMocks
     private AlarmLocationCacheCleanupService alarmLocationCacheCleanupService;
 
-    @Test
-    @DisplayName("성공: 29일 지난 Google 장소 캐시만 삭제한다")
-    void success() {
-        // given
-        LocalDateTime now = LocalDateTime.of(2026, 7, 25, 12, 0);
-        given(timeProvider.now()).willReturn(now);
+    @Nested
+    @DisplayName("만료된 Google 장소 위치 캐시를 삭제한다")
+    class RemoveExpiredGoogleLocationCachesTest {
 
-        // when
-        alarmLocationCacheCleanupService.clearExpiredGoogleLocationCaches();
+        @Test
+        @DisplayName("성공: 29일 지난 Google 장소 캐시만 삭제한다")
+        void success() {
+            // given
+            LocalDateTime now = LocalDateTime.of(2026, 7, 25, 12, 0);
+            given(timeProvider.now()).willReturn(now);
 
-        // then
-        verify(alarmRepository).clearLocationCachesBySourceAndCachedAtBefore(
-            LocationSource.GOOGLE_PLACE, now.minusDays(29)
-        );
+            // when
+            alarmLocationCacheCleanupService.removeExpiredGoogleLocationCaches();
+
+            // then
+            verify(alarmRepository).updateLocationCachesBySourceAndCachedAtBefore(
+                LocationSource.GOOGLE_PLACE, now.minusDays(29)
+            );
+        }
     }
 }

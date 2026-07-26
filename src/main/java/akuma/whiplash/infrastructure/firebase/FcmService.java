@@ -38,6 +38,7 @@ public class FcmService {
     private static final int FCM_MULTICAST_LIMIT = 500;
     private static final String DEFAULT_TITLE = "눈 떠";
     private static final String RINGING_BODY = "알람이 울리고 있어요! 앱으로 접속해서 알람을 꺼주세요!";
+    private static final String PRE_ALARM_BODY_WITHOUT_ADDRESS = "1시간 뒤 알람이 울릴 예정이에요!";
     
     // TODO: 테스트용 지연 변수 (배포 시 제거 필요)
     public static long TEST_DELAY_MS = 0;
@@ -71,9 +72,7 @@ public class FcmService {
 
         // body 문구가 동일한 것끼리 묶어서 멀티캐스트 효율 증가
         Map<String, List<PushTargetDto>> groupedByBody = targets.stream()
-            .collect(Collectors.groupingBy(
-                dto -> String.format("1시간 뒤 %s에서 알림이 울릴 예정이에요!", dto.address())
-            ));
+            .collect(Collectors.groupingBy(dto -> getPreAlarmBody(dto.address())));
 
         Set<Long> successOccurrenceIds = new HashSet<>();
         List<String> invalidTokens = new ArrayList<>();
@@ -131,6 +130,12 @@ public class FcmService {
             .successCount(totalSuccessCount)
             .failedCount(totalFailureCount)
             .build();
+    }
+
+    static String getPreAlarmBody(String address) {
+        return address == null
+            ? PRE_ALARM_BODY_WITHOUT_ADDRESS
+            : String.format("1시간 뒤 %s에서 알림이 울릴 예정이에요!", address);
     }
 
     /**

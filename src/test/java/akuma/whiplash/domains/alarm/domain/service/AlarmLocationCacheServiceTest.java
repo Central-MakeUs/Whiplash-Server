@@ -21,7 +21,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
-@DisplayName("AlarmLocationCacheService Unit Test")
+@DisplayName("Google 장소 위치 캐시를 관리한다")
 class AlarmLocationCacheServiceTest {
 
     private static final LocalDateTime FIXED_NOW = LocalDateTime.of(2026, 7, 25, 12, 0);
@@ -30,11 +30,13 @@ class AlarmLocationCacheServiceTest {
     private GoogleClient googleClient;
     @Mock
     private TimeProvider timeProvider;
+    @Mock
+    private AlarmLocationCachePersistenceService alarmLocationCachePersistenceService;
     @InjectMocks
     private AlarmLocationCacheService alarmLocationCacheService;
 
     @Nested
-    @DisplayName("hasValidGoogleLocationCache - 캐시 유효성 판단")
+    @DisplayName("Google 장소 위치 캐시 유효성을 판단한다")
     class HasValidGoogleLocationCacheTest {
 
         @Test
@@ -65,8 +67,8 @@ class AlarmLocationCacheServiceTest {
     }
 
     @Nested
-    @DisplayName("refreshGoogleLocationCache - Google 장소 캐시 갱신")
-    class RefreshGoogleLocationCacheTest {
+    @DisplayName("Google 장소 위치 캐시를 갱신한다")
+    class ModifyGoogleLocationCacheTest {
 
         @Test
         @DisplayName("성공: Place ID로 조회한 좌표와 주소를 새 캐시로 저장한다")
@@ -81,7 +83,7 @@ class AlarmLocationCacheServiceTest {
                 .willReturn(detail);
 
             // when
-            alarmLocationCacheService.refreshGoogleLocationCache(alarm);
+            alarmLocationCacheService.modifyGoogleLocationCache(alarm);
 
             // then
             verify(googleClient).getPlaceDetails(new PlaceDetailsCriteria("google-place-id", null, null, null));
@@ -89,6 +91,8 @@ class AlarmLocationCacheServiceTest {
             assertThat(alarm.getLongitude()).isEqualTo(126.9779);
             assertThat(alarm.getAddress()).isEqualTo("서울특별시 중구 세종대로 110");
             assertThat(alarm.getLocationCachedAt()).isEqualTo(FIXED_NOW);
+            verify(alarmLocationCachePersistenceService)
+                .modifyGoogleLocationCache(alarm.getId(), detail, FIXED_NOW);
         }
     }
 

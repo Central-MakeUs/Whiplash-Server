@@ -44,10 +44,10 @@ public class AlarmLocationCacheCleanupScheduler {
     }
 
     @Scheduled(cron = "0 0 * * * *")
-    public void clearExpiredGoogleLocationCaches() {
+    public void removeExpiredGoogleLocationCaches() {
         cleanupTimer.record(() -> {
             try {
-                int clearedCount = alarmLocationCacheCleanupService.clearExpiredGoogleLocationCaches();
+                int clearedCount = alarmLocationCacheCleanupService.removeExpiredGoogleLocationCaches();
                 clearedLocationCacheCounter.increment(clearedCount);
                 cleanupSuccessCounter.increment();
                 lastSuccessEpochSeconds.set(Instant.now().getEpochSecond());

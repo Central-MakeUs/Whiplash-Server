@@ -108,7 +108,7 @@ class AlarmRepositoryTest {
     }
 
     @Nested
-    @DisplayName("clearLocationCachesBySourceAndCachedAtBefore - 만료 위치 캐시 정리")
+    @DisplayName("updateLocationCachesBySourceAndCachedAtBefore - 만료 위치 캐시 정리")
     class ClearLocationCachesBySourceAndCachedAtBeforeTest {
 
         @Test
@@ -129,7 +129,7 @@ class AlarmRepositoryTest {
             alarmRepository.saveAndFlush(legacyAlarm);
 
             // when
-            int clearedCount = alarmRepository.clearLocationCachesBySourceAndCachedAtBefore(
+            int clearedCount = alarmRepository.updateLocationCachesBySourceAndCachedAtBefore(
                 LocationSource.GOOGLE_PLACE,
                 LocalDateTime.of(2026, 7, 25, 12, 0)
             );

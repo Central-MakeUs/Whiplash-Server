@@ -22,6 +22,7 @@ public class AlarmLocationCacheService {
 
     private final GoogleClient googleClient;
     private final TimeProvider timeProvider;
+    private final AlarmLocationCachePersistenceService alarmLocationCachePersistenceService;
 
     public boolean hasValidGoogleLocationCache(AlarmEntity alarm, LocalDateTime now) {
         return alarm.getLocationSource() == LocationSource.GOOGLE_PLACE
@@ -36,21 +37,29 @@ public class AlarmLocationCacheService {
     }
 
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
-    public void refreshGoogleLocationCache(AlarmEntity alarm) {
-        refreshGoogleLocationCache(alarm, null);
+    public void modifyGoogleLocationCache(AlarmEntity alarm) {
+        modifyGoogleLocationCache(alarm, null);
     }
 
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
-    public void refreshGoogleLocationCache(AlarmEntity alarm, String sessionToken) {
-        SelectedPlaceDetail detail = googleClient.getPlaceDetails(
-            new PlaceDetailsCriteria(alarm.getGooglePlaceId(), sessionToken, null, null)
-        );
-        alarm.updateGooglePlaceLocation(
-            detail.providerPlaceId(),
-            detail.address(),
-            detail.latitude(),
-            detail.longitude(),
-            timeProvider.now()
-        );
+    public void modifyGoogleLocationCache(AlarmEntity alarm, String sessionToken) {
+        try {
+            SelectedPlaceDetail detail = googleClient.getPlaceDetails(
+                new PlaceDetailsCriteria(alarm.getGooglePlaceId(), sessionToken, null, null)
+            );
+            LocalDateTime locationCachedAt = timeProvider.now();
+            alarm.updateGooglePlaceLocation(
+                detail.providerPlaceId(),
+                detail.address(),
+                detail.latitude(),
+                detail.longitude(),
+                locationCachedAt
+            );
+            alarmLocationCachePersistenceService.modifyGoogleLocationCache(alarm.getId(), detail, locationCachedAt);
+        } catch (RuntimeException exception) {
+            alarm.clearGooglePlaceLocationCache();
+            alarmLocationCachePersistenceService.removeGoogleLocationCache(alarm.getId());
+            throw exception;
+        }
     }
 }

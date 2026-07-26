@@ -77,7 +77,7 @@ public interface AlarmRepository extends JpaRepository<AlarmEntity, Long> {
         WHERE a.locationSource = :locationSource
           AND a.locationCachedAt <= :expiresAt
     """)
-    int clearLocationCachesBySourceAndCachedAtBefore(
+    int updateLocationCachesBySourceAndCachedAtBefore(
         @Param("locationSource") LocationSource locationSource,
         @Param("expiresAt") LocalDateTime expiresAt
     );

@@ -256,8 +256,14 @@ public class AlarmQueryServiceImpl implements AlarmQueryService {
 
     private void refreshMissingGooglePlaceAddresses(List<AlarmEntity> alarms) {
         alarms.stream()
-            .filter(alarm -> alarm.getAddress() == null)
+            .filter(alarm -> !alarmLocationCacheService.hasValidGoogleLocationCache(alarm, timeProvider.now()))
             .filter(alarmLocationCacheService::canRefreshGoogleLocationCache)
-            .forEach(alarmLocationCacheService::refreshGoogleLocationCache);
+            .forEach(alarm -> {
+                try {
+                    alarmLocationCacheService.modifyGoogleLocationCache(alarm);
+                } catch (RuntimeException exception) {
+                    log.warn("Google 장소 캐시 갱신에 실패했습니다. alarmId={}", alarm.getId(), exception);
+                }
+            });
     }
 }

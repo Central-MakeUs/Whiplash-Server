@@ -301,7 +301,7 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
             if (!alarm.hasGooglePlaceId()) {
                 throw ApplicationException.from(ALARM_LOCATION_RESELECTION_REQUIRED);
             }
-            alarmLocationCacheService.refreshGoogleLocationCache(alarm);
+            alarmLocationCacheService.modifyGoogleLocationCache(alarm);
         }
 
         // 5. 사용자가 알람 목적지 반경 50m 안에 있는지 검증한다.
