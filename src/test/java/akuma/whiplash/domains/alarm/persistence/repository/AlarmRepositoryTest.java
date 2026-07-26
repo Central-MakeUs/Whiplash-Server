@@ -6,12 +6,15 @@ import akuma.whiplash.common.config.PersistenceTest;
 import akuma.whiplash.common.fixture.AlarmFixture;
 import akuma.whiplash.common.fixture.MemberFixture;
 import akuma.whiplash.domains.alarm.domain.constant.AlarmStatus;
+import akuma.whiplash.domains.alarm.domain.constant.LocationSource;
 import akuma.whiplash.domains.alarm.domain.constant.SoundType;
 import akuma.whiplash.domains.alarm.domain.constant.Weekday;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmEntity;
 import akuma.whiplash.domains.alarm.persistence.repository.AlarmRepository.AlarmOccurrenceBatchTarget;
 import akuma.whiplash.domains.member.persistence.entity.MemberEntity;
 import akuma.whiplash.domains.member.persistence.repository.MemberRepository;
+import jakarta.persistence.EntityManager;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
@@ -26,6 +29,8 @@ class AlarmRepositoryTest {
     private AlarmRepository alarmRepository;
     @Autowired
     private MemberRepository memberRepository;
+    @Autowired
+    private EntityManager entityManager;
 
     @Nested
     @DisplayName("findAllByMemberId - 회원 ID로 알람 조회")
@@ -102,4 +107,44 @@ class AlarmRepositoryTest {
         }
     }
 
+    @Nested
+    @DisplayName("clearLocationCachesBySourceAndCachedAtBefore - 만료 위치 캐시 정리")
+    class ClearLocationCachesBySourceAndCachedAtBeforeTest {
+
+        @Test
+        @DisplayName("성공: 만료된 Google 장소 캐시만 삭제하고 Place ID는 남긴다")
+        void success() {
+            // given
+            MemberEntity member = memberRepository.save(MemberFixture.MEMBER_8.toEntity());
+            AlarmEntity googlePlaceAlarm = AlarmFixture.ALARM_08.toEntity(member);
+            googlePlaceAlarm.updateGooglePlaceLocation(
+                "google-place-id",
+                googlePlaceAlarm.getAddress(),
+                googlePlaceAlarm.getLatitude(),
+                googlePlaceAlarm.getLongitude(),
+                LocalDateTime.of(2026, 6, 26, 12, 0)
+            );
+            AlarmEntity legacyAlarm = AlarmFixture.ALARM_09.toEntity(member);
+            alarmRepository.saveAndFlush(googlePlaceAlarm);
+            alarmRepository.saveAndFlush(legacyAlarm);
+
+            // when
+            int clearedCount = alarmRepository.clearLocationCachesBySourceAndCachedAtBefore(
+                LocationSource.GOOGLE_PLACE,
+                LocalDateTime.of(2026, 7, 25, 12, 0)
+            );
+            entityManager.clear();
+
+            // then
+            AlarmEntity clearedAlarm = alarmRepository.findById(googlePlaceAlarm.getId()).orElseThrow();
+            AlarmEntity retainedLegacyAlarm = alarmRepository.findById(legacyAlarm.getId()).orElseThrow();
+            assertThat(clearedCount).isEqualTo(1);
+            assertThat(clearedAlarm.getGooglePlaceId()).isEqualTo("google-place-id");
+            assertThat(clearedAlarm.getLatitude()).isNull();
+            assertThat(clearedAlarm.getLongitude()).isNull();
+            assertThat(clearedAlarm.getAddress()).isNull();
+            assertThat(clearedAlarm.getLocationCachedAt()).isNull();
+            assertThat(retainedLegacyAlarm.getLatitude()).isNotNull();
+        }
+    }
 }

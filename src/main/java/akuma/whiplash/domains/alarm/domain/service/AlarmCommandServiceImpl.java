@@ -19,6 +19,7 @@ import akuma.whiplash.domains.alarm.application.dto.response.CreateAlarmResponse
 import akuma.whiplash.domains.alarm.application.mapper.AlarmMapper;
 import akuma.whiplash.domains.alarm.application.service.AuditLogRecorder;
 import akuma.whiplash.domains.alarm.domain.constant.OccurrenceStatus;
+import akuma.whiplash.domains.alarm.domain.constant.LocationSource;
 import akuma.whiplash.domains.alarm.domain.constant.DeactivationResult;
 import akuma.whiplash.domains.alarm.domain.constant.Weekday;
 import akuma.whiplash.domains.alarm.domain.util.AlarmScheduleCalculator;
@@ -83,6 +84,7 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
     private final AdSessionService adSessionService;
     private final ApplicationEventPublisher eventPublisher;
     private final TimeProvider timeProvider;
+    private final AlarmLocationCacheService alarmLocationCacheService;
 
     private static final double CHECKIN_RADIUS_METERS = 50.0;
 
@@ -96,7 +98,7 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
         }
 
         // 1. 알람 엔티티 생성 및 저장
-        AlarmEntity alarm = AlarmMapper.mapToAlarmEntity(request, memberEntity);
+        AlarmEntity alarm = AlarmMapper.mapToAlarmEntity(request, memberEntity, timeProvider.now());
         alarmRepository.save(alarm);
 
         // 2. 다음 알람 발생 날짜 계산
@@ -293,7 +295,16 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
             throw ApplicationException.from(CHECKIN_NOT_YET_AVAILABLE);
         }
 
-        // 4. 사용자가 알람 목적지 반경 50m 안에 있는지 검증한다.
+        // 4. Google 장소 캐시가 만료됐으면 Place ID로 갱신한 좌표만 사용한다.
+        if (alarm.getLocationSource() == LocationSource.GOOGLE_PLACE
+            && !alarmLocationCacheService.hasValidGoogleLocationCache(alarm, processedAt)) {
+            if (!alarm.hasGooglePlaceId()) {
+                throw ApplicationException.from(ALARM_LOCATION_RESELECTION_REQUIRED);
+            }
+            alarmLocationCacheService.refreshGoogleLocationCache(alarm);
+        }
+
+        // 5. 사용자가 알람 목적지 반경 50m 안에 있는지 검증한다.
         boolean isInRange = isWithinDistance(
             alarm.getLatitude(), alarm.getLongitude(),
             request.latitude(), request.longitude(), CHECKIN_RADIUS_METERS);
@@ -302,17 +313,17 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
             throw ApplicationException.from(CHECKIN_OUT_OF_RANGE);
         }
 
-        // 5. 체크인 완료 시각을 기록하고 회차 상태를 CHECKIN으로 전환한다.
+        // 6. 체크인 완료 시각을 기록하고 회차 상태를 CHECKIN으로 전환한다.
         occurrence.checkin(processedAt);
 
-        // 6. 클라이언트 동기화를 위해 다음 예정 회차를 함께 조회한다.
+        // 7. 클라이언트 동기화를 위해 다음 예정 회차를 함께 조회한다.
         AlarmOccurrenceEntity nextOccurrence = alarmOccurrenceRepository
             .findNextScheduledByAlarmIds(List.of(alarmId), OccurrenceStatus.SCHEDULED, processedAt)
             .stream()
             .findFirst()
             .orElse(null);
 
-        // 7. 체크인 로그는 본 처리와 분리해 커밋 후 별도 트랜잭션에서 best-effort로 저장한다.
+        // 8. 체크인 로그는 본 처리와 분리해 커밋 후 별도 트랜잭션에서 best-effort로 저장한다.
         eventPublisher.publishEvent(new AlarmCheckinCompletedEvent(
             occurrence.getId(),
             member.getId(),
@@ -321,7 +332,7 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
             processedAt
         ));
 
-        // 8. 다음 회차 정보를 포함한 응답을 반환한다.
+        // 9. 다음 회차 정보를 포함한 응답을 반환한다.
         return AlarmMapper.mapToAlarmCheckinResponse(alarm, nextOccurrence);
     }
 

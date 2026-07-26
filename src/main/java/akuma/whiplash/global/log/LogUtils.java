@@ -18,9 +18,9 @@ public final class LogUtils {
 
     private static final Set<String> SENSITIVE_KEYS = Set.of(
         "password", "passwd", "pwd", "authorization", "accesstoken", "refreshtoken",
-        "token", "secret", "apikey", "privatekey", "email", "phone", "ssn", "address",
+        "token", "sessiontoken", "secret", "apikey", "privatekey", "email", "phone", "ssn", "address",
         "deviceid", "clientid", "sessionid", "fcmtoken", "paymentid", "adprooftoken",
-        "latitude", "longitude"
+        "latitude", "longitude", "googleplaceid", "placeid", "place_id"
     );
 
     public static String nowIso() {

@@ -1,6 +1,7 @@
 package akuma.whiplash.domains.alarm.persistence.entity;
 
 import akuma.whiplash.domains.alarm.domain.constant.AlarmStatus;
+import akuma.whiplash.domains.alarm.domain.constant.LocationSource;
 import akuma.whiplash.domains.alarm.domain.constant.SoundType;
 import akuma.whiplash.domains.alarm.domain.constant.Weekday;
 import akuma.whiplash.domains.alarm.domain.util.RepeatDaysConverter;
@@ -61,14 +62,25 @@ public class AlarmEntity extends BaseTimeEntity {
     @Column(name = "sound_type", length = 20, nullable = false)
     private SoundType soundType = SoundType.VIBRATION_ONLY;
 
-    @Column(nullable = false)
+    @Column
     private Double latitude;
 
-    @Column(nullable = false)
+    @Column
     private Double longitude;
 
-    @Column(length = 50, nullable = false)
+    @Column(length = 255)
     private String address;
+
+    @Builder.Default
+    @Enumerated(EnumType.STRING)
+    @Column(name = "location_source", length = 20, nullable = false)
+    private LocationSource locationSource = LocationSource.GOOGLE_PLACE;
+
+    @Column(name = "google_place_id", length = 255)
+    private String googlePlaceId;
+
+    @Column(name = "location_cached_at")
+    private LocalDateTime locationCachedAt;
 
     @Builder.Default
     @Enumerated(EnumType.STRING)
@@ -88,5 +100,34 @@ public class AlarmEntity extends BaseTimeEntity {
     public void softDelete(LocalDateTime now) {
         this.status = AlarmStatus.DELETED;
         this.deletedAt = now;
+    }
+
+    public void updateGooglePlaceLocation(
+        String googlePlaceId,
+        String address,
+        double latitude,
+        double longitude,
+        LocalDateTime locationCachedAt
+    ) {
+        this.locationSource = LocationSource.GOOGLE_PLACE;
+        this.googlePlaceId = googlePlaceId;
+        this.address = address;
+        this.latitude = latitude;
+        this.longitude = longitude;
+        this.locationCachedAt = locationCachedAt;
+    }
+
+    public void clearGooglePlaceLocationCache() {
+        if (locationSource != LocationSource.GOOGLE_PLACE) {
+            return;
+        }
+        this.latitude = null;
+        this.longitude = null;
+        this.address = null;
+        this.locationCachedAt = null;
+    }
+
+    public boolean hasGooglePlaceId() {
+        return googlePlaceId != null && !googlePlaceId.isBlank();
     }
 }

@@ -1,6 +1,7 @@
 package akuma.whiplash.common.fixture;
 
 import akuma.whiplash.domains.alarm.domain.constant.SoundType;
+import akuma.whiplash.domains.alarm.domain.constant.LocationSource;
 import akuma.whiplash.domains.alarm.domain.constant.Weekday;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmEntity;
 import akuma.whiplash.domains.member.persistence.entity.MemberEntity;
@@ -75,6 +76,7 @@ public enum AlarmFixture {
             .latitude(latitude)
             .longitude(longitude)
             .address(address)
+            .locationSource(LocationSource.USER_PIN)
             .member(member.toEntity())
             .build();
     }
@@ -89,6 +91,7 @@ public enum AlarmFixture {
             .latitude(latitude)
             .longitude(longitude)
             .address(address)
+            .locationSource(LocationSource.USER_PIN)
             .member(member)
             .build();
     }
@@ -102,6 +105,7 @@ public enum AlarmFixture {
             .latitude(latitude)
             .longitude(longitude)
             .address(address)
+            .locationSource(LocationSource.USER_PIN)
             .member(member)
             .build();
     }
