@@ -1,6 +1,6 @@
 ---
 name: development-workflow
-description: 이 저장소에서 신규 기능 개발, 기존 기능 리팩토링, 버그 수정, API 변경, 도메인 정책 변경을 수행할 때 설계 문서화, Red-Green-Refactor 테스트 작성, 구현, 관련 테스트와 전체 테스트 검증, 배포/PR 확인까지 자연스럽게 이어가도록 사용하는 워크플로우 스킬이다.
+description: 이 저장소에서 영향도에 비례해 신규 기능, 주요 변경, 국소 버그 수정, 리팩토링의 설계·테스트·검증 경로를 선택할 때 사용하는 워크플로우 스킬이다.
 ---
 
 # Development Workflow
@@ -14,21 +14,21 @@ description: 이 저장소에서 신규 기능 개발, 기존 기능 리팩토�
 ## Workflow
 
 1. 작업 유형을 분류한다.
-   - 신규 기능, 버그 수정, API/DTO/정책 변경, 도메인 로직 변경: 설계와 TDD 흐름을 적용한다.
-   - 순수 리팩토링: 기존 동작 기준선을 먼저 테스트로 확인하고, red 테스트가 부자연스러운 이유를 명시한다.
-   - 단순 오타, 주석, 문서만 변경: 영향 없음과 검증 범위를 짧게 남긴다.
+   - API 계약, DB schema, Redis key, 외부 API, 결제/FCM/스케줄러, ErrorCode, 도메인 정책 또는 여러 레이어를 변경: 이 워크플로우 전체를 적용한다.
+   - 국소 버그 수정·순수 리팩토링: 관련 테스트로 기존 동작을 먼저 확인하고, 설계 문서와 전체 테스트는 영향도에 따라 결정한다.
+   - 단순 오타, 주석, 문서, 에이전트 지침 변경: 영향 범위와 문서/링크 검증만 짧게 남긴다. 애플리케이션 테스트와 PLAN.md는 요구하지 않는다.
 
-2. 설계 필요 여부를 결정한다.
+2. 코드 변경일 때 설계 필요 여부를 결정한다.
    - API 계약, DB schema, Redis key, 외부 API, 결제/FCM/스케줄러, ErrorCode, 도메인 정책, SLO 영향이 있으면 [to-prd](../to-prd/SKILL.md)를 사용해 `docs/history/{0001}-{feature-slug}/PLAN.md`를 생성하거나 갱신한다.
    - 운영 의미가 큰 정책이나 기존 설계와 충돌 가능성이 있으면 [grill-with-docs](../grill-with-docs/SKILL.md)로 문서와 코드를 대조한다.
    - PLAN.md가 필요 없으면 “설계 문서 생략 사유”를 작업 메모나 최종 응답에 남긴다.
 
-3. 테스트 계획을 먼저 세운다.
+3. 코드 변경일 때 테스트 계획을 먼저 세운다.
    - [write-test-code](../write-test-code/SKILL.md)를 사용해 성공/실패 시나리오와 테스트 슬라이스를 정한다.
    - controller, service, repository, Redis, integration 중 변경 책임에 맞는 테스트를 선택한다.
    - SLO 영향이 있으면 [slo-check](../slo-check/SKILL.md)로 latency, availability, error rate 관점의 검증 항목을 정리한다.
 
-4. Red를 확인한다.
+4. 코드 변경일 때 Red를 확인한다.
    - 신규 기능, 버그 수정, 정책 변경은 구현 전에 핵심 계약을 검증하는 실패 테스트를 먼저 작성한다.
    - 관련 테스트 명령으로 의도한 이유의 실패를 확인한다.
    - 순수 리팩토링처럼 red가 부자연스러운 경우, 기존 관련 테스트를 먼저 실행해 기준선을 잡고 예외 사유를 남긴다.
@@ -38,13 +38,14 @@ description: 이 저장소에서 신규 기능 개발, 기존 기능 리팩토�
    - 새 도메인이나 레이어 확장이 있으면 [create-domain-layer](../create-domain-layer/SKILL.md)를 사용한다.
    - 새 ErrorCode, validation, `@CustomErrorCodes` 변경이 있으면 [handle-exception](../handle-exception/SKILL.md)를 사용한다.
 
-6. Green과 Refactor를 완료한다.
+6. 코드 변경이면 Green과 Refactor를 완료한다.
    - 먼저 변경 범위의 관련 테스트를 통과시킨다.
    - 중복, mapper 위치, 트랜잭션 경계, 레이어 의존을 정리한다.
    - 테스트 자체의 구조와 네이밍은 [review-test](../review-test/SKILL.md) 기준으로 확인한다.
 
-7. 전체 검증을 실행한다.
-   - 작업 완료 전 기본 명령은 `./gradlew test`다.
+7. 변경 범위에 맞는 검증을 실행한다.
+   - 애플리케이션 코드를 변경하면 기본 명령은 `./gradlew test`다.
+   - 문서·스킬만 변경하면 YAML frontmatter, 상대 링크, 지침 간 충돌과 diff를 검토한다.
    - 전체 테스트를 실행할 수 없으면 미실행 사유, 대신 실행한 관련 테스트, 남은 리스크를 최종 응답과 PR 설명에 남긴다.
    - CI/CD나 배포 영향이 있으면 `.github/workflows`, 운영 민감 파일, 환경 설정 변경 여부를 재확인한다.
 
@@ -55,12 +56,12 @@ description: 이 저장소에서 신규 기능 개발, 기존 기능 리팩토�
 
 ## Completion Checklist
 
-- PLAN.md 생성/갱신 필요 여부를 판단했는가?
-- PLAN.md가 필요 없으면 생략 사유를 남겼는가?
-- 신규 기능/버그 수정/정책 변경에서 red 테스트를 먼저 확인했는가?
-- red 예외가 있다면 이유를 명시했는가?
-- 관련 테스트를 먼저 통과시켰는가?
-- 완료 전 `./gradlew test`를 실행했거나, 미실행 사유와 리스크를 남겼는가?
+- 코드 변경에서 PLAN.md 생성/갱신 필요 여부를 판단했는가?
+- 코드 변경에서 PLAN.md가 필요 없으면 생략 사유를 남겼는가?
+- 코드 변경에서 red 테스트 또는 기존 기준선 테스트를 먼저 확인했는가?
+- 코드 변경에서 관련 테스트를 통과시켰는가?
+- 코드 변경에서 `./gradlew test`를 실행했거나, 미실행 사유와 리스크를 남겼는가?
+- 문서·스킬만 변경했다면 링크와 지침 간 충돌을 검토했는가?
 - 최종 응답에 문서, 구현, 테스트, 검증 결과가 함께 정리되었는가?
 
 ## Related Skills

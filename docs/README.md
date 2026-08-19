@@ -24,6 +24,8 @@ docs/
 ├── ARCHITECTURE.md               상세 시스템 구조
 ├── PRIVACY_AND_AUDIT_LOGGING_POLICY.md
 │                                 개인정보와 감사·운영 로그 정책
+├── AI_DEVELOPMENT_PROCESS_EVALUATION.md
+│                                 AI 활용 개발 프로세스의 효과 평가 기준
 ├── TODO.md                       로컬 backlog
 ├── adr/                          장기간 적용할 결정과 선택 이유
 └── history/                      기능별 계획과 인수인계
@@ -46,6 +48,7 @@ docs/
 | 공개 제품명과 공통 용어 | 루트 `CONTEXT.md` |
 | 상세 제품 목표와 정책 | 로컬 `docs/PRD.md`와 정책 문서 |
 | 아키텍처 결정과 선택 이유 | 로컬 `docs/adr/`의 최신 `Accepted` ADR |
+| AI 활용 개발 프로세스의 효과 평가 | 로컬 `docs/AI_DEVELOPMENT_PROCESS_EVALUATION.md` |
 | 현재 구현 동작 | source code, test, Flyway migration |
 | 과거 결정과 작업 과정 | 로컬 `docs/history/` |
 

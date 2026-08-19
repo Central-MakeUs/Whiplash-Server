@@ -31,7 +31,9 @@
 - 개인정보, 위치 데이터, 감사/운영 로그 변경: `docs/PRIVACY_AND_AUDIT_LOGGING_POLICY.md`
 - 구조적 결정 또는 정책 선택: 관련 `docs/adr/*.md`
 - 기능별 과거 계획, API 계약, 인수인계: 관련 `docs/history/{번호}-{기능명}/`
+- AI 활용 개발 프로세스의 효과 평가: `docs/AI_DEVELOPMENT_PROCESS_EVALUATION.md`
 - 반복 가능한 작업 절차: `.codex/skills/{skill-name}/SKILL.md`
+- 에이전트 작업 지침을 변경하거나 품질을 비교: `.codex/skills/evaluate-agent-workflow/SKILL.md`
 - 실제 정책 검증: `src/test/`
 - 자동 검증과 배포 절차: `.github/workflows/`
 
@@ -39,9 +41,8 @@
 
 ## 절대 규칙
 
-- 신규 기능 개발, 기존 기능 리팩토링, 버그 수정, API/도메인 정책 변경 작업은 먼저 `.codex/skills/development-workflow/SKILL.md`를 적용한다.
+- API·DB·외부 연동·도메인 정책을 변경하거나 여러 레이어에 영향을 주는 작업은 먼저 `.codex/skills/development-workflow/SKILL.md`를 적용한다. 문서·주석·국소 수정은 변경 범위에 맞는 경량 검증만 수행한다.
 - 예외는 반드시 `ApplicationException.from(ErrorCode)`를 사용한다.
-- 도메인 `XxxErrorCode`의 허용 `HttpStatus`는 `400`, `401`, `403`, `404`, `409`만 사용한다. framework/system 오류를 표현하는 `CommonErrorCode`는 예외다.
 - API 응답은 반드시 `ApplicationResponse<T>`를 사용한다.
 - 레이어 방향은 `presentation -> application -> domain -> persistence`를 지킨다.
 - 네이밍 규칙:
@@ -65,51 +66,12 @@
 - 현재 책임을 수행하는 데 필수적이지 않은 파라미터는 추가하지 않는다.
 - 클래스와 메서드의 책임을 명확히 분리한다. 요구사항이나 구현 방식이 기존 아키텍처와 충돌하거나 설계상 부자연스러우면 구현 전에 문제와 대안을 알린다.
 
-## 예외 및 응답 규칙
+## 세부 구현 규칙 라우팅
 
-- 예외는 `ApplicationException.from(XxxErrorCode.SOME_ERROR)`로 발생시킨다.
-- 신규 ErrorCode 포맷:
-
-```java
-NAME(HttpStatus.STATUS, "DOMAIN_001", "~입니다.")
-```
-
-- 신규 코드 번호는 `001~099=400`, `101~199=401`, `301~399=403`, `401~499=404`, `901~999=409` 범위를 사용한다.
-- 이미 외부 계약으로 사용 중인 ErrorCode는 번호 범위가 다르더라도 형식 통일만을 위해 변경하지 않는다.
-
-- Controller 메서드는 `ApplicationResponse.onSuccess(result)` 또는 `ApplicationResponse.onSuccess()`를 반환한다.
-- 모든 매핑 메서드에는 `@CustomErrorCodes`를 선언한다.
-
-## Mapper 규칙
-
-- 엔티티/DTO 변환은 `{Domain}Mapper.mapToXxx()` static 메서드로 처리한다.
-- Service나 UseCase 내부에서 변환용 builder를 인라인으로 작성하지 않는다.
-- Mapper 클래스는 아래 형태를 따른다.
-
-```java
-public class XxxMapper {
-    private XxxMapper() {
-        throw new IllegalArgumentException();
-    }
-}
-```
-
-## Entity 및 Repository 규칙
-
-- FK id 필드보다 `@ManyToOne(fetch = FetchType.LAZY)` 객체 참조를 우선한다.
-- 중첩 프로퍼티 Repository 쿼리는 `_`로 경로를 구분한다.
-
-```java
-findByMember_IdAndDeviceId(Long memberId, String deviceId)
-```
-
-## DTO 규칙
-
-- PK 필드는 `alarmId`, `memberId`처럼 도메인명을 포함한다.
-- List 응답 필드명은 `alarms`처럼 복수형 도메인명을 사용한다.
-- Enum 값은 기본적으로 `.name()`을 사용한다.
-- 날짜/시간 값은 `ISO_LOCAL_DATE` 또는 `ISO_LOCAL_DATE_TIME` 형식을 따른다.
-- 페이지네이션 필드는 `page`, `size`, `sortType`을 사용한다.
+- ErrorCode, validation, controller 오류 선언을 변경할 때는 `handle-exception` 스킬을 사용한다.
+- 도메인 레이어, entity, repository, DTO, mapper, controller를 추가하거나 확장할 때는 `create-domain-layer` 스킬을 사용한다.
+- 테스트를 작성하거나 변경할 때는 `write-test-code` 스킬을 사용하고, 테스트 리뷰에는 `review-test` 스킬을 사용한다.
+- 각 스킬이 다루는 상세 형식, 예시, 체크리스트는 해당 스킬을 단일 원본으로 삼는다.
 
 ## 시간 처리 규칙
 
@@ -118,28 +80,6 @@ findByMember_IdAndDeviceId(Long memberId, String deviceId)
 - 절대 시각은 `Instant` 또는 UTC로 변환 가능한 값으로 다루고, 사용자 반복 일정은 `LocalDate`, `LocalTime`, `LocalDateTime`과 명시적인 `ZoneId`로 다룬다.
 - 테스트에서는 고정 `Clock` 또는 명시적 상수 시간을 사용한다. 기존 코드의 직접 `now()` 호출은 새 코드의 선례로 삼지 않는다.
 - 세부 정책은 로컬 문서 `docs/adr/0003-device-timezone-alarm-policy.md`를 따른다.
-
-## 테스트 규칙
-
-- 구조:
-
-```text
-{ClassName}Test
-  @Nested {MethodName}Test
-    success()
-    fail_{reason}()
-```
-
-- `@DisplayName`은 문장형으로 작성한다.
-- `~테스트` 표현은 사용하지 않는다.
-- 권장 prefix:
-  - `성공: ...`
-  - `실패: ...`
-- `// given`, `// when`, `// then` 주석을 포함한다.
-- inner class `@DisplayName`은 `"{메서드명} - {기능}"` 형식을 따른다.
-- 테스트 엔티티는 `src/test/java/akuma/whiplash/common/fixture/`의 fixture 사용을 우선한다.
-- 에러 응답은 `status`, `isSuccess`, `code` 중심으로 검증하고, 문자열보다 ErrorCode enum을 사용한다.
-- 변경 가능한 에러 메시지는 계약인 경우에만 검증한다.
 
 ## 커밋 규칙
 
