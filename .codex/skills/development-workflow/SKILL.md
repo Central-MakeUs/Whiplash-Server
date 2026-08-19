@@ -19,7 +19,7 @@ description: 이 저장소에서 영향도에 비례해 신규 기능, 주요 �
    - 단순 오타, 주석, 문서, 에이전트 지침 변경: 영향 범위와 문서/링크 검증만 짧게 남긴다. 애플리케이션 테스트와 PLAN.md는 요구하지 않는다.
 
 2. 코드 변경일 때 설계 필요 여부를 결정한다.
-   - API 계약, DB schema, Redis key, 외부 API, 결제/FCM/스케줄러, ErrorCode, 도메인 정책, SLO 영향이 있으면 [to-prd](../to-prd/SKILL.md)를 사용해 `docs/history/{0001}-{feature-slug}/PLAN.md`를 생성하거나 갱신한다.
+   - API 계약, DB schema, Redis key, 외부 API, 결제/FCM/스케줄러, ErrorCode, 도메인 정책, SLO 영향이 있으면 [to-prd](../to-prd/SKILL.md)를 사용해 `docs/history/{도메인 번호}. {한글 도메인}/{0001}-{feature-slug}/PLAN.md`를 생성하거나 갱신한다.
    - 운영 의미가 큰 정책이나 기존 설계와 충돌 가능성이 있으면 [grill-with-docs](../grill-with-docs/SKILL.md)로 문서와 코드를 대조한다.
    - PLAN.md가 필요 없으면 “설계 문서 생략 사유”를 작업 메모나 최종 응답에 남긴다.
 

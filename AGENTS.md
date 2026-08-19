@@ -15,7 +15,7 @@
 
 - 저장소 공통 개발 규칙의 단일 원본은 루트 `AGENTS.md`다.
 - 공개 가능한 제품명과 공통 도메인 용어의 단일 원본은 루트 `CONTEXT.md`다.
-- 아키텍처와 운영 정책의 선택 이유는 `docs/adr/`의 최신 `Accepted` ADR을 따른다.
+- 아키텍처와 운영 정책의 선택 이유는 `docs/adr/README.md`에서 도메인을 찾은 뒤 관련 최신 `Accepted` ADR을 따른다.
 - 실제 구현 상태는 source code, test, Flyway migration을 기준으로 확인한다.
 - `docs/history/`는 특정 작업 당시의 계획과 이력이며 현재 정책을 자동으로 대체하지 않는다.
 - 규칙, ADR, 문서, 코드가 충돌하면 임의로 하나를 선택하지 않는다. 실제 구현과 목표 정책의 차이를 사용자에게 알리고 작업 범위를 확인한다.
@@ -29,8 +29,8 @@
 - 제품 목표, 범위, KPI, SLO 확인: `docs/PRD.md`
 - 전역 시스템 구조와 외부 연동 확인: `docs/ARCHITECTURE.md`
 - 개인정보, 위치 데이터, 감사/운영 로그 변경: `docs/PRIVACY_AND_AUDIT_LOGGING_POLICY.md`
-- 구조적 결정 또는 정책 선택: 관련 `docs/adr/*.md`
-- 기능별 과거 계획, API 계약, 인수인계: 관련 `docs/history/{번호}-{기능명}/`
+- 구조적 결정 또는 정책 선택: `docs/adr/README.md`에서 도메인을 찾은 뒤 관련 `docs/adr/{도메인 번호}. {한글 도메인}/{번호}-{결정명}.md`
+- 기능별 과거 계획, API 계약, 인수인계: `docs/history/README.md`에서 도메인을 찾은 뒤 관련 `docs/history/{도메인 번호}. {한글 도메인}/{번호}-{기능명}/`
 - AI 활용 개발 프로세스의 효과 평가: `docs/AI_DEVELOPMENT_PROCESS_EVALUATION.md`
 - 반복 가능한 작업 절차: `.codex/skills/{skill-name}/SKILL.md`
 - 에이전트 작업 지침을 변경하거나 품질을 비교: `.codex/skills/evaluate-agent-workflow/SKILL.md`
@@ -79,7 +79,7 @@
 - 새 비즈니스 로직에서는 `LocalDateTime.now()`, `LocalDate.now()`, `LocalTime.now()`를 직접 호출하지 않고 `TimeProvider` 또는 주입된 `Clock`을 사용한다.
 - 절대 시각은 `Instant` 또는 UTC로 변환 가능한 값으로 다루고, 사용자 반복 일정은 `LocalDate`, `LocalTime`, `LocalDateTime`과 명시적인 `ZoneId`로 다룬다.
 - 테스트에서는 고정 `Clock` 또는 명시적 상수 시간을 사용한다. 기존 코드의 직접 `now()` 호출은 새 코드의 선례로 삼지 않는다.
-- 세부 정책은 로컬 문서 `docs/adr/0003-device-timezone-alarm-policy.md`를 따른다.
+- 세부 정책은 로컬 문서 `docs/adr/02. 알람/0003-device-timezone-alarm-policy.md`를 따른다.
 
 ## 커밋 규칙
 
