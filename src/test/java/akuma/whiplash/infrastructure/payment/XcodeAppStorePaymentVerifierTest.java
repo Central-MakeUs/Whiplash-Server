@@ -6,7 +6,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
-@DisplayName("XcodeAppStorePaymentVerifier Test")
+@DisplayName("Xcode StoreKit 결제 검증을 확인한다")
 class XcodeAppStorePaymentVerifierTest {
 
     private final XcodeAppStorePaymentVerifier verifier = new XcodeAppStorePaymentVerifier();
@@ -38,6 +38,36 @@ class XcodeAppStorePaymentVerifierTest {
             // given
             AppStorePaymentVerificationRequest request = new AppStorePaymentVerificationRequest(
                 "", "ALARM_OFF"
+            );
+
+            // when
+            var result = verifier.verify(request);
+
+            // then
+            assertThat(result).isEmpty();
+        }
+
+        @Test
+        @DisplayName("실패: 상품 ID가 없으면 허용하지 않는다")
+        void fail_blankProductId() {
+            // given
+            AppStorePaymentVerificationRequest request = new AppStorePaymentVerificationRequest(
+                "xcode-transaction-id", ""
+            );
+
+            // when
+            var result = verifier.verify(request);
+
+            // then
+            assertThat(result).isEmpty();
+        }
+
+        @Test
+        @DisplayName("실패: 지원하지 않는 상품 ID면 허용하지 않는다")
+        void fail_unsupportedProductId() {
+            // given
+            AppStorePaymentVerificationRequest request = new AppStorePaymentVerificationRequest(
+                "xcode-transaction-id", "UNSUPPORTED"
             );
 
             // when

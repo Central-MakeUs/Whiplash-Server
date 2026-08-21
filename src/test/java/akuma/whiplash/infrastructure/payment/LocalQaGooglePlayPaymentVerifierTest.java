@@ -6,7 +6,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
-@DisplayName("LocalQaGooglePlayPaymentVerifier Test")
+@DisplayName("Local/QA Google Play 결제 검증을 확인한다")
 class LocalQaGooglePlayPaymentVerifierTest {
 
     private final LocalQaGooglePlayPaymentVerifier verifier = new LocalQaGooglePlayPaymentVerifier();
@@ -37,6 +37,21 @@ class LocalQaGooglePlayPaymentVerifierTest {
         void fail_blankPurchaseToken() {
             // given
             GooglePlayPaymentVerificationRequest request = new GooglePlayPaymentVerificationRequest("", "ALARM_OFF");
+
+            // when
+            var result = verifier.verify(request);
+
+            // then
+            assertThat(result).isEmpty();
+        }
+
+        @Test
+        @DisplayName("실패: 지원하지 않는 상품 ID면 거래를 허용하지 않는다")
+        void fail_unsupportedProductId() {
+            // given
+            GooglePlayPaymentVerificationRequest request = new GooglePlayPaymentVerificationRequest(
+                "google-play-purchase-token", "UNSUPPORTED"
+            );
 
             // when
             var result = verifier.verify(request);

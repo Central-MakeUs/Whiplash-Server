@@ -6,10 +6,6 @@ import akuma.whiplash.domains.ad.domain.constant.AdPurpose;
 import akuma.whiplash.domains.ad.domain.service.AdSessionService;
 import akuma.whiplash.domains.ad.persistence.entity.AdSessionEntity;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmAdSessionCreateRequest;
-import akuma.whiplash.domains.alarm.application.dto.request.AppStoreAlarmDeletePaymentRequest;
-import akuma.whiplash.domains.alarm.application.dto.request.AppStoreAlarmPaymentRequest;
-import akuma.whiplash.domains.alarm.application.dto.request.GooglePlayAlarmDeletePaymentRequest;
-import akuma.whiplash.domains.alarm.application.dto.request.GooglePlayAlarmPaymentRequest;
 import akuma.whiplash.domains.alarm.application.event.AlarmCheckinCompletedEvent;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmCheckinRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmDeleteByAdRequest;
@@ -45,7 +41,8 @@ import akuma.whiplash.domains.member.persistence.repository.MemberRepository;
 import akuma.whiplash.domains.payment.application.mapper.PaymentMapper;
 import akuma.whiplash.domains.payment.domain.constant.PaymentStatus;
 import akuma.whiplash.domains.payment.domain.constant.PaymentType;
-import akuma.whiplash.domains.payment.domain.constant.AppStorePaymentPurpose;
+import akuma.whiplash.domains.payment.domain.command.StorePaymentProof;
+import akuma.whiplash.domains.payment.domain.constant.InAppPaymentPurpose;
 import akuma.whiplash.domains.payment.exception.PaymentErrorCode;
 import akuma.whiplash.domains.payment.persistence.repository.PaymentRepository;
 import akuma.whiplash.global.exception.ApplicationException;
@@ -287,32 +284,32 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
         Long memberId,
         String deviceId,
         Long alarmId,
-        AppStoreAlarmDeletePaymentRequest request
+        StorePaymentProof paymentProof
     ) {
         AlarmEntity alarm = findAlarmById(alarmId);
         MemberEntity member = alarm.getMember();
         validAlarmOwner(memberId, member.getId());
 
+        ZoneId memberZone = validateAppStoreDevice(memberId, deviceId);
         AlarmOccurrenceEntity todayOccurrence = alarmOccurrenceRepository
-            .findByAlarmIdAndDate(alarmId, timeProvider.today())
+            .findByAlarmIdAndDate(alarmId, timeProvider.today(memberZone))
             .orElseThrow(() -> ApplicationException.from(TODAY_IS_NOT_ALARM_DAY));
         if (todayOccurrence.getStatus() != OccurrenceStatus.SCHEDULED
             && todayOccurrence.getStatus() != OccurrenceStatus.RINGING) {
             throw ApplicationException.from(ALREADY_DEACTIVATED);
         }
 
-        validateAppStoreDevice(memberId, deviceId);
-        if (paymentRepository.existsByPaymentId(request.transactionId())) {
+        if (paymentRepository.existsByPaymentId(paymentProof.paymentId())) {
             throw ApplicationException.from(PaymentErrorCode.DUPLICATE_PAYMENT);
         }
 
         LocalDateTime processedAt = timeProvider.now();
-        if (!isVerifiedAppStorePayment(request.transactionId(), request.productId(), AppStorePaymentPurpose.ALARM_DELETE)) {
+        if (!isVerifiedAppStorePayment(paymentProof.paymentId(), paymentProof.productId(), InAppPaymentPurpose.ALARM_DELETE)) {
             try {
                 auditLogRecorder.recordPaymentDeleteFailure(
                     member,
                     alarm,
-                    request.transactionId(),
+                    paymentProof.paymentId(),
                     processedAt,
                     "APP_STORE_PAYMENT_VERIFICATION_FAILED"
                 );
@@ -322,12 +319,12 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
             throw ApplicationException.from(PaymentErrorCode.PAYMENT_VERIFICATION_FAILED);
         }
 
-        savePaymentOrThrowDuplicate(member, alarm, request.transactionId(), PaymentType.DELETE_ALARM);
+        savePaymentOrThrowDuplicate(member, alarm, paymentProof.paymentId(), PaymentType.DELETE_ALARM);
         alarm.softDelete(processedAt);
         alarmDeleteLogRepository.save(AlarmMapper.mapToPaymentDeleteLogEntity(
             alarm,
             member,
-            request.transactionId(),
+            paymentProof.paymentId(),
             "",
             processedAt,
             processedAt
@@ -339,32 +336,32 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
         Long memberId,
         String deviceId,
         Long alarmId,
-        GooglePlayAlarmDeletePaymentRequest request
+        StorePaymentProof paymentProof
     ) {
         AlarmEntity alarm = findAlarmById(alarmId);
         MemberEntity member = alarm.getMember();
         validAlarmOwner(memberId, member.getId());
 
+        ZoneId memberZone = validateGooglePlayDevice(memberId, deviceId);
         AlarmOccurrenceEntity todayOccurrence = alarmOccurrenceRepository
-            .findByAlarmIdAndDate(alarmId, timeProvider.today())
+            .findByAlarmIdAndDate(alarmId, timeProvider.today(memberZone))
             .orElseThrow(() -> ApplicationException.from(TODAY_IS_NOT_ALARM_DAY));
         if (todayOccurrence.getStatus() != OccurrenceStatus.SCHEDULED
             && todayOccurrence.getStatus() != OccurrenceStatus.RINGING) {
             throw ApplicationException.from(ALREADY_DEACTIVATED);
         }
 
-        validateGooglePlayDevice(memberId, deviceId);
-        if (paymentRepository.existsByPaymentId(request.purchaseToken())) {
+        if (paymentRepository.existsByPaymentId(paymentProof.paymentId())) {
             throw ApplicationException.from(PaymentErrorCode.DUPLICATE_PAYMENT);
         }
 
         LocalDateTime processedAt = timeProvider.now();
-        if (!isVerifiedGooglePlayPayment(request.purchaseToken(), request.productId(), AppStorePaymentPurpose.ALARM_DELETE)) {
+        if (!isVerifiedGooglePlayPayment(paymentProof.paymentId(), paymentProof.productId(), InAppPaymentPurpose.ALARM_DELETE)) {
             try {
                 auditLogRecorder.recordPaymentDeleteFailure(
                     member,
                     alarm,
-                    request.purchaseToken(),
+                    paymentProof.paymentId(),
                     processedAt,
                     "GOOGLE_PLAY_PAYMENT_VERIFICATION_FAILED"
                 );
@@ -374,12 +371,12 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
             throw ApplicationException.from(PaymentErrorCode.PAYMENT_VERIFICATION_FAILED);
         }
 
-        savePaymentOrThrowDuplicate(member, alarm, request.purchaseToken(), PaymentType.DELETE_ALARM);
+        savePaymentOrThrowDuplicate(member, alarm, paymentProof.paymentId(), PaymentType.DELETE_ALARM);
         alarm.softDelete(processedAt);
         alarmDeleteLogRepository.save(AlarmMapper.mapToPaymentDeleteLogEntity(
             alarm,
             member,
-            request.purchaseToken(),
+            paymentProof.paymentId(),
             "",
             processedAt,
             processedAt
@@ -559,7 +556,8 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
         Long memberId,
         String deviceId,
         Long alarmId,
-        AppStoreAlarmPaymentRequest request
+        Long occurrenceId,
+        StorePaymentProof paymentProof
     ) {
         AlarmEntity alarm = findAlarmById(alarmId);
         MemberEntity member = alarm.getMember();
@@ -567,23 +565,30 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
 
         LocalDateTime processedAt = timeProvider.now();
         validateAppStoreDevice(memberId, deviceId);
-        if (paymentRepository.existsByPaymentId(request.transactionId())) {
+        if (paymentRepository.existsByPaymentId(paymentProof.paymentId())) {
             throw ApplicationException.from(PaymentErrorCode.DUPLICATE_PAYMENT);
         }
 
-        AlarmOccurrenceEntity occurrenceForAudit = alarmOccurrenceRepository.findById(request.occurrenceId())
+        AlarmOccurrenceEntity occurrenceForAudit = alarmOccurrenceRepository.findById(occurrenceId)
             .filter(occurrence -> occurrence.getAlarm().getId().equals(alarmId))
             .orElseThrow(() -> ApplicationException.from(ALARM_OCCURRENCE_NOT_FOUND));
 
-        // 검증 실패 이력은 별도 트랜잭션으로 저장한다. 회차의 비관적 락을 얻기 전에 처리해야
-        // 별도 트랜잭션이 알람 연관 FK를 저장할 때 자기 자신과 lock wait을 일으키지 않는다.
-        if (!isVerifiedAppStorePayment(request.transactionId(), request.productId(), AppStorePaymentPurpose.ALARM_OFF)) {
+        if (occurrenceForAudit.getStatus() != OccurrenceStatus.SCHEDULED
+            && occurrenceForAudit.getStatus() != OccurrenceStatus.RINGING) {
+            throw ApplicationException.from(ALREADY_DEACTIVATED);
+        }
+        if (processedAt.isBefore(occurrenceForAudit.getScheduledAt().minusHours(3))) {
+            throw ApplicationException.from(PaymentErrorCode.PAYMENT_NOT_YET_AVAILABLE);
+        }
+
+        // 감사 로그의 별도 트랜잭션이 비관적 락과 충돌하지 않도록 검증은 락 획득 전에 수행한다.
+        if (!isVerifiedAppStorePayment(paymentProof.paymentId(), paymentProof.productId(), InAppPaymentPurpose.ALARM_OFF)) {
             try {
                 auditLogRecorder.recordPaymentDeactivationFailure(
                     member,
                     alarm,
                     occurrenceForAudit,
-                    request.transactionId(),
+                    paymentProof.paymentId(),
                     deviceId,
                     processedAt,
                     "APP_STORE_PAYMENT_VERIFICATION_FAILED"
@@ -595,7 +600,7 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
         }
 
         AlarmOccurrenceEntity occurrence = alarmOccurrenceRepository
-            .findByIdAndAlarmId(request.occurrenceId(), alarmId)
+            .findByIdAndAlarmId(occurrenceId, alarmId)
             .orElseThrow(() -> ApplicationException.from(ALARM_OCCURRENCE_NOT_FOUND));
         if (occurrence.getStatus() != OccurrenceStatus.SCHEDULED
             && occurrence.getStatus() != OccurrenceStatus.RINGING) {
@@ -606,12 +611,12 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
             throw ApplicationException.from(PaymentErrorCode.PAYMENT_NOT_YET_AVAILABLE);
         }
 
-        savePaymentOrThrowDuplicate(member, alarm, request.transactionId(), PaymentType.STOP_ALARM);
+        savePaymentOrThrowDuplicate(member, alarm, paymentProof.paymentId(), PaymentType.STOP_ALARM);
         occurrence.deactivateByPayment(processedAt);
         alarmDeactivationLogRepository.save(AlarmMapper.mapToPaymentDeactivationLogEntity(
             occurrence,
             member,
-            request.transactionId(),
+            paymentProof.paymentId(),
             deviceId,
             processedAt,
             processedAt,
@@ -632,7 +637,8 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
         Long memberId,
         String deviceId,
         Long alarmId,
-        GooglePlayAlarmPaymentRequest request
+        Long occurrenceId,
+        StorePaymentProof paymentProof
     ) {
         AlarmEntity alarm = findAlarmById(alarmId);
         MemberEntity member = alarm.getMember();
@@ -640,21 +646,29 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
 
         LocalDateTime processedAt = timeProvider.now();
         validateGooglePlayDevice(memberId, deviceId);
-        if (paymentRepository.existsByPaymentId(request.purchaseToken())) {
+        if (paymentRepository.existsByPaymentId(paymentProof.paymentId())) {
             throw ApplicationException.from(PaymentErrorCode.DUPLICATE_PAYMENT);
         }
 
-        AlarmOccurrenceEntity occurrenceForAudit = alarmOccurrenceRepository.findById(request.occurrenceId())
+        AlarmOccurrenceEntity occurrenceForAudit = alarmOccurrenceRepository.findById(occurrenceId)
             .filter(occurrence -> occurrence.getAlarm().getId().equals(alarmId))
             .orElseThrow(() -> ApplicationException.from(ALARM_OCCURRENCE_NOT_FOUND));
 
-        if (!isVerifiedGooglePlayPayment(request.purchaseToken(), request.productId(), AppStorePaymentPurpose.ALARM_OFF)) {
+        if (occurrenceForAudit.getStatus() != OccurrenceStatus.SCHEDULED
+            && occurrenceForAudit.getStatus() != OccurrenceStatus.RINGING) {
+            throw ApplicationException.from(ALREADY_DEACTIVATED);
+        }
+        if (processedAt.isBefore(occurrenceForAudit.getScheduledAt().minusHours(3))) {
+            throw ApplicationException.from(PaymentErrorCode.PAYMENT_NOT_YET_AVAILABLE);
+        }
+
+        if (!isVerifiedGooglePlayPayment(paymentProof.paymentId(), paymentProof.productId(), InAppPaymentPurpose.ALARM_OFF)) {
             try {
                 auditLogRecorder.recordPaymentDeactivationFailure(
                     member,
                     alarm,
                     occurrenceForAudit,
-                    request.purchaseToken(),
+                    paymentProof.paymentId(),
                     deviceId,
                     processedAt,
                     "GOOGLE_PLAY_PAYMENT_VERIFICATION_FAILED"
@@ -666,7 +680,7 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
         }
 
         AlarmOccurrenceEntity occurrence = alarmOccurrenceRepository
-            .findByIdAndAlarmId(request.occurrenceId(), alarmId)
+            .findByIdAndAlarmId(occurrenceId, alarmId)
             .orElseThrow(() -> ApplicationException.from(ALARM_OCCURRENCE_NOT_FOUND));
         if (occurrence.getStatus() != OccurrenceStatus.SCHEDULED
             && occurrence.getStatus() != OccurrenceStatus.RINGING) {
@@ -677,12 +691,12 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
             throw ApplicationException.from(PaymentErrorCode.PAYMENT_NOT_YET_AVAILABLE);
         }
 
-        savePaymentOrThrowDuplicate(member, alarm, request.purchaseToken(), PaymentType.STOP_ALARM);
+        savePaymentOrThrowDuplicate(member, alarm, paymentProof.paymentId(), PaymentType.STOP_ALARM);
         occurrence.deactivateByPayment(processedAt);
         alarmDeactivationLogRepository.save(AlarmMapper.mapToPaymentDeactivationLogEntity(
             occurrence,
             member,
-            request.purchaseToken(),
+            paymentProof.paymentId(),
             deviceId,
             processedAt,
             processedAt,
@@ -789,26 +803,28 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
             .orElseThrow(() -> ApplicationException.from(CommonErrorCode.BAD_REQUEST));
     }
 
-    private void validateAppStoreDevice(Long memberId, String deviceId) {
+    private ZoneId validateAppStoreDevice(Long memberId, String deviceId) {
         MemberDeviceEntity device = memberDeviceRepository.findByMember_IdAndDeviceId(memberId, deviceId)
             .orElseThrow(() -> ApplicationException.from(DeviceErrorCode.DEVICE_NOT_FOUND));
         if (!"IOS".equalsIgnoreCase(device.getPlatform())) {
             throw ApplicationException.from(CommonErrorCode.BAD_REQUEST);
         }
+        return ZoneId.of(device.getTimeZone());
     }
 
-    private void validateGooglePlayDevice(Long memberId, String deviceId) {
+    private ZoneId validateGooglePlayDevice(Long memberId, String deviceId) {
         MemberDeviceEntity device = memberDeviceRepository.findByMember_IdAndDeviceId(memberId, deviceId)
             .orElseThrow(() -> ApplicationException.from(DeviceErrorCode.DEVICE_NOT_FOUND));
         if (!"ANDROID".equalsIgnoreCase(device.getPlatform())) {
             throw ApplicationException.from(CommonErrorCode.BAD_REQUEST);
         }
+        return ZoneId.of(device.getTimeZone());
     }
 
     private boolean isVerifiedAppStorePayment(
         String transactionId,
         String productId,
-        AppStorePaymentPurpose purpose
+        InAppPaymentPurpose purpose
     ) {
         try {
             return appStorePaymentVerificationPort.verify(new AppStorePaymentVerificationRequest(
@@ -818,6 +834,7 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
                 .filter(result -> purpose.allows(result.productId()))
                 .isPresent();
         } catch (Exception e) {
+            log.warn("App Store payment verification failed. transactionId={}", transactionId, e);
             return false;
         }
     }
@@ -825,7 +842,7 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
     private boolean isVerifiedGooglePlayPayment(
         String purchaseToken,
         String productId,
-        AppStorePaymentPurpose purpose
+        InAppPaymentPurpose purpose
     ) {
         try {
             return googlePlayPaymentVerificationPort.verify(new GooglePlayPaymentVerificationRequest(
@@ -835,6 +852,7 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
                 .filter(result -> purpose.allows(result.productId()))
                 .isPresent();
         } catch (Exception e) {
+            log.warn("Google Play payment verification failed. purchaseToken={}", purchaseToken, e);
             return false;
         }
     }
