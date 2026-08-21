@@ -8,10 +8,12 @@ import static akuma.whiplash.domains.member.exception.MemberErrorCode.MEMBER_NOT
 import static akuma.whiplash.domains.payment.exception.PaymentErrorCode.*;
 
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmAdSessionCreateRequest;
+import akuma.whiplash.domains.alarm.application.dto.request.AppStoreAlarmDeletePaymentRequest;
+import akuma.whiplash.domains.alarm.application.dto.request.AppStoreAlarmPaymentRequest;
+import akuma.whiplash.domains.alarm.application.dto.request.GooglePlayAlarmDeletePaymentRequest;
+import akuma.whiplash.domains.alarm.application.dto.request.GooglePlayAlarmPaymentRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmCheckinRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmDeleteByAdRequest;
-import akuma.whiplash.domains.alarm.application.dto.request.AlarmDeleteByPaymentRequest;
-import akuma.whiplash.domains.alarm.application.dto.request.AlarmPaymentRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmRegisterRequest;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmAdSessionCreateResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmCheckinResponse;
@@ -65,14 +67,31 @@ public class AlarmController {
         deviceErrorCodes = {DEVICE_NOT_FOUND},
         authErrorCodes = {PERMISSION_DENIED}
     )
-    @Operation(summary = "결제로 알람 삭제", description = "알람 당일 인앱 결제를 통해 알람을 삭제합니다.")
-    @PostMapping("/{alarmId}/delete/payment")
-    public ApplicationResponse<Void> removeAlarmByPayment(
+    @Operation(summary = "App Store 결제로 알람 삭제", description = "Xcode StoreKit 거래를 검증한 뒤 알람을 삭제합니다.")
+    @PostMapping("/{alarmId}/delete/payment/app-store")
+    public ApplicationResponse<Void> removeAlarmByAppStorePayment(
         @AuthenticationPrincipal MemberContext memberContext,
         @PathVariable Long alarmId,
-        @RequestBody @Valid AlarmDeleteByPaymentRequest request
+        @RequestBody @Valid AppStoreAlarmDeletePaymentRequest request
     ) {
-        alarmUseCase.removeAlarmByPayment(memberContext.memberId(), alarmId, request);
+        alarmUseCase.removeAlarmByAppStorePayment(memberContext.memberId(), memberContext.deviceId(), alarmId, request);
+        return ApplicationResponse.onSuccess();
+    }
+
+    @CustomErrorCodes(
+        alarmErrorCodes = {ALARM_NOT_FOUND, TODAY_IS_NOT_ALARM_DAY, ALREADY_DEACTIVATED},
+        paymentErrorCodes = {DUPLICATE_PAYMENT, PAYMENT_VERIFICATION_FAILED},
+        deviceErrorCodes = {DEVICE_NOT_FOUND},
+        authErrorCodes = {PERMISSION_DENIED}
+    )
+    @Operation(summary = "Google Play 결제로 알람 삭제", description = "Google Play 거래를 검증한 뒤 알람을 삭제합니다.")
+    @PostMapping("/{alarmId}/delete/payment/google-play")
+    public ApplicationResponse<Void> removeAlarmByGooglePlayPayment(
+        @AuthenticationPrincipal MemberContext memberContext,
+        @PathVariable Long alarmId,
+        @RequestBody @Valid GooglePlayAlarmDeletePaymentRequest request
+    ) {
+        alarmUseCase.removeAlarmByGooglePlayPayment(memberContext.memberId(), memberContext.deviceId(), alarmId, request);
         return ApplicationResponse.onSuccess();
     }
 
@@ -180,15 +199,41 @@ public class AlarmController {
         deviceErrorCodes = {DEVICE_NOT_FOUND},
         authErrorCodes = {PERMISSION_DENIED}
     )
-    @Operation(summary = "결제로 알람 끄기", description = "인앱 결제를 통해 알람 회차를 비활성화합니다.")
-    @PostMapping("/{alarmId}/off/payment")
-    public ApplicationResponse<AlarmPaymentResponse> deactivateByPayment(
+    @Operation(summary = "App Store 결제로 알람 끄기", description = "Xcode StoreKit 거래를 검증한 뒤 알람 회차를 비활성화합니다.")
+    @PostMapping("/{alarmId}/off/payment/app-store")
+    public ApplicationResponse<AlarmPaymentResponse> deactivateByAppStorePayment(
         @AuthenticationPrincipal MemberContext memberContext,
         @PathVariable Long alarmId,
-        @RequestBody @Valid AlarmPaymentRequest request
+        @RequestBody @Valid AppStoreAlarmPaymentRequest request
     ) {
         return ApplicationResponse.onSuccess(
-            alarmUseCase.deactivateByPayment(memberContext.memberId(), alarmId, request)
+            alarmUseCase.deactivateByAppStorePayment(memberContext.memberId(), memberContext.deviceId(), alarmId, request)
+        );
+    }
+
+    @CustomErrorCodes(
+        alarmErrorCodes = {
+            ALARM_NOT_FOUND,
+            ALARM_OCCURRENCE_NOT_FOUND,
+            ALREADY_DEACTIVATED
+        },
+        paymentErrorCodes = {
+            DUPLICATE_PAYMENT,
+            PAYMENT_NOT_YET_AVAILABLE,
+            PAYMENT_VERIFICATION_FAILED
+        },
+        deviceErrorCodes = {DEVICE_NOT_FOUND},
+        authErrorCodes = {PERMISSION_DENIED}
+    )
+    @Operation(summary = "Google Play 결제로 알람 끄기", description = "Google Play 거래를 검증한 뒤 알람 회차를 비활성화합니다.")
+    @PostMapping("/{alarmId}/off/payment/google-play")
+    public ApplicationResponse<AlarmPaymentResponse> deactivateByGooglePlayPayment(
+        @AuthenticationPrincipal MemberContext memberContext,
+        @PathVariable Long alarmId,
+        @RequestBody @Valid GooglePlayAlarmPaymentRequest request
+    ) {
+        return ApplicationResponse.onSuccess(
+            alarmUseCase.deactivateByGooglePlayPayment(memberContext.memberId(), memberContext.deviceId(), alarmId, request)
         );
     }
 

@@ -7,10 +7,6 @@ import akuma.whiplash.domains.alarm.persistence.entity.AlarmOccurrenceEntity;
 import akuma.whiplash.domains.alarm.persistence.repository.AlarmDeactivationLogRepository;
 import akuma.whiplash.domains.alarm.persistence.repository.AlarmDeleteLogRepository;
 import akuma.whiplash.domains.member.persistence.entity.MemberEntity;
-import akuma.whiplash.domains.payment.application.mapper.PaymentMapper;
-import akuma.whiplash.domains.payment.domain.constant.PaymentStatus;
-import akuma.whiplash.domains.payment.domain.constant.PaymentType;
-import akuma.whiplash.domains.payment.persistence.repository.PaymentRepository;
 import akuma.whiplash.global.log.NoMethodLog;
 import java.time.LocalDateTime;
 import lombok.RequiredArgsConstructor;
@@ -23,7 +19,6 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class AuditLogRecorder {
 
-    private final PaymentRepository paymentRepository;
     private final AlarmDeactivationLogRepository alarmDeactivationLogRepository;
     private final AlarmDeleteLogRepository alarmDeleteLogRepository;
 
@@ -37,14 +32,6 @@ public class AuditLogRecorder {
         LocalDateTime processedAt,
         String failReason
     ) {
-        paymentRepository.saveAndFlush(PaymentMapper.mapToPaymentEntity(
-            member,
-            alarm,
-            paymentId,
-            PaymentType.STOP_ALARM,
-            PaymentStatus.FAILED
-        ));
-
         alarmDeactivationLogRepository.save(AlarmMapper.mapToPaymentDeactivationLogEntity(
             occurrence,
             member,
@@ -65,14 +52,6 @@ public class AuditLogRecorder {
         LocalDateTime processedAt,
         String failReason
     ) {
-        paymentRepository.saveAndFlush(PaymentMapper.mapToPaymentEntity(
-            member,
-            alarm,
-            paymentId,
-            PaymentType.DELETE_ALARM,
-            PaymentStatus.FAILED
-        ));
-
         alarmDeleteLogRepository.save(AlarmMapper.mapToPaymentDeleteFailureLogEntity(
             alarm,
             member,

@@ -21,10 +21,12 @@ import akuma.whiplash.domains.ad.domain.constant.AdSessionStatus;
 import akuma.whiplash.domains.ad.persistence.entity.AdSessionEntity;
 import akuma.whiplash.domains.ad.persistence.repository.AdSessionRepository;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmAdSessionCreateRequest;
+import akuma.whiplash.domains.alarm.application.dto.request.AppStoreAlarmDeletePaymentRequest;
+import akuma.whiplash.domains.alarm.application.dto.request.AppStoreAlarmPaymentRequest;
+import akuma.whiplash.domains.alarm.application.dto.request.GooglePlayAlarmDeletePaymentRequest;
+import akuma.whiplash.domains.alarm.application.dto.request.GooglePlayAlarmPaymentRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmCheckinRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmDeleteByAdRequest;
-import akuma.whiplash.domains.alarm.application.dto.request.AlarmDeleteByPaymentRequest;
-import akuma.whiplash.domains.alarm.application.dto.request.AlarmPaymentRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmRegisterRequest;
 import akuma.whiplash.domains.alarm.application.mapper.AlarmMapper;
 import akuma.whiplash.domains.alarm.domain.constant.*;
@@ -42,11 +44,15 @@ import akuma.whiplash.domains.member.persistence.entity.MemberEntity;
 import akuma.whiplash.domains.member.persistence.repository.MemberDeviceRepository;
 import akuma.whiplash.domains.member.persistence.repository.MemberRepository;
 import akuma.whiplash.domains.payment.persistence.repository.PaymentRepository;
+import akuma.whiplash.domains.payment.exception.PaymentErrorCode;
 import akuma.whiplash.domains.place.domain.client.GoogleClient;
 import akuma.whiplash.domains.place.domain.model.SelectedPlaceDetail;
 import akuma.whiplash.global.config.security.jwt.JwtProvider;
 import akuma.whiplash.global.util.date.TimeProvider;
-import akuma.whiplash.infrastructure.payment.PaymentVerificationPort;
+import akuma.whiplash.infrastructure.payment.AppStorePaymentVerificationPort;
+import akuma.whiplash.infrastructure.payment.AppStorePaymentVerificationResult;
+import akuma.whiplash.infrastructure.payment.GooglePlayPaymentVerificationPort;
+import akuma.whiplash.infrastructure.payment.GooglePlayPaymentVerificationResult;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
@@ -54,6 +60,7 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -85,7 +92,8 @@ class AlarmControllerIntegrationTest {
     @Autowired private AlarmDeleteLogRepository alarmDeleteLogRepository;
     @Autowired private AdSessionRepository adSessionRepository;
     @Autowired private PaymentRepository paymentRepository;
-    @MockitoBean private PaymentVerificationPort paymentVerificationPort;
+    @MockitoBean private AppStorePaymentVerificationPort appStorePaymentVerificationPort;
+    @MockitoBean private GooglePlayPaymentVerificationPort googlePlayPaymentVerificationPort;
     @MockitoBean private TimeProvider timeProvider;
     @MockitoBean private GoogleClient googleClient;
 
@@ -166,6 +174,10 @@ class AlarmControllerIntegrationTest {
         return jwtProvider.generateAccessToken(member.getId(), member.getRole(), "mock_device_id");
     }
 
+    private String buildAccessToken(MemberEntity member, String deviceId) {
+        return jwtProvider.generateAccessToken(member.getId(), member.getRole(), deviceId);
+    }
+
     private AlarmOccurrenceEntity saveOccurrence(AlarmEntity alarm, LocalDateTime scheduledAt, OccurrenceStatus status) {
         return alarmOccurrenceRepository.save(AlarmOccurrenceEntity.builder()
             .alarm(alarm)
@@ -181,6 +193,195 @@ class AlarmControllerIntegrationTest {
 
     private AlarmCheckinRequest buildCheckinRequest(AlarmOccurrenceEntity occurrence, Double latitude, Double longitude) {
         return new AlarmCheckinRequest(occurrence.getId(), "device-uuid", latitude, longitude);
+    }
+
+    @Nested
+    @DisplayName("[POST] /api/v1/alarms/{alarmId}/off/payment/app-store - App Store 결제로 알람 끄기")
+    class DeactivateByAppStorePaymentTest {
+
+        @Test
+        @DisplayName("성공: 인증 토큰의 iOS 기기와 Xcode 거래가 검증되면 알람 회차를 비활성화한다")
+        void success() throws Exception {
+            // given
+            MemberEntity member = memberRepository.save(MemberFixture.MEMBER_9.toEntity());
+            memberDeviceRepository.save(MemberDeviceFixture.IOS.toEntity(member));
+            AlarmEntity alarm = alarmRepository.save(AlarmFixture.ALARM_09.toEntity(member));
+            AlarmOccurrenceEntity occurrence = saveOccurrence(alarm, FIXED_NOW.plusHours(1), OccurrenceStatus.SCHEDULED);
+            AppStoreAlarmPaymentRequest request = new AppStoreAlarmPaymentRequest(
+                occurrence.getId(), "xcode-transaction-id", "ALARM_OFF"
+            );
+            given(appStorePaymentVerificationPort.verify(any())).willReturn(Optional.of(
+                new AppStorePaymentVerificationResult(request.transactionId(), request.productId())
+            ));
+
+            // when
+            mockMvc.perform(post(BASE + "/{alarmId}/off/payment/app-store", alarm.getId())
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + buildAccessToken(member, MemberDeviceFixture.IOS.getDeviceId()))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk());
+
+            // then
+            assertThat(alarmOccurrenceRepository.findById(occurrence.getId()).orElseThrow().getStatus())
+                .isEqualTo(OccurrenceStatus.PAYMENT);
+            assertThat(paymentRepository.existsByPaymentId(request.transactionId())).isTrue();
+        }
+
+        @Test
+        @DisplayName("실패: 삭제 전용 상품은 알람 끄기에 사용할 수 없다")
+        @Transactional(propagation = Propagation.NOT_SUPPORTED)
+        void fail_productPurposeMismatch() throws Exception {
+            // given
+            MemberEntity member = memberRepository.save(MemberFixture.MEMBER_10.toEntity());
+            memberDeviceRepository.save(MemberDeviceFixture.IOS.toEntity(member));
+            AlarmEntity alarm = alarmRepository.save(AlarmFixture.ALARM_10.toEntity(member));
+            AlarmOccurrenceEntity occurrence = saveOccurrence(alarm, FIXED_NOW.plusHours(1), OccurrenceStatus.SCHEDULED);
+            AppStoreAlarmPaymentRequest request = new AppStoreAlarmPaymentRequest(
+                occurrence.getId(), "xcode-delete-transaction-id", "ALARM_DELETE"
+            );
+            given(appStorePaymentVerificationPort.verify(any())).willReturn(Optional.of(
+                new AppStorePaymentVerificationResult(request.transactionId(), request.productId())
+            ));
+
+            // when
+            mockMvc.perform(post(BASE + "/{alarmId}/off/payment/app-store", alarm.getId())
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + buildAccessToken(member, MemberDeviceFixture.IOS.getDeviceId()))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(PaymentErrorCode.PAYMENT_VERIFICATION_FAILED.getCustomCode()));
+
+            // then
+            assertThat(alarmOccurrenceRepository.findById(occurrence.getId()).orElseThrow().getStatus())
+                .isEqualTo(OccurrenceStatus.SCHEDULED);
+        }
+    }
+
+    @Nested
+    @DisplayName("[POST] /api/v1/alarms/{alarmId}/delete/payment/app-store - App Store 결제로 알람 삭제")
+    class RemoveByAppStorePaymentTest {
+
+        @Test
+        @DisplayName("성공: 인증 토큰의 iOS 기기와 Xcode 거래가 검증되면 알람을 삭제한다")
+        void success() throws Exception {
+            // given
+            MemberEntity member = memberRepository.save(MemberFixture.MEMBER_3.toEntity());
+            memberDeviceRepository.save(MemberDeviceFixture.IOS.toEntity(member));
+            AlarmEntity alarm = alarmRepository.save(AlarmFixture.ALARM_03.toEntity(member));
+            saveOccurrence(alarm, FIXED_NOW, OccurrenceStatus.SCHEDULED);
+            AppStoreAlarmDeletePaymentRequest request = new AppStoreAlarmDeletePaymentRequest(
+                "xcode-delete-transaction-id", "ALARM_DELETE"
+            );
+            given(appStorePaymentVerificationPort.verify(any())).willReturn(Optional.of(
+                new AppStorePaymentVerificationResult(request.transactionId(), request.productId())
+            ));
+
+            // when
+            mockMvc.perform(post(BASE + "/{alarmId}/delete/payment/app-store", alarm.getId())
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + buildAccessToken(member, MemberDeviceFixture.IOS.getDeviceId()))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk());
+
+            // then
+            assertThat(alarmRepository.findById(alarm.getId()).orElseThrow().getStatus()).isEqualTo(AlarmStatus.DELETED);
+            assertThat(paymentRepository.existsByPaymentId(request.transactionId())).isTrue();
+        }
+    }
+
+    @Nested
+    @DisplayName("[POST] /api/v1/alarms/{alarmId}/off/payment/google-play - Google Play 결제로 알람 끄기")
+    class DeactivateByGooglePlayPaymentTest {
+
+        @Test
+        @DisplayName("성공: 인증 토큰의 Android 기기와 구매 토큰이 검증되면 알람 회차를 비활성화한다")
+        void success() throws Exception {
+            // given
+            MemberEntity member = memberRepository.save(MemberFixture.MEMBER_9.toEntity());
+            memberDeviceRepository.save(MemberDeviceFixture.ANDROID.toEntity(member));
+            AlarmEntity alarm = alarmRepository.save(AlarmFixture.ALARM_09.toEntity(member));
+            AlarmOccurrenceEntity occurrence = saveOccurrence(alarm, FIXED_NOW.plusHours(1), OccurrenceStatus.SCHEDULED);
+            GooglePlayAlarmPaymentRequest request = new GooglePlayAlarmPaymentRequest(
+                occurrence.getId(), "google-play-off-purchase-token", "ALARM_OFF"
+            );
+            given(googlePlayPaymentVerificationPort.verify(any())).willReturn(Optional.of(
+                new GooglePlayPaymentVerificationResult(request.purchaseToken(), request.productId())
+            ));
+
+            // when
+            mockMvc.perform(post(BASE + "/{alarmId}/off/payment/google-play", alarm.getId())
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + buildAccessToken(member, MemberDeviceFixture.ANDROID.getDeviceId()))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk());
+
+            // then
+            assertThat(alarmOccurrenceRepository.findById(occurrence.getId()).orElseThrow().getStatus())
+                .isEqualTo(OccurrenceStatus.PAYMENT);
+            assertThat(paymentRepository.existsByPaymentId(request.purchaseToken())).isTrue();
+        }
+
+        @Test
+        @DisplayName("실패: 삭제 전용 상품은 알람 끄기에 사용할 수 없다")
+        @Transactional(propagation = Propagation.NOT_SUPPORTED)
+        void fail_productPurposeMismatch() throws Exception {
+            // given
+            MemberEntity member = memberRepository.save(MemberFixture.MEMBER_10.toEntity());
+            memberDeviceRepository.save(MemberDeviceFixture.ANDROID.toEntity(member));
+            AlarmEntity alarm = alarmRepository.save(AlarmFixture.ALARM_10.toEntity(member));
+            AlarmOccurrenceEntity occurrence = saveOccurrence(alarm, FIXED_NOW.plusHours(1), OccurrenceStatus.SCHEDULED);
+            GooglePlayAlarmPaymentRequest request = new GooglePlayAlarmPaymentRequest(
+                occurrence.getId(), "google-play-delete-purchase-token", "ALARM_DELETE"
+            );
+            given(googlePlayPaymentVerificationPort.verify(any())).willReturn(Optional.of(
+                new GooglePlayPaymentVerificationResult(request.purchaseToken(), request.productId())
+            ));
+
+            // when
+            mockMvc.perform(post(BASE + "/{alarmId}/off/payment/google-play", alarm.getId())
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + buildAccessToken(member, MemberDeviceFixture.ANDROID.getDeviceId()))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.isSuccess").value(false))
+                .andExpect(jsonPath("$.code").value(PaymentErrorCode.PAYMENT_VERIFICATION_FAILED.getCustomCode()));
+
+            // then
+            assertThat(alarmOccurrenceRepository.findById(occurrence.getId()).orElseThrow().getStatus())
+                .isEqualTo(OccurrenceStatus.SCHEDULED);
+        }
+    }
+
+    @Nested
+    @DisplayName("[POST] /api/v1/alarms/{alarmId}/delete/payment/google-play - Google Play 결제로 알람 삭제")
+    class RemoveByGooglePlayPaymentTest {
+
+        @Test
+        @DisplayName("성공: 인증 토큰의 Android 기기와 구매 토큰이 검증되면 알람을 삭제한다")
+        void success() throws Exception {
+            // given
+            MemberEntity member = memberRepository.save(MemberFixture.MEMBER_3.toEntity());
+            memberDeviceRepository.save(MemberDeviceFixture.ANDROID.toEntity(member));
+            AlarmEntity alarm = alarmRepository.save(AlarmFixture.ALARM_03.toEntity(member));
+            saveOccurrence(alarm, FIXED_NOW, OccurrenceStatus.SCHEDULED);
+            GooglePlayAlarmDeletePaymentRequest request = new GooglePlayAlarmDeletePaymentRequest(
+                "google-play-delete-purchase-token", "ALARM_DELETE"
+            );
+            given(googlePlayPaymentVerificationPort.verify(any())).willReturn(Optional.of(
+                new GooglePlayPaymentVerificationResult(request.purchaseToken(), request.productId())
+            ));
+
+            // when
+            mockMvc.perform(post(BASE + "/{alarmId}/delete/payment/google-play", alarm.getId())
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + buildAccessToken(member, MemberDeviceFixture.ANDROID.getDeviceId()))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk());
+
+            // then
+            assertThat(alarmRepository.findById(alarm.getId()).orElseThrow().getStatus()).isEqualTo(AlarmStatus.DELETED);
+            assertThat(paymentRepository.existsByPaymentId(request.purchaseToken())).isTrue();
+        }
     }
 
     @Nested
@@ -519,251 +720,6 @@ class AlarmControllerIntegrationTest {
         }
     }
 
-    @Nested
-    @DisplayName("deactivateByPayment - 결제로 알람 끄기")
-    class DeactivateByPaymentTest {
-
-        @Test
-        @DisplayName("성공: 결제 요청이 성공하면 200 OK와 동기화 정보를 반환한다")
-        void success() throws Exception {
-            // given
-            MemberEntity member = memberRepository.save(MemberFixture.MEMBER_8.toEntity());
-            memberDeviceRepository.save(MemberDeviceFixture.ANDROID.toEntity(member));
-            AlarmEntity alarm = alarmRepository.save(AlarmFixture.ALARM_08.toEntity(member));
-            AlarmOccurrenceEntity occurrence = alarmOccurrenceRepository.save(
-                AlarmOccurrenceFixture.ALARM_OCCURRENCE_02.toEntity(alarm, FIXED_NOW.plusHours(1), OccurrenceStatus.SCHEDULED)
-            );
-            AlarmPaymentRequest request = new AlarmPaymentRequest(
-                occurrence.getId(),
-                MemberDeviceFixture.ANDROID.getDeviceId(),
-                "integration-payment-success-001"
-            );
-            String accessToken = buildAccessToken(member);
-            given(paymentVerificationPort.supportedPlatform()).willReturn(MemberDeviceFixture.ANDROID.getPlatform());
-            given(paymentVerificationPort.verify(request.paymentId())).willReturn(true);
-
-            // when
-            mockMvc.perform(post(BASE + "/{alarmId}/off/payment", alarm.getId())
-                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.result.alarmId").value(alarm.getId()));
-
-            // then
-            AlarmOccurrenceEntity savedOccurrence = alarmOccurrenceRepository.findById(occurrence.getId()).orElseThrow();
-            assertThat(savedOccurrence.getStatus()).isEqualTo(OccurrenceStatus.PAYMENT);
-            assertThat(paymentRepository.existsByPaymentId(request.paymentId())).isTrue();
-            assertThat(alarmDeactivationLogRepository.findAll()).hasSize(1);
-        }
-
-        @Test
-        @DisplayName("실패: 이미 처리된 결제 ID이면 409와 에러 코드를 반환한다")
-        void fail_duplicatePayment() throws Exception {
-            // given
-            MemberEntity member = memberRepository.save(MemberFixture.MEMBER_9.toEntity());
-            memberDeviceRepository.save(MemberDeviceFixture.ANDROID.toEntity(member));
-            AlarmEntity alarm = alarmRepository.save(AlarmFixture.ALARM_09.toEntity(member));
-            AlarmOccurrenceEntity occurrence = alarmOccurrenceRepository.save(
-                AlarmOccurrenceFixture.ALARM_OCCURRENCE_02.toEntity(alarm, FIXED_NOW.plusHours(1), OccurrenceStatus.SCHEDULED)
-            );
-            paymentRepository.save(PaymentFixture.STOP_ALARM_SUCCESS.toEntity(member, alarm));
-            AlarmPaymentRequest request = new AlarmPaymentRequest(
-                occurrence.getId(),
-                MemberDeviceFixture.ANDROID.getDeviceId(),
-                PaymentFixture.STOP_ALARM_SUCCESS.getPaymentId()
-            );
-            String accessToken = buildAccessToken(member);
-
-            // when & then
-            mockMvc.perform(post(BASE + "/{alarmId}/off/payment", alarm.getId())
-                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.code").value("PAYMENT_901"));
-        }
-
-        @Test
-        @DisplayName("실패: 결제 가능 시간 전이면 400과 에러 코드를 반환한다")
-        void fail_notYetAvailable() throws Exception {
-            // given
-            MemberEntity member = memberRepository.save(MemberFixture.MEMBER_10.toEntity());
-            memberDeviceRepository.save(MemberDeviceFixture.ANDROID.toEntity(member));
-            AlarmEntity alarm = alarmRepository.save(AlarmFixture.ALARM_10.toEntity(member));
-            AlarmOccurrenceEntity occurrence = alarmOccurrenceRepository.save(
-                AlarmOccurrenceFixture.ALARM_OCCURRENCE_02.toEntity(alarm, FIXED_NOW.plusHours(6), OccurrenceStatus.SCHEDULED)
-            );
-            AlarmPaymentRequest request = new AlarmPaymentRequest(
-                occurrence.getId(),
-                MemberDeviceFixture.ANDROID.getDeviceId(),
-                "integration-payment-not-yet-available"
-            );
-            String accessToken = buildAccessToken(member);
-
-            // when & then
-            mockMvc.perform(post(BASE + "/{alarmId}/off/payment", alarm.getId())
-                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("PAYMENT_001"));
-        }
-    }
-
-    @Nested
-    @DisplayName("[POST] /api/v1/alarms/{alarmId}/delete/payment - 결제로 알람 삭제")
-    class RemoveAlarmByPaymentTest {
-
-        @Test
-        @DisplayName("성공: 결제 삭제 요청이 성공하면 알람이 소프트 삭제된다")
-        void success() throws Exception {
-            // given
-            MemberEntity member = memberRepository.save(MemberFixture.MEMBER_3.toEntity());
-            AlarmEntity alarm = alarmRepository.save(AlarmFixture.ALARM_03.toEntity(member));
-            saveOccurrence(alarm, FIXED_NOW, OccurrenceStatus.SCHEDULED);
-            memberDeviceRepository.save(MemberDeviceFixture.ANDROID.toEntity(member));
-            AlarmDeleteByPaymentRequest request = new AlarmDeleteByPaymentRequest(
-                MemberDeviceFixture.ANDROID.getDeviceId(),
-                PaymentFixture.DELETE_ALARM_SUCCESS.getPaymentId()
-            );
-            String accessToken = jwtProvider.generateAccessToken(member.getId(), member.getRole(), "mock_device_id");
-            given(paymentVerificationPort.supportedPlatform()).willReturn(MemberDeviceFixture.ANDROID.getPlatform());
-            given(paymentVerificationPort.verify(request.paymentId())).willReturn(true);
-
-            // when
-            mockMvc.perform(post(BASE + "/{alarmId}/delete/payment", alarm.getId())
-                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.result").doesNotExist());
-
-            // then
-            AlarmEntity deletedAlarm = alarmRepository.findById(alarm.getId()).orElseThrow();
-            assertThat(deletedAlarm.getStatus()).isEqualTo(AlarmStatus.DELETED);
-            assertThat(deletedAlarm.getDeletedAt()).isEqualTo(FIXED_NOW);
-            assertThat(paymentRepository.existsByPaymentId(request.paymentId())).isTrue();
-            assertThat(alarmDeleteLogRepository.findAll()).hasSize(1);
-        }
-
-        @Test
-        @DisplayName("실패: 알람이 존재하지 않으면 404를 반환한다")
-        void fail_alarmNotFound() throws Exception {
-            // given
-            MemberEntity member = memberRepository.save(MemberFixture.MEMBER_4.toEntity());
-            AlarmDeleteByPaymentRequest request = new AlarmDeleteByPaymentRequest("device-uuid", "payment-id");
-            String accessToken = jwtProvider.generateAccessToken(member.getId(), member.getRole(), "mock_device_id");
-
-            // when & then
-            mockMvc.perform(post(BASE + "/{alarmId}/delete/payment", 999L)
-                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isNotFound());
-        }
-
-        @Test
-        @DisplayName("실패: 소유자가 아니면 403을 반환한다")
-        void fail_permissionDenied() throws Exception {
-            // given
-            MemberEntity owner = memberRepository.save(MemberFixture.MEMBER_5.toEntity());
-            AlarmEntity alarm = alarmRepository.save(AlarmFixture.ALARM_05.toEntity(owner));
-            MemberEntity other = memberRepository.save(MemberFixture.MEMBER_6.toEntity());
-            AlarmDeleteByPaymentRequest request = new AlarmDeleteByPaymentRequest("device-uuid", "payment-id");
-            String accessToken = jwtProvider.generateAccessToken(other.getId(), other.getRole(), "mock_device_id");
-
-            // when & then
-            mockMvc.perform(post(BASE + "/{alarmId}/delete/payment", alarm.getId())
-                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isForbidden());
-        }
-
-        @Test
-        @DisplayName("실패: 결제 ID가 비어 있으면 400을 반환한다")
-        void fail_paymentIdBlank() throws Exception {
-            // given
-            MemberEntity member = memberRepository.save(MemberFixture.MEMBER_7.toEntity());
-            AlarmEntity alarm = alarmRepository.save(AlarmFixture.ALARM_07.toEntity(member));
-            AlarmDeleteByPaymentRequest request = new AlarmDeleteByPaymentRequest("device-uuid", "");
-            String accessToken = jwtProvider.generateAccessToken(member.getId(), member.getRole(), "mock_device_id");
-
-            // when & then
-            mockMvc.perform(post(BASE + "/{alarmId}/delete/payment", alarm.getId())
-                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isBadRequest());
-        }
-
-        @Test
-        @DisplayName("실패: 오늘 회차가 없으면 400을 반환한다")
-        void fail_todayIsNotAlarmDay() throws Exception {
-            // given
-            MemberEntity member = memberRepository.save(MemberFixture.MEMBER_7.toEntity());
-            AlarmEntity alarm = alarmRepository.save(AlarmFixture.ALARM_07.toEntity(member));
-            AlarmDeleteByPaymentRequest request = new AlarmDeleteByPaymentRequest("device-uuid", "payment-id");
-            String accessToken = jwtProvider.generateAccessToken(member.getId(), member.getRole(), "mock_device_id");
-
-            // when & then
-            mockMvc.perform(post(BASE + "/{alarmId}/delete/payment", alarm.getId())
-                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("ALARM_001"));
-        }
-
-        @Test
-        @DisplayName("실패: 이미 비활성화된 회차이면 400을 반환한다")
-        void fail_alreadyDeactivated() throws Exception {
-            // given
-            MemberEntity member = memberRepository.save(MemberFixture.MEMBER_7.toEntity());
-            AlarmEntity alarm = alarmRepository.save(AlarmFixture.ALARM_07.toEntity(member));
-            saveOccurrence(alarm, FIXED_NOW, OccurrenceStatus.PAYMENT);
-            AlarmDeleteByPaymentRequest request = new AlarmDeleteByPaymentRequest("device-uuid", "payment-id");
-            String accessToken = jwtProvider.generateAccessToken(member.getId(), member.getRole(), "mock_device_id");
-
-            // when & then
-            mockMvc.perform(post(BASE + "/{alarmId}/delete/payment", alarm.getId())
-                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("ALARM_003"));
-        }
-
-        @Test
-        @DisplayName("실패: 결제 검증에 실패하면 실패 기록을 남기고 400을 반환한다")
-        @Transactional(propagation = Propagation.NOT_SUPPORTED)
-        void fail_paymentVerificationFailed() throws Exception {
-            // given
-            MemberEntity member = memberRepository.save(MemberFixture.MEMBER_20.toEntity());
-            AlarmEntity alarm = alarmRepository.save(AlarmFixture.ALARM_07.toEntity(member));
-            saveOccurrence(alarm, FIXED_NOW, OccurrenceStatus.SCHEDULED);
-            memberDeviceRepository.save(MemberDeviceFixture.ANDROID.toEntity(member));
-            AlarmDeleteByPaymentRequest request = new AlarmDeleteByPaymentRequest(
-                MemberDeviceFixture.ANDROID.getDeviceId(),
-                PaymentFixture.DELETE_ALARM_FAILED.getPaymentId()
-            );
-            String accessToken = jwtProvider.generateAccessToken(member.getId(), member.getRole(), "mock_device_id");
-            given(paymentVerificationPort.supportedPlatform()).willReturn(MemberDeviceFixture.ANDROID.getPlatform());
-            given(paymentVerificationPort.verify(request.paymentId())).willReturn(false);
-
-            // when & then
-            mockMvc.perform(post(BASE + "/{alarmId}/delete/payment", alarm.getId())
-                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("PAYMENT_002"));
-
-            assertThat(paymentRepository.existsByPaymentId(request.paymentId())).isTrue();
-            assertThat(alarmDeleteLogRepository.findAll()).hasSize(1);
-        }
-    }
 
     @Nested
     @DisplayName("getAlarmDeleteMethod - 알람 삭제 방법 조회")

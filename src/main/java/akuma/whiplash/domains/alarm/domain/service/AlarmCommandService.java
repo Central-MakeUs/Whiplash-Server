@@ -10,6 +10,7 @@ import akuma.whiplash.domains.alarm.application.dto.response.AlarmAdSessionCreat
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmCheckinResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmPaymentResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.CreateAlarmResponse;
+import akuma.whiplash.domains.payment.domain.command.StorePaymentProof;
 import java.util.Set;
 
 public interface AlarmCommandService {
@@ -18,8 +19,12 @@ public interface AlarmCommandService {
     AlarmAdSessionCreateResponse createAdSession(Long memberId, Long alarmId, AlarmAdSessionCreateRequest request);
     void removeAlarmByAd(Long memberId, Long alarmId, AlarmDeleteByAdRequest request);
     void removeAlarmByPayment(Long memberId, Long alarmId, AlarmDeleteByPaymentRequest request);
+    void removeAlarmByAppStorePayment(Long memberId, String deviceId, Long alarmId, StorePaymentProof paymentProof);
+    void removeAlarmByGooglePlayPayment(Long memberId, String deviceId, Long alarmId, StorePaymentProof paymentProof);
     AlarmCheckinResponse checkinAlarm(Long memberId, Long alarmId, AlarmCheckinRequest request);
     AlarmPaymentResponse deactivateByPayment(Long memberId, Long alarmId, AlarmPaymentRequest request);
+    AlarmPaymentResponse deactivateByAppStorePayment(Long memberId, String deviceId, Long alarmId, Long occurrenceId, StorePaymentProof paymentProof);
+    AlarmPaymentResponse deactivateByGooglePlayPayment(Long memberId, String deviceId, Long alarmId, Long occurrenceId, StorePaymentProof paymentProof);
     void ringAlarm(Long memberId, Long alarmId, String deviceId);
     void markReminderSent(Set<Long> occurrenceIds);
 }

@@ -21,7 +21,6 @@ import akuma.whiplash.common.fixture.MemberFixture;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmAdSessionCreateRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmCheckinRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmDeleteByAdRequest;
-import akuma.whiplash.domains.alarm.application.dto.request.AlarmDeleteByPaymentRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmRegisterRequest;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmAdSessionCreateResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmDeleteMethodResponse;
@@ -114,6 +113,104 @@ class AlarmControllerTest {
 
     private AlarmCheckinRequest buildCheckinRequest() {
         return new AlarmCheckinRequest(501L, "device-uuid", 37.0, 127.0);
+    }
+
+    @Nested
+    @DisplayName("[POST] /api/v1/alarms/{alarmId}/off/payment/app-store - App Store 결제로 알람 끄기")
+    class DeactivateByAppStorePaymentTest {
+
+        @Test
+        @DisplayName("성공: Xcode 거래로 결제 요청을 보내면 200을 반환한다")
+        void success() throws Exception {
+            // given
+            setSecurityContext(buildContext(MEMBER_3));
+            String request = """
+                {
+                  "occurrenceId": 501,
+                  "transactionId": "xcode-transaction-id",
+                  "productId": "ALARM_OFF"
+                }
+                """;
+
+            // when & then
+            mockMvc.perform(post(BASE + "/{alarmId}/off/payment/app-store", 123L)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(request))
+                .andExpect(status().isOk());
+        }
+    }
+
+    @Nested
+    @DisplayName("[POST] /api/v1/alarms/{alarmId}/delete/payment/app-store - App Store 결제로 알람 삭제")
+    class RemoveByAppStorePaymentTest {
+
+        @Test
+        @DisplayName("성공: Xcode 거래로 삭제 결제 요청을 보내면 200을 반환한다")
+        void success() throws Exception {
+            // given
+            setSecurityContext(buildContext(MEMBER_3));
+            String request = """
+                {
+                  "transactionId": "xcode-transaction-id",
+                  "productId": "ALARM_DELETE"
+                }
+                """;
+
+            // when & then
+            mockMvc.perform(post(BASE + "/{alarmId}/delete/payment/app-store", 123L)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(request))
+                .andExpect(status().isOk());
+        }
+    }
+
+    @Nested
+    @DisplayName("[POST] /api/v1/alarms/{alarmId}/off/payment/google-play - Google Play 결제로 알람 끄기")
+    class DeactivateByGooglePlayPaymentTest {
+
+        @Test
+        @DisplayName("성공: Google Play 거래로 결제 요청을 보내면 200을 반환한다")
+        void success() throws Exception {
+            // given
+            setSecurityContext(buildContext(MEMBER_3));
+            String request = """
+                {
+                  "occurrenceId": 501,
+                  "purchaseToken": "google-play-purchase-token",
+                  "productId": "ALARM_OFF"
+                }
+                """;
+
+            // when & then
+            mockMvc.perform(post(BASE + "/{alarmId}/off/payment/google-play", 123L)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(request))
+                .andExpect(status().isOk());
+        }
+    }
+
+    @Nested
+    @DisplayName("[POST] /api/v1/alarms/{alarmId}/delete/payment/google-play - Google Play 결제로 알람 삭제")
+    class RemoveByGooglePlayPaymentTest {
+
+        @Test
+        @DisplayName("성공: Google Play 거래로 삭제 결제 요청을 보내면 200을 반환한다")
+        void success() throws Exception {
+            // given
+            setSecurityContext(buildContext(MEMBER_3));
+            String request = """
+                {
+                  "purchaseToken": "google-play-purchase-token",
+                  "productId": "ALARM_DELETE"
+                }
+                """;
+
+            // when & then
+            mockMvc.perform(post(BASE + "/{alarmId}/delete/payment/google-play", 123L)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(request))
+                .andExpect(status().isOk());
+        }
     }
 
     @AfterEach
@@ -405,90 +502,6 @@ class AlarmControllerTest {
         }
     }
 
-    @Nested
-    @DisplayName("[POST] /api/v1/alarms/{alarmId}/delete/payment - 결제로 알람 삭제")
-    class RemoveAlarmByPaymentTest {
-
-        @Test
-        @DisplayName("성공: 결제 삭제 요청이 성공하면 200을 반환한다")
-        void success() throws Exception {
-            // given
-            AlarmDeleteByPaymentRequest request = new AlarmDeleteByPaymentRequest("device-uuid", "payment-id");
-            setSecurityContext(buildContext(MEMBER_5));
-
-            // when & then
-            mockMvc.perform(post(BASE + "/{alarmId}/delete/payment", 1L)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.result").doesNotExist());
-
-            verify(alarmUseCase, times(1))
-                .removeAlarmByPayment(eq(MEMBER_5.getId()), eq(1L), any(AlarmDeleteByPaymentRequest.class));
-        }
-
-        @Test
-        @DisplayName("실패: 알람이 존재하지 않으면 404를 반환한다")
-        void fail_alarmNotFound() throws Exception {
-            // given
-            AlarmDeleteByPaymentRequest request = new AlarmDeleteByPaymentRequest("device-uuid", "payment-id");
-            setSecurityContext(buildContext(MEMBER_6));
-            doThrow(ApplicationException.from(AlarmErrorCode.ALARM_NOT_FOUND))
-                .when(alarmUseCase).removeAlarmByPayment(anyLong(), anyLong(), any(AlarmDeleteByPaymentRequest.class));
-
-            // when & then
-            mockMvc.perform(post(BASE + "/{alarmId}/delete/payment", 1L)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isNotFound());
-        }
-
-        @Test
-        @DisplayName("실패: 소유자가 아니면 403을 반환한다")
-        void fail_permissionDenied() throws Exception {
-            // given
-            AlarmDeleteByPaymentRequest request = new AlarmDeleteByPaymentRequest("device-uuid", "payment-id");
-            setSecurityContext(buildContext(MEMBER_7));
-            doThrow(ApplicationException.from(AuthErrorCode.PERMISSION_DENIED))
-                .when(alarmUseCase).removeAlarmByPayment(anyLong(), anyLong(), any(AlarmDeleteByPaymentRequest.class));
-
-            // when & then
-            mockMvc.perform(post(BASE + "/{alarmId}/delete/payment", 1L)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isForbidden());
-        }
-
-        @Test
-        @DisplayName("실패: 결제 ID가 비어 있으면 400을 반환한다")
-        void fail_paymentIdBlank() throws Exception {
-            // given
-            AlarmDeleteByPaymentRequest request = new AlarmDeleteByPaymentRequest("device-uuid", "");
-            setSecurityContext(buildContext(MEMBER_8));
-
-            // when & then
-            mockMvc.perform(post(BASE + "/{alarmId}/delete/payment", 1L)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isBadRequest());
-        }
-
-        @Test
-        @DisplayName("실패: 결제 검증에 실패하면 400을 반환한다")
-        void fail_paymentVerificationFailed() throws Exception {
-            // given
-            AlarmDeleteByPaymentRequest request = new AlarmDeleteByPaymentRequest("device-uuid", "payment-id");
-            setSecurityContext(buildContext(MEMBER_8));
-            doThrow(ApplicationException.from(PaymentErrorCode.PAYMENT_VERIFICATION_FAILED))
-                .when(alarmUseCase).removeAlarmByPayment(anyLong(), anyLong(), any(AlarmDeleteByPaymentRequest.class));
-
-            // when & then
-            mockMvc.perform(post(BASE + "/{alarmId}/delete/payment", 1L)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isBadRequest());
-        }
-    }
 
     @Nested
     @DisplayName("[POST] /api/v1/alarms/{alarmId}/ad-session - 광고 삭제 세션 발급")
