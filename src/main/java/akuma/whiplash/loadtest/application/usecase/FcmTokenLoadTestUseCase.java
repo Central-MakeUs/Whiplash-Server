@@ -24,7 +24,7 @@ import org.springframework.stereotype.Service;
  *
  * 검증 방법:
  *   동일 memberId, 동일 deviceId에 대해 여러 VU가 동시에 다른 토큰을 등록한 뒤
- *   GET /api/load-test/fcm-token/verify/{memberId} 로 tokenCount를 확인한다.
+ *   GET /api/v1/test/fcm-token/verify/{memberId} 로 tokenCount를 확인한다.
  *   - AS-IS: tokenCount > 1 (stale token 잔류 가능)
  *   - TO-BE: tokenCount == 1 (항상 마지막 토큰만 유지)
  */
