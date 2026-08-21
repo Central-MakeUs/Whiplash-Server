@@ -45,10 +45,10 @@ public class RequestMatcherHolder {
         new RequestInfo(GET, "/webjars/**",null),
         new RequestInfo(GET, "/favicon.ico",null),
 
-        // 부하 테스트 전용 (profile: !prod) — prod에서는 Controller Bean 자체가 생성되지 않음
-        new RequestInfo(GET, "/api/load-test/**", null),
-        new RequestInfo(POST, "/api/load-test/**", null),
-        new RequestInfo(DELETE, "/api/load-test/**", null),
+        // local·qa 전용 테스트 API
+        new RequestInfo(GET, "/api/v1/test/**", null),
+        new RequestInfo(POST, "/api/v1/test/**", null),
+        new RequestInfo(DELETE, "/api/v1/test/**", null),
 
         // alarm
         new RequestInfo(GET, "/api/v1/alarms/**",USER),
