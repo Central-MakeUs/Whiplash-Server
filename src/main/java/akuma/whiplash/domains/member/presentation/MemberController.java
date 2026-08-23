@@ -21,10 +21,10 @@ public class MemberController {
     private final MemberUseCase memberUseCase;
 
     @CustomErrorCodes(memberErrorCodes = {MEMBER_NOT_FOUND})
-    @Operation(summary = "회원 탈퇴", description = "회원 정보, 관련된 알람 정보를 soft delete 합니다.")
+    @Operation(summary = "회원 탈퇴", description = "회원 정보와 관련된 서비스 데이터를 즉시 삭제합니다.")
     @DeleteMapping
-    public ApplicationResponse<Void> softDeleteMember(@AuthenticationPrincipal MemberContext memberContext) {
-        memberUseCase.softDeleteMember(memberContext);
+    public ApplicationResponse<Void> deleteMember(@AuthenticationPrincipal MemberContext memberContext) {
+        memberUseCase.deleteMember(memberContext);
         return ApplicationResponse.onSuccess();
     }
 }

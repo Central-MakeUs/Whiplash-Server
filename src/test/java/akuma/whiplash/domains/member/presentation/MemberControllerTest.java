@@ -75,7 +75,7 @@ class MemberControllerTest {
 
     @Nested
     @DisplayName("[DELETE] /api/members - 회원 탈퇴")
-    class SoftDeleteMemberTest {
+    class DeleteMemberTest {
 
         @Test
         @DisplayName("성공: 회원 탈퇴 요청 시 200 OK를 반환한다")
@@ -88,7 +88,7 @@ class MemberControllerTest {
             mockMvc.perform(delete("/api/v1/members"))
                 .andExpect(status().isOk());
 
-            verify(memberUseCase).softDeleteMember(context);
+            verify(memberUseCase).deleteMember(context);
         }
 
         @Test
@@ -98,7 +98,7 @@ class MemberControllerTest {
             MemberContext context = buildContextFromFixture(MemberFixture.MEMBER_2);
             setSecurityContext(context);
             doThrow(ApplicationException.from(MEMBER_NOT_FOUND))
-                .when(memberUseCase).softDeleteMember(context);
+                .when(memberUseCase).deleteMember(context);
 
             // when & then
             mockMvc.perform(delete("/api/v1/members"))
