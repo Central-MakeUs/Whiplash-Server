@@ -86,6 +86,13 @@ public interface AlarmOccurrenceRepository extends JpaRepository<AlarmOccurrence
     """)
     List<AlarmOccurrenceEntity> findAllByAlarmId(@Param("alarmId") Long alarmId);
 
+    @Modifying
+    @Query("""
+        DELETE FROM AlarmOccurrenceEntity ao
+        WHERE ao.alarm.id = :alarmId
+    """)
+    void deleteByAlarmId(@Param("alarmId") Long alarmId);
+
     @Query("""
     SELECT ao.alarm.id
     FROM AlarmOccurrenceEntity ao

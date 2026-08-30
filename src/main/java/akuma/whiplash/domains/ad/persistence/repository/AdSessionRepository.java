@@ -26,6 +26,13 @@ public interface AdSessionRepository extends JpaRepository<AdSessionEntity, Long
     @Modifying
     @Query("""
         DELETE FROM AdSessionEntity ads
+        WHERE ads.alarm.id = :alarmId
+    """)
+    void deleteByAlarmId(@Param("alarmId") Long alarmId);
+
+    @Modifying
+    @Query("""
+        DELETE FROM AdSessionEntity ads
         WHERE ads.member.id = :memberId
            OR ads.alarm.member.id = :memberId
     """)

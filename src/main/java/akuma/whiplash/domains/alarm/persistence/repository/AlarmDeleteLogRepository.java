@@ -11,6 +11,13 @@ public interface AlarmDeleteLogRepository extends JpaRepository<AlarmDeleteLogEn
     @Modifying
     @Query("""
         DELETE FROM AlarmDeleteLogEntity adl
+        WHERE adl.alarm.id = :alarmId
+    """)
+    void deleteByAlarmId(@Param("alarmId") Long alarmId);
+
+    @Modifying
+    @Query("""
+        DELETE FROM AlarmDeleteLogEntity adl
         WHERE adl.member.id = :memberId
            OR adl.alarm.member.id = :memberId
     """)

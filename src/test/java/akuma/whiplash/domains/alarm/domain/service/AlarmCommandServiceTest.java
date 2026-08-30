@@ -3,6 +3,7 @@ package akuma.whiplash.domains.alarm.domain.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 
 import akuma.whiplash.common.fixture.AlarmFixture;
@@ -12,6 +13,7 @@ import akuma.whiplash.domains.ad.domain.constant.AdPurpose;
 import akuma.whiplash.domains.ad.domain.constant.AdSessionStatus;
 import akuma.whiplash.domains.ad.domain.service.AdSessionService;
 import akuma.whiplash.domains.ad.persistence.entity.AdSessionEntity;
+import akuma.whiplash.domains.ad.persistence.repository.AdSessionRepository;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmAdActionRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmOffAdSessionCreateRequest;
 import akuma.whiplash.domains.alarm.domain.constant.OccurrenceStatus;
@@ -20,6 +22,7 @@ import akuma.whiplash.domains.alarm.persistence.entity.AlarmOccurrenceEntity;
 import akuma.whiplash.domains.alarm.persistence.repository.*;
 import akuma.whiplash.domains.member.persistence.entity.MemberEntity;
 import akuma.whiplash.domains.member.persistence.repository.*;
+import akuma.whiplash.domains.payment.persistence.repository.PaymentRepository;
 import akuma.whiplash.global.util.date.TimeProvider;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -43,9 +46,12 @@ class AlarmCommandServiceTest {
     @Mock private AlarmRingingLogRepository alarmRingingLogRepository;
     @Mock private AlarmDeactivationLogRepository alarmDeactivationLogRepository;
     @Mock private AlarmDeleteLogRepository alarmDeleteLogRepository;
+    @Mock private AlarmOffLogRepository alarmOffLogRepository;
     @Mock private MemberRepository memberRepository;
     @Mock private MemberDeviceRepository memberDeviceRepository;
     @Mock private AdSessionService adSessionService;
+    @Mock private AdSessionRepository adSessionRepository;
+    @Mock private PaymentRepository paymentRepository;
     @Mock private ApplicationEventPublisher eventPublisher;
     @Mock private TimeProvider timeProvider;
     @Mock private AlarmLocationCacheService alarmLocationCacheService;
@@ -53,7 +59,7 @@ class AlarmCommandServiceTest {
 
     @BeforeEach
     void setUp() {
-        given(timeProvider.now()).willReturn(NOW);
+        lenient().when(timeProvider.now()).thenReturn(NOW);
     }
 
     @Nested
@@ -96,6 +102,25 @@ class AlarmCommandServiceTest {
             assertThat(occurrence.getStatus()).isEqualTo(OccurrenceStatus.WATCH_AD);
             assertThat(session.getStatus()).isEqualTo(AdSessionStatus.CONSUMED);
             verify(alarmDeactivationLogRepository).save(any());
+        }
+
+        @Test
+        @DisplayName("검증된 광고 세션으로 알람과 모든 연결 데이터를 물리 삭제한다")
+        void physicallyDeletesAlarmAndRelatedDataByAd() {
+            MemberEntity member = MemberFixture.MEMBER_9.toMockEntity();
+            AlarmEntity alarm = AlarmFixture.ALARM_09.toMockEntity(member);
+            given(alarmRepository.findByIdWithMemberForUpdate(alarm.getId())).willReturn(Optional.of(alarm));
+
+            alarmCommandService.removeAlarmByAd(member.getId(), "device", alarm.getId(), new AlarmAdActionRequest("session"));
+
+            verify(adSessionRepository).deleteByAlarmId(alarm.getId());
+            verify(alarmRingingLogRepository).deleteByAlarmId(alarm.getId());
+            verify(alarmDeactivationLogRepository).deleteByAlarmId(alarm.getId());
+            verify(alarmOffLogRepository).deleteAllByAlarmId(alarm.getId());
+            verify(alarmDeleteLogRepository).deleteByAlarmId(alarm.getId());
+            verify(paymentRepository).deleteByAlarmId(alarm.getId());
+            verify(alarmOccurrenceRepository).deleteByAlarmId(alarm.getId());
+            verify(alarmRepository).deleteByAlarmId(alarm.getId());
         }
     }
 }

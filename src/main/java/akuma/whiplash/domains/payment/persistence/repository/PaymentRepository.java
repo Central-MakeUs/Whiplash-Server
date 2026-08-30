@@ -16,6 +16,13 @@ public interface PaymentRepository extends JpaRepository<PaymentEntity, Long> {
     @Modifying
     @Query("""
         DELETE FROM PaymentEntity p
+        WHERE p.alarm.id = :alarmId
+    """)
+    void deleteByAlarmId(@Param("alarmId") Long alarmId);
+
+    @Modifying
+    @Query("""
+        DELETE FROM PaymentEntity p
         WHERE p.member.id = :memberId
            OR p.alarm.member.id = :memberId
     """)

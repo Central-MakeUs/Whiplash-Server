@@ -190,8 +190,10 @@ class AlarmControllerIntegrationTest {
                     .content(objectMapper.writeValueAsString(new AlarmAdActionRequest(session.getAdSessionId()))))
                 .andExpect(status().isOk());
 
-            assertThat(alarmRepository.findById(alarm.getId()).orElseThrow().getStatus().name()).isEqualTo("DELETED");
-            assertThat(adSessionRepository.findById(session.getId()).orElseThrow().getStatus()).isEqualTo(AdSessionStatus.CONSUMED);
+            assertThat(alarmRepository.findById(alarm.getId())).isEmpty();
+            assertThat(alarmOccurrenceRepository.findAllByAlarmId(alarm.getId())).isEmpty();
+            assertThat(adSessionRepository.findById(session.getId())).isEmpty();
+            assertThat(alarmDeleteLogRepository.findAll()).isEmpty();
         }
     }
 

@@ -5,6 +5,7 @@ import static akuma.whiplash.domains.alarm.exception.AlarmErrorCode.*;
 import akuma.whiplash.domains.ad.domain.constant.AdPurpose;
 import akuma.whiplash.domains.ad.domain.service.AdSessionService;
 import akuma.whiplash.domains.ad.persistence.entity.AdSessionEntity;
+import akuma.whiplash.domains.ad.persistence.repository.AdSessionRepository;
 import akuma.whiplash.domains.alarm.application.dto.request.*;
 import akuma.whiplash.domains.alarm.application.dto.response.*;
 import akuma.whiplash.domains.alarm.application.event.AlarmCheckinCompletedEvent;
@@ -17,6 +18,7 @@ import akuma.whiplash.domains.auth.exception.AuthErrorCode;
 import akuma.whiplash.domains.member.exception.MemberErrorCode;
 import akuma.whiplash.domains.member.persistence.entity.*;
 import akuma.whiplash.domains.member.persistence.repository.*;
+import akuma.whiplash.domains.payment.persistence.repository.PaymentRepository;
 import akuma.whiplash.global.exception.ApplicationException;
 import akuma.whiplash.global.util.date.TimeProvider;
 import java.time.*;
@@ -37,6 +39,9 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
     private final AlarmRingingLogRepository alarmRingingLogRepository;
     private final AlarmDeactivationLogRepository alarmDeactivationLogRepository;
     private final AlarmDeleteLogRepository alarmDeleteLogRepository;
+    private final AlarmOffLogRepository alarmOffLogRepository;
+    private final AdSessionRepository adSessionRepository;
+    private final PaymentRepository paymentRepository;
     private final MemberRepository memberRepository;
     private final MemberDeviceRepository memberDeviceRepository;
     private final AdSessionService adSessionService;
@@ -100,11 +105,8 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
     public void removeAlarmByAd(Long memberId, String deviceId, Long alarmId, AlarmAdActionRequest request) {
         AlarmEntity alarm = findActiveAlarmByIdForUpdate(alarmId);
         validAlarmOwner(memberId, alarm.getMember().getId());
-        LocalDateTime now = timeProvider.now();
-        AdSessionEntity session = adSessionService.getVerifiedSessionForConsume(request.adSessionId(), memberId, alarmId, deviceId, AdPurpose.DELETE_ALARM, null);
-        alarm.softDelete(now);
-        alarmDeleteLogRepository.save(AlarmMapper.mapToAdDeleteLogEntity(alarm, alarm.getMember(), request.adSessionId(), now, now));
-        session.consume(now);
+        adSessionService.getVerifiedSessionForConsume(request.adSessionId(), memberId, alarmId, deviceId, AdPurpose.DELETE_ALARM, null);
+        deleteAlarmAndRelatedData(alarmId);
     }
 
     @Override
@@ -141,6 +143,17 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
 
     private AlarmOccurrenceEntity findNextScheduledOccurrence(Long alarmId, LocalDateTime now) {
         return alarmOccurrenceRepository.findNextScheduledByAlarmIds(List.of(alarmId), OccurrenceStatus.SCHEDULED, now).stream().findFirst().orElse(null);
+    }
+
+    private void deleteAlarmAndRelatedData(Long alarmId) {
+        adSessionRepository.deleteByAlarmId(alarmId);
+        alarmRingingLogRepository.deleteByAlarmId(alarmId);
+        alarmDeactivationLogRepository.deleteByAlarmId(alarmId);
+        alarmOffLogRepository.deleteAllByAlarmId(alarmId);
+        alarmDeleteLogRepository.deleteByAlarmId(alarmId);
+        paymentRepository.deleteByAlarmId(alarmId);
+        alarmOccurrenceRepository.deleteByAlarmId(alarmId);
+        alarmRepository.deleteByAlarmId(alarmId);
     }
     private boolean isWithinDistance(double targetLat, double targetLon, double reqLat, double reqLon, double radiusMeters) {
         double dLat = Math.toRadians(reqLat - targetLat), dLon = Math.toRadians(reqLon - targetLon);

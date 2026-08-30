@@ -12,6 +12,13 @@ public interface AlarmRingingLogRepository extends JpaRepository<AlarmRingingLog
     @Modifying
     @Query("""
         DELETE FROM AlarmRingingLogEntity arl
+        WHERE arl.alarmOccurrence.alarm.id = :alarmId
+    """)
+    void deleteByAlarmId(@Param("alarmId") Long alarmId);
+
+    @Modifying
+    @Query("""
+        DELETE FROM AlarmRingingLogEntity arl
         WHERE arl.alarmOccurrence.alarm.member.id = :memberId
     """)
     void deleteByMemberId(@Param("memberId") Long memberId);

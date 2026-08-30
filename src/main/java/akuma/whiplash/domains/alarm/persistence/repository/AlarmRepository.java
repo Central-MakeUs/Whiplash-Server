@@ -78,6 +78,13 @@ public interface AlarmRepository extends JpaRepository<AlarmEntity, Long> {
     """)
     void deleteByMemberId(@Param("memberId") Long memberId);
 
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("""
+        DELETE FROM AlarmEntity a
+        WHERE a.id = :alarmId
+    """)
+    void deleteByAlarmId(@Param("alarmId") Long alarmId);
+
     @Modifying
     @Query("""
         UPDATE AlarmEntity a
