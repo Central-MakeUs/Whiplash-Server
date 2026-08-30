@@ -59,15 +59,6 @@ public class MockFcmService extends FcmService {
 
     @Override
     public FcmMetricResult sendRingingNotifications(List<RingingPushTargetDto> targets) {
-        // 부모의 지연 로직(TEST_DELAY_MS)을 반영하기 위해 sleep 시뮬레이션 추가
-        if (TEST_DELAY_MS > 0) {
-            try {
-                Thread.sleep(TEST_DELAY_MS);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            }
-        }
-
         log.info("[MockFcmService] sendRingingNotifications called with {} targets", targets.size());
 
         if (targets == null || targets.isEmpty()) {

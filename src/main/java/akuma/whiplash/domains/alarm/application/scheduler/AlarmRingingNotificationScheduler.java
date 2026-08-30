@@ -100,10 +100,11 @@ public class AlarmRingingNotificationScheduler {
         // ── 구간 2: Redis FCM 토큰 조회 + 발송 대상 조립 ─────────────────────────
         List<RingingPushTargetDto> targets = infos.stream()
             .flatMap(info -> redisService.getFcmTokens(info.memberId()).stream()
-                .map(token -> RingingPushTargetDto.builder()
-                    .token(token)
-                    .alarmId(info.alarmId())
-                    .memberId(info.memberId())
+                    .map(token -> RingingPushTargetDto.builder()
+                        .token(token)
+                        .alarmId(info.alarmId())
+                        .occurrenceId(info.occurrenceId())
+                        .memberId(info.memberId())
                     .build()))
             .toList();
 

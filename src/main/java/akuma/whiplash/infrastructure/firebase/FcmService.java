@@ -14,6 +14,7 @@ import com.google.firebase.messaging.BatchResponse;
 import com.google.firebase.messaging.FirebaseMessaging;
 import com.google.firebase.messaging.FirebaseMessagingException;
 import com.google.firebase.messaging.MulticastMessage;
+import com.google.firebase.messaging.Notification;
 import com.google.firebase.messaging.SendResponse;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -28,7 +29,6 @@ import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import org.springframework.web.util.UriComponentsBuilder;
 
 @Slf4j
 @Service
@@ -36,13 +36,12 @@ import org.springframework.web.util.UriComponentsBuilder;
 public class FcmService {
 
     private static final int FCM_MULTICAST_LIMIT = 500;
-    private static final String DEFAULT_TITLE = "눈 떠";
+    private static final String DEFAULT_TITLE = "TimeBomb";
     private static final String RINGING_BODY = "알람이 울리고 있어요! 앱으로 접속해서 알람을 꺼주세요!";
     private static final String PRE_ALARM_BODY_WITHOUT_ADDRESS = "1시간 뒤 알람이 울릴 예정이에요!";
+    private static final String PRE_ALARM_PUSH_TYPE = "ALARM_PRE_NOTIFICATION";
+    private static final String RINGING_PUSH_TYPE = "ALARM_RINGING";
     
-    // TODO: 테스트용 지연 변수 (배포 시 제거 필요)
-    public static long TEST_DELAY_MS = 0;
-
     private final RedisService redisService;
 
     /**
@@ -53,10 +52,10 @@ public class FcmService {
     }
 
     /**
-     * 데이터 전용(data-only) 멀티캐스트 전송
-     * - Notification payload 제거, data만 사용
+     * 사전 알림 멀티캐스트 전송
+     * - notification payload와 화면 이동 data를 함께 사용
      * - Android priority=HIGH, iOS apns-priority=10 + content-available=1
-     * - 같은 body 문구(=주소)끼리 묶어서 전송 효율화
+     * - 같은 occurrence의 token만 묶어 화면 이동 data가 섞이지 않도록 보장
      * - 전송 성공한 occurrenceId 수집, 무효 토큰은 즉시 Redis에서 제거
      */
     public FcmSendResult sendBulkNotification(List<PushTargetDto> targets) {
@@ -70,9 +69,10 @@ public class FcmService {
                 .build();
         }
 
-        // body 문구가 동일한 것끼리 묶어서 멀티캐스트 효율 증가
-        Map<String, List<PushTargetDto>> groupedByBody = targets.stream()
-            .collect(Collectors.groupingBy(dto -> getPreAlarmBody(dto.address())));
+        Map<PushDataKey, List<PushTargetDto>> groupedByOccurrence = targets.stream()
+            .collect(Collectors.groupingBy(dto -> new PushDataKey(
+                PRE_ALARM_PUSH_TYPE, dto.alarmId(), dto.occurrenceId()
+            )));
 
         Set<Long> successOccurrenceIds = new HashSet<>();
         List<String> invalidTokens = new ArrayList<>();
@@ -81,33 +81,15 @@ public class FcmService {
         int totalSuccessCount = 0
           , totalFailureCount = 0;
 
-        for (Map.Entry<String, List<PushTargetDto>> entry : groupedByBody.entrySet()) {
-            String body = entry.getKey();
+        for (Map.Entry<PushDataKey, List<PushTargetDto>> entry : groupedByOccurrence.entrySet()) {
+            PushDataKey dataKey = entry.getKey();
             List<PushTargetDto> group = dedupByToken(entry.getValue(), PushTargetDto::token);
 
-            String deeplink = UriComponentsBuilder.newInstance()
-                .scheme("nuntteo")
-                .host("main")
-                .build()
-                .toUriString();
-
-            Map<String, String> data = Map.of(
-                "title", DEFAULT_TITLE,
-                "body", body,
-                "deeplink", deeplink
-            );
-
             for (List<PushTargetDto> batch : partition(group, FCM_MULTICAST_LIMIT)) {
-                MulticastMessage message = MulticastMessage.builder()
-                    .addAllTokens(batch.stream().map(PushTargetDto::token).toList())
-                    .putAllData(data)
-                    .setAndroidConfig(
-                        buildAndroidConfig(Duration.ofMinutes(60), Priority.HIGH)
-                    )
-                    .setApnsConfig( // IOS 설정
-                        buildApnsConfigAlert(DEFAULT_TITLE, body, Duration.ofMinutes(60))
-                    )
-                    .build();
+                MulticastMessage message = buildAlarmNotification(
+                    batch.stream().map(PushTargetDto::token).toList(), PRE_ALARM_BODY_WITHOUT_ADDRESS,
+                    dataKey, Duration.ofMinutes(60)
+                );
 
                 try {
                     BatchResponse response = FirebaseMessaging.getInstance().sendEachForMulticast(message);
@@ -118,7 +100,7 @@ public class FcmService {
 
                     handleSendResult(response.getResponses(), batch, successOccurrenceIds, invalidTokens, memberToTokens);
                 } catch (FirebaseMessagingException e) {
-                    log.error("FCM 전송 실패(멀티캐스트 전체). body={}", body, e);
+                    log.error("FCM 전송 실패(사전 알림 멀티캐스트 전체)", e);
                 }
             }
         }
@@ -132,26 +114,11 @@ public class FcmService {
             .build();
     }
 
-    static String getPreAlarmBody(String address) {
-        return address == null
-            ? PRE_ALARM_BODY_WITHOUT_ADDRESS
-            : String.format("1시간 뒤 %s에서 알림이 울릴 예정이에요!", address);
-    }
-
     /**
      * 알람 울릴 때 FCM 푸시 알림 전송
       * @param targets
      */
     public FcmMetricResult sendRingingNotifications(List<RingingPushTargetDto> targets) {
-        if (TEST_DELAY_MS > 0) {
-            try {
-                log.warn("FCM Latency Simulation: Sleeping for {}ms", TEST_DELAY_MS);
-                Thread.sleep(TEST_DELAY_MS);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            }
-        }
-
         if (targets == null || targets.isEmpty()) {
             return FcmMetricResult.builder()
                 .successCount(0)
@@ -159,37 +126,23 @@ public class FcmService {
                 .build();
         }
 
-        Map<Long, List<RingingPushTargetDto>> groupedByAlarm = targets.stream()
-            .collect(Collectors.groupingBy(RingingPushTargetDto::alarmId));
+        Map<PushDataKey, List<RingingPushTargetDto>> groupedByOccurrence = targets.stream()
+            .collect(Collectors.groupingBy(dto -> new PushDataKey(
+                RINGING_PUSH_TYPE, dto.alarmId(), dto.occurrenceId()
+            )));
 
         int totalSuccessCount = 0
           , totalFailureCount = 0;
 
-        for (Map.Entry<Long, List<RingingPushTargetDto>> entry : groupedByAlarm.entrySet()) {
-            Long alarmId = entry.getKey();
+        for (Map.Entry<PushDataKey, List<RingingPushTargetDto>> entry : groupedByOccurrence.entrySet()) {
+            PushDataKey dataKey = entry.getKey();
             List<RingingPushTargetDto> group = dedupByToken(entry.getValue(), RingingPushTargetDto::token);
 
-            String deeplink = UriComponentsBuilder.newInstance()
-                .scheme("nuntteo")
-                .host("alarm")
-                .path("/ringing")
-                .queryParam("alarmId", alarmId)
-                .build()
-                .toUriString();
-
-            Map<String, String> data = Map.of(
-                "title", DEFAULT_TITLE,
-                "body", RINGING_BODY,
-                "deeplink", deeplink
-            );
-
             for (List<RingingPushTargetDto> batch : partition(group, FCM_MULTICAST_LIMIT)) {
-                MulticastMessage message = MulticastMessage.builder()
-                    .addAllTokens(batch.stream().map(RingingPushTargetDto::token).toList())
-                    .putAllData(data)
-                    .setAndroidConfig(buildAndroidConfig(Duration.ofSeconds(30), Priority.HIGH))
-                    .setApnsConfig(buildApnsConfigAlert(DEFAULT_TITLE, RINGING_BODY, Duration.ofSeconds(30)))
-                    .build();
+                MulticastMessage message = buildAlarmNotification(
+                    batch.stream().map(RingingPushTargetDto::token).toList(), RINGING_BODY,
+                    dataKey, Duration.ofSeconds(30)
+                );
 
                 try {
                     BatchResponse response = FirebaseMessaging.getInstance().sendEachForMulticast(message);
@@ -274,6 +227,25 @@ public class FcmService {
         return builder.build();
     }
 
+    private MulticastMessage buildAlarmNotification(
+        List<String> tokens,
+        String body,
+        PushDataKey dataKey,
+        Duration ttl
+    ) {
+        return MulticastMessage.builder()
+            .addAllTokens(tokens)
+            .setNotification(Notification.builder().setTitle(DEFAULT_TITLE).setBody(body).build())
+            .putAllData(Map.of(
+                "type", dataKey.type(),
+                "alarmId", String.valueOf(dataKey.alarmId()),
+                "occurrenceId", String.valueOf(dataKey.occurrenceId())
+            ))
+            .setAndroidConfig(buildAndroidConfig(ttl, Priority.HIGH))
+            .setApnsConfig(buildApnsConfigAlert(DEFAULT_TITLE, body, ttl))
+            .build();
+    }
+
     // iOS 알림(백그라운드 알림 X, UI에 표시되는 알림)
     private ApnsConfig buildApnsConfigAlert(String title, String body, Duration ttl) {
         ApnsConfig.Builder apns = ApnsConfig.builder()
@@ -327,4 +299,6 @@ public class FcmService {
         if (len <= 10) return "***";
         return token.substring(0, 6) + "..." + token.substring(len - 4);
     }
+
+    private record PushDataKey(String type, Long alarmId, Long occurrenceId) {}
 }

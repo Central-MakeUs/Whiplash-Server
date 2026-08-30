@@ -407,13 +407,10 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
             throw ApplicationException.from(CHECKIN_NOT_YET_AVAILABLE);
         }
 
-        // 4. Google 장소 캐시가 만료됐으면 Place ID로 갱신한 좌표만 사용한다.
+        // 4. Google 장소 cache가 준비되지 않았으면 인증 화면의 background refresh 완료를 기다린다.
         if (alarm.getLocationSource() == LocationSource.GOOGLE_PLACE
             && !alarmLocationCacheService.hasValidGoogleLocationCache(alarm, processedAt)) {
-            if (!alarm.hasGooglePlaceId()) {
-                throw ApplicationException.from(ALARM_LOCATION_RESELECTION_REQUIRED);
-            }
-            alarmLocationCacheService.modifyGoogleLocationCache(alarm);
+            throw ApplicationException.from(ALARM_LOCATION_NOT_READY);
         }
 
         // 5. 사용자가 알람 목적지 반경 50m 안에 있는지 검증한다.

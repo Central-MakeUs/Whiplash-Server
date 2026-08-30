@@ -11,6 +11,7 @@ import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 import akuma.whiplash.common.fixture.AlarmFixture;
 import akuma.whiplash.common.fixture.MemberFixture;
@@ -109,8 +110,8 @@ class AlarmQueryServiceTest {
         }
 
         @Test
-        @DisplayName("성공: 주소 캐시가 없는 Google 장소는 응답 전에 Place ID로 갱신한다")
-        void success_refreshMissingGooglePlaceAddress() {
+        @DisplayName("성공: 만료된 Google 장소 cache가 있어도 위치 갱신 없이 주소 null을 반환한다")
+        void success_doesNotRefreshGooglePlaceAddress() {
             // given
             MemberEntity member = MemberFixture.MEMBER_11.toMockEntity();
             AlarmEntity alarm = AlarmFixture.ALARM_11.toMockEntity();
@@ -118,17 +119,17 @@ class AlarmQueryServiceTest {
             given(memberRepository.findById(member.getId())).willReturn(Optional.of(member));
             given(alarmRepository.findAllByMemberIdAndStatusNot(member.getId(), AlarmStatus.DELETED))
                 .willReturn(List.of(alarm));
-            given(alarmLocationCacheService.canRefreshGoogleLocationCache(alarm)).willReturn(true);
             given(alarmOccurrenceRepository.findLatestProcessedByAlarmIds(anyList(), anyList()))
                 .willReturn(List.of());
             given(alarmOccurrenceRepository.findByAlarmIdsAndOccurrenceDates(anyList(), anyList()))
                 .willReturn(List.of());
 
             // when
-            alarmQueryService.getAlarms(member.getId(), REQUEST_DEVICE_ID);
+            GetAlarmsResponse result = alarmQueryService.getAlarms(member.getId(), REQUEST_DEVICE_ID);
 
             // then
-            verify(alarmLocationCacheService).modifyGoogleLocationCache(alarm);
+            assertThat(result.alarms().get(0).address()).isNull();
+            verifyNoInteractions(alarmLocationCacheService);
         }
 
         @Test
@@ -404,12 +405,12 @@ class AlarmQueryServiceTest {
     class GetPreNotificationTargetsTest {
 
         @Test
-        @DisplayName("성공: scheduledAt 기준 윈도우로 사전 알림 대상을 조회한다")
+        @DisplayName("성공: scheduledAt 기준 윈도우로 사전 알림 대상을 조회하고 위치 cache를 갱신하지 않는다")
         void success() {
             // given
             LocalDateTime start = FIXED_NOW.plusMinutes(59);
             LocalDateTime end = FIXED_NOW.plusMinutes(61);
-            OccurrencePushInfo info = new OccurrencePushInfo(1L, 2L, 3L, "서울");
+            OccurrencePushInfo info = new OccurrencePushInfo(1L, 2L, 3L);
             given(alarmOccurrenceRepository.findPreNotificationTargetsByScheduledAtBetween(
                 start,
                 end,
@@ -421,96 +422,7 @@ class AlarmQueryServiceTest {
 
             // then
             assertThat(result).containsExactly(info);
-        }
-
-        @Test
-        @DisplayName("성공: 주소 캐시가 없으면 사전 알림 전에 Google 장소 캐시를 갱신한다")
-        void success_refreshesMissingGooglePlaceAddress() {
-            // given
-            LocalDateTime start = FIXED_NOW.plusMinutes(59);
-            LocalDateTime end = FIXED_NOW.plusMinutes(61);
-            OccurrencePushInfo info = new OccurrencePushInfo(1L, 2L, 3L, null);
-            AlarmEntity alarm = AlarmFixture.ALARM_03.toMockEntity();
-            alarm.updateGooglePlaceLocation("google-place-id", null, 37.5, 127.0, FIXED_NOW.minusDays(29));
-            given(alarmOccurrenceRepository.findPreNotificationTargetsByScheduledAtBetween(
-                start,
-                end,
-                OccurrenceStatus.SCHEDULED
-            )).willReturn(List.of(info));
-            given(alarmRepository.findAllById(List.of(3L))).willReturn(List.of(alarm));
-            given(alarmLocationCacheService.canRefreshGoogleLocationCache(alarm)).willReturn(true);
-            doAnswer(invocation -> {
-                alarm.updateGooglePlaceLocation("google-place-id", "서울", 37.5, 127.0, FIXED_NOW);
-                return null;
-            }).when(alarmLocationCacheService).modifyGoogleLocationCache(alarm);
-
-            // when
-            List<OccurrencePushInfo> result = alarmQueryService.getPreNotificationTargets(start, end);
-
-            // then
-            verify(alarmLocationCacheService).modifyGoogleLocationCache(alarm);
-            assertThat(result).containsExactly(new OccurrencePushInfo(1L, 2L, 3L, "서울"));
-        }
-
-        @Test
-        @DisplayName("성공: 만료된 캐시는 사전 알림 전에 Google 장소 캐시를 갱신한다")
-        void success_refreshesExpiredGooglePlaceCache() {
-            // given
-            LocalDateTime start = FIXED_NOW.plusMinutes(59);
-            LocalDateTime end = FIXED_NOW.plusMinutes(61);
-            OccurrencePushInfo info = new OccurrencePushInfo(1L, 2L, 3L, "기존 주소");
-            AlarmEntity alarm = AlarmFixture.ALARM_03.toMockEntity();
-            given(alarmOccurrenceRepository.findPreNotificationTargetsByScheduledAtBetween(
-                start,
-                end,
-                OccurrenceStatus.SCHEDULED
-            )).willReturn(List.of(info));
-            given(alarmRepository.findAllById(List.of(3L))).willReturn(List.of(alarm));
-            given(alarmLocationCacheService.hasValidGoogleLocationCache(any(), any())).willReturn(false);
-            given(alarmLocationCacheService.canRefreshGoogleLocationCache(alarm)).willReturn(true);
-            doAnswer(invocation -> {
-                alarm.updateGooglePlaceLocation("google-place-id", "새 주소", 37.5, 127.0, FIXED_NOW);
-                return null;
-            }).when(alarmLocationCacheService).modifyGoogleLocationCache(alarm);
-
-            // when
-            List<OccurrencePushInfo> result = alarmQueryService.getPreNotificationTargets(start, end);
-
-            // then
-            verify(alarmLocationCacheService).modifyGoogleLocationCache(alarm);
-            assertThat(result).containsExactly(new OccurrencePushInfo(1L, 2L, 3L, "새 주소"));
-        }
-
-        @Test
-        @DisplayName("성공: Google 장소 캐시 갱신에 실패해도 주소 없는 사전 알림 대상을 반환한다")
-        void success_returnsAddresslessTargetWhenGoogleCacheRefreshFails() {
-            // given
-            LocalDateTime start = FIXED_NOW.plusMinutes(59);
-            LocalDateTime end = FIXED_NOW.plusMinutes(61);
-            OccurrencePushInfo info = new OccurrencePushInfo(1L, 2L, 3L, null);
-            AlarmEntity alarm = AlarmFixture.ALARM_03.toMockEntity();
-            alarm.updateGooglePlaceLocation(
-                "google-place-id", alarm.getAddress(), 37.5, 127.0, FIXED_NOW.minusDays(29)
-            );
-            given(alarmOccurrenceRepository.findPreNotificationTargetsByScheduledAtBetween(
-                start,
-                end,
-                OccurrenceStatus.SCHEDULED
-            )).willReturn(List.of(info));
-            given(alarmRepository.findAllById(List.of(3L))).willReturn(List.of(alarm));
-            given(alarmLocationCacheService.hasValidGoogleLocationCache(any(), any())).willReturn(false);
-            given(alarmLocationCacheService.canRefreshGoogleLocationCache(alarm)).willReturn(true);
-            doAnswer(invocation -> {
-                alarm.clearGooglePlaceLocationCache();
-                throw new IllegalStateException("Google Places unavailable");
-            }).when(alarmLocationCacheService).modifyGoogleLocationCache(alarm);
-
-            // when
-            List<OccurrencePushInfo> result = alarmQueryService.getPreNotificationTargets(start, end);
-
-            // then
-            verify(alarmLocationCacheService).modifyGoogleLocationCache(alarm);
-            assertThat(result).containsExactly(info);
+            verifyNoInteractions(alarmRepository, alarmLocationCacheService);
         }
     }
 

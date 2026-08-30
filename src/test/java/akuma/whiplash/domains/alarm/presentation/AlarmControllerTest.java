@@ -29,6 +29,8 @@ import akuma.whiplash.domains.alarm.application.dto.response.AlarmSyncItemDto;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmSyncResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.CreateAlarmResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.GetAlarmsResponse;
+import akuma.whiplash.domains.alarm.application.dto.response.LocationPreparationResponse;
+import akuma.whiplash.domains.alarm.application.dto.response.LocationPreparationState;
 import akuma.whiplash.domains.alarm.application.usecase.AlarmUseCase;
 import akuma.whiplash.domains.alarm.domain.constant.AlarmDeleteMethod;
 import akuma.whiplash.domains.alarm.domain.constant.Weekday;
@@ -113,6 +115,29 @@ class AlarmControllerTest {
 
     private AlarmCheckinRequest buildCheckinRequest() {
         return new AlarmCheckinRequest(501L, "device-uuid", 37.0, 127.0);
+    }
+
+    @Nested
+    @DisplayName("[POST] /api/v1/alarms/{alarmId}/occurrences/{occurrenceId}/destination - 알람 목적지 조회")
+    class LocationPreparationTest {
+
+        @Test
+        @DisplayName("성공: 위치 준비 요청은 PREPARING 상태를 반환한다")
+        void success() throws Exception {
+            // given
+            MemberContext context = buildContext(MEMBER_3);
+            setSecurityContext(context);
+            when(alarmUseCase.getLocationPreparation(context.memberId(), 123L, 501L))
+                .thenReturn(LocationPreparationResponse.waiting(LocationPreparationState.PREPARING));
+
+            // when & then
+            mockMvc.perform(post(BASE + "/{alarmId}/occurrences/{occurrenceId}/destination", 123L, 501L))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.isSuccess").value(true))
+                .andExpect(jsonPath("$.result.state").value("PREPARING"))
+                .andExpect(jsonPath("$.result.canCheckin").value(false));
+            verify(alarmUseCase).getLocationPreparation(context.memberId(), 123L, 501L);
+        }
     }
 
     @Nested
