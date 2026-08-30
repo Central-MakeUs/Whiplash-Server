@@ -10,6 +10,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 import akuma.whiplash.common.fixture.AlarmFixture;
+import akuma.whiplash.common.fixture.AlarmOccurrenceFixture;
 import akuma.whiplash.common.fixture.MemberFixture;
 import akuma.whiplash.domains.ad.application.dto.etc.AdMobRewardCallback;
 import akuma.whiplash.domains.ad.application.dto.request.AdMobRewardCallbackRequest;
@@ -17,7 +18,9 @@ import akuma.whiplash.domains.ad.domain.constant.AdPurpose;
 import akuma.whiplash.domains.ad.domain.constant.AdSessionStatus;
 import akuma.whiplash.domains.ad.persistence.entity.AdSessionEntity;
 import akuma.whiplash.domains.ad.persistence.repository.AdSessionRepository;
+import akuma.whiplash.domains.alarm.domain.constant.OccurrenceStatus;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmEntity;
+import akuma.whiplash.domains.alarm.persistence.entity.AlarmOccurrenceEntity;
 import akuma.whiplash.domains.member.persistence.entity.MemberEntity;
 import akuma.whiplash.global.exception.ApplicationException;
 import akuma.whiplash.global.util.date.TimeProvider;
@@ -159,6 +162,40 @@ class AdSessionServiceTest {
                 .isInstanceOfSatisfying(ApplicationException.class, e ->
                     assertThat(e.getCode()).isEqualTo(AD_SESSION_ALREADY_CONSUMED)
                 );
+        }
+    }
+
+    @Nested
+    @DisplayName("getVerifiedSessionForConsume - 광고 세션 소비 검증")
+    class GetVerifiedSessionForConsumeTest {
+
+        @Test
+        @DisplayName("실패: 알람 끄기 세션을 다른 발생 건에 사용할 수 없다")
+        void fail_occurrenceMismatch() {
+            // given
+            MemberEntity member = MemberFixture.MEMBER_8.toMockEntity();
+            AlarmEntity alarm = AlarmFixture.ALARM_08.toMockEntity(member);
+            AlarmOccurrenceEntity occurrence = AlarmOccurrenceFixture.ALARM_OCCURRENCE_01
+                .toMockEntity(alarm, 100L, FIXED_NOW, OccurrenceStatus.SCHEDULED);
+            AdSessionEntity adSession = AdSessionEntity.builder()
+                .adSessionId("ad-session-id")
+                .member(member)
+                .alarm(alarm)
+                .alarmOccurrence(occurrence)
+                .deviceId("device-uuid")
+                .purpose(AdPurpose.STOP_ALARM)
+                .status(AdSessionStatus.VERIFIED)
+                .expiresAt(FIXED_NOW.plusMinutes(10))
+                .build();
+            given(adSessionRepository.findByAdSessionIdForUpdate("ad-session-id")).willReturn(Optional.of(adSession));
+            given(timeProvider.now()).willReturn(FIXED_NOW);
+
+            // when & then
+            assertThatThrownBy(() -> adSessionService.getVerifiedSessionForConsume(
+                "ad-session-id", member.getId(), alarm.getId(), "device-uuid", AdPurpose.STOP_ALARM, 101L
+            )).isInstanceOfSatisfying(ApplicationException.class, e ->
+                assertThat(e.getCode()).isEqualTo(akuma.whiplash.domains.ad.exception.AdErrorCode.AD_SESSION_MISMATCH)
+            );
         }
     }
 

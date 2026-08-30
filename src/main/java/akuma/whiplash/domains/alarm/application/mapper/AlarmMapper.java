@@ -2,15 +2,13 @@ package akuma.whiplash.domains.alarm.application.mapper;
 
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmRegisterRequest;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmCheckinResponse;
-import akuma.whiplash.domains.alarm.application.dto.response.AlarmDeleteMethodResponse;
-import akuma.whiplash.domains.alarm.application.dto.response.AlarmPaymentResponse;
+import akuma.whiplash.domains.alarm.application.dto.response.AlarmDeactivationResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmAdSessionCreateResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmSyncItemDto;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmSyncResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.CreateAlarmResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.NextOccurrenceResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmPreviewDto;
-import akuma.whiplash.domains.alarm.domain.constant.AlarmDeleteMethod;
 import akuma.whiplash.domains.alarm.domain.constant.DeactivateType;
 import akuma.whiplash.domains.alarm.domain.constant.DeactivationResult;
 import akuma.whiplash.domains.alarm.domain.constant.AlarmStatus;
@@ -158,6 +156,7 @@ public class AlarmMapper {
             .alarmOccurrence(occurrence)
             .member(member)
             .paymentId(null)
+            .adProofToken(null)
             .deactivateType(DeactivateType.CHECKIN)
             .requestDeviceId(deviceId)
             .requestedAt(requestedAt)
@@ -180,78 +179,40 @@ public class AlarmMapper {
             .build();
     }
 
-    public static AlarmPaymentResponse mapToAlarmPaymentResponse(
+    public static AlarmDeactivationResponse mapToAlarmDeactivationResponse(
         AlarmEntity alarm,
         LocalDateTime deactivatedAt,
         AlarmOccurrenceEntity nextOccurrence
     ) {
-        return AlarmPaymentResponse.builder()
+        return AlarmDeactivationResponse.builder()
             .alarmId(alarm.getId())
             .deactivatedAt(deactivatedAt)
-            .nextOccurrence(nextOccurrence == null ? null : AlarmPaymentResponse.NextOccurrenceInfo.builder()
+            .nextOccurrence(nextOccurrence == null ? null : AlarmDeactivationResponse.NextOccurrenceInfo.builder()
                 .occurrenceId(nextOccurrence.getId())
                 .scheduledAt(nextOccurrence.getScheduledAt())
                 .build())
             .build();
     }
 
-    public static AlarmDeactivationLogEntity mapToPaymentDeactivationLogEntity(
+    public static AlarmDeactivationLogEntity mapToAdDeactivationLogEntity(
         AlarmOccurrenceEntity occurrence,
         MemberEntity member,
-        String paymentId,
+        String adSessionId,
         String deviceId,
         LocalDateTime requestedAt,
-        LocalDateTime processedAt,
-        DeactivationResult result,
-        String failReason
+        LocalDateTime processedAt
     ) {
         return AlarmDeactivationLogEntity.builder()
             .alarmOccurrence(occurrence)
             .member(member)
-            .paymentId(paymentId)
-            .deactivateType(DeactivateType.PAYMENT)
+            .paymentId(null)
+            .adProofToken(adSessionId)
+            .deactivateType(DeactivateType.AD)
             .requestDeviceId(deviceId)
             .requestedAt(requestedAt)
             .processedAt(processedAt)
-            .result(result)
-            .failReason(failReason)
-            .build();
-    }
-
-    public static AlarmDeleteLogEntity mapToPaymentDeleteLogEntity(
-        AlarmEntity alarm,
-        MemberEntity member,
-        String paymentId,
-        String reason,
-        LocalDateTime requestedAt,
-        LocalDateTime deletedAt
-    ) {
-        return AlarmDeleteLogEntity.builder()
-            .alarm(alarm)
-            .member(member)
-            .deleteType(DeleteType.PAYMENT)
-            .reason(reason)
-            .paymentId(paymentId)
-            .requestedAt(requestedAt)
-            .deletedAt(deletedAt)
-            .build();
-    }
-
-    public static AlarmDeleteLogEntity mapToPaymentDeleteFailureLogEntity(
-        AlarmEntity alarm,
-        MemberEntity member,
-        String paymentId,
-        String reason,
-        LocalDateTime requestedAt
-    ) {
-        return AlarmDeleteLogEntity.builder()
-            .alarm(alarm)
-            .member(member)
-            .deleteType(DeleteType.PAYMENT_FAILED)
-            .reason(truncateReason(reason))
-            .paymentId(paymentId)
-            .requestedAt(requestedAt)
-            .deletedAt(null)
+            .result(DeactivationResult.SUCCESS)
+            .failReason("")
             .build();
     }
 
@@ -367,12 +328,6 @@ public class AlarmMapper {
             .serverTime(serverTime)
             .timeZone(timeZone)
             .alarms(alarms)
-            .build();
-    }
-
-    public static AlarmDeleteMethodResponse mapToAlarmDeleteMethodResponse(AlarmDeleteMethod deleteMethod) {
-        return AlarmDeleteMethodResponse.builder()
-            .deleteMethod(deleteMethod.name())
             .build();
     }
 

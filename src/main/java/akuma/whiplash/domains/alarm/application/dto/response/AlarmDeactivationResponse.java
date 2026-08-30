@@ -4,15 +4,12 @@ import java.time.LocalDateTime;
 import lombok.Builder;
 
 @Builder
-public record AlarmPaymentResponse(
+public record AlarmDeactivationResponse(
     Long alarmId,
     LocalDateTime deactivatedAt,
     NextOccurrenceInfo nextOccurrence
 ) {
     @Builder
-    public record NextOccurrenceInfo(
-        Long occurrenceId,
-        LocalDateTime scheduledAt
-    ) {
+    public record NextOccurrenceInfo(Long occurrenceId, LocalDateTime scheduledAt) {
     }
 }

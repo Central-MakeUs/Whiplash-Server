@@ -1,19 +1,12 @@
 package akuma.whiplash.domains.alarm.application.usecase;
 
-import akuma.whiplash.domains.alarm.application.dto.request.AlarmAdSessionCreateRequest;
-import akuma.whiplash.domains.alarm.application.dto.request.AppStoreAlarmDeletePaymentRequest;
-import akuma.whiplash.domains.alarm.application.dto.request.AppStoreAlarmPaymentRequest;
-import akuma.whiplash.domains.alarm.application.dto.request.GooglePlayAlarmDeletePaymentRequest;
-import akuma.whiplash.domains.alarm.application.dto.request.GooglePlayAlarmPaymentRequest;
+import akuma.whiplash.domains.alarm.application.dto.request.AlarmAdActionRequest;
+import akuma.whiplash.domains.alarm.application.dto.request.AlarmOffAdSessionCreateRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmCheckinRequest;
-import akuma.whiplash.domains.alarm.application.dto.request.AlarmDeleteByAdRequest;
-import akuma.whiplash.domains.alarm.application.dto.request.AlarmDeleteByPaymentRequest;
-import akuma.whiplash.domains.alarm.application.dto.request.AlarmPaymentRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmRegisterRequest;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmAdSessionCreateResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmCheckinResponse;
-import akuma.whiplash.domains.alarm.application.dto.response.AlarmDeleteMethodResponse;
-import akuma.whiplash.domains.alarm.application.dto.response.AlarmPaymentResponse;
+import akuma.whiplash.domains.alarm.application.dto.response.AlarmDeactivationResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmSyncResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.CreateAlarmResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.GetAlarmsResponse;
@@ -21,7 +14,6 @@ import akuma.whiplash.domains.alarm.application.dto.response.LocationPreparation
 import akuma.whiplash.domains.alarm.application.service.AlarmLocationPreparationService;
 import akuma.whiplash.domains.alarm.domain.service.AlarmCommandService;
 import akuma.whiplash.domains.alarm.domain.service.AlarmQueryService;
-import akuma.whiplash.domains.payment.domain.command.StorePaymentProof;
 import akuma.whiplash.global.annotation.architecture.UseCase;
 import lombok.RequiredArgsConstructor;
 
@@ -37,44 +29,24 @@ public class AlarmUseCase {
         return alarmCommandService.createAlarm(request, memberId, deviceId);
     }
 
-    public void removeAlarmByPayment(Long memberId, Long alarmId, AlarmDeleteByPaymentRequest request) {
-        alarmCommandService.removeAlarmByPayment(memberId, alarmId, request);
+    public AlarmAdSessionCreateResponse createOffAdSession(Long memberId, String deviceId, Long alarmId, AlarmOffAdSessionCreateRequest request) {
+        return alarmCommandService.createOffAdSession(memberId, deviceId, alarmId, request);
     }
 
-    public void removeAlarmByAppStorePayment(Long memberId, String deviceId, Long alarmId, AppStoreAlarmDeletePaymentRequest request) {
-        alarmCommandService.removeAlarmByAppStorePayment(memberId, deviceId, alarmId,
-            new StorePaymentProof(request.transactionId(), request.productId()));
+    public AlarmDeactivationResponse deactivateByAd(Long memberId, String deviceId, Long alarmId, AlarmAdActionRequest request) {
+        return alarmCommandService.deactivateByAd(memberId, deviceId, alarmId, request);
     }
 
-    public void removeAlarmByGooglePlayPayment(Long memberId, String deviceId, Long alarmId, GooglePlayAlarmDeletePaymentRequest request) {
-        alarmCommandService.removeAlarmByGooglePlayPayment(memberId, deviceId, alarmId,
-            new StorePaymentProof(request.purchaseToken(), request.productId()));
+    public AlarmAdSessionCreateResponse createDeleteAdSession(Long memberId, String deviceId, Long alarmId) {
+        return alarmCommandService.createDeleteAdSession(memberId, deviceId, alarmId);
     }
 
-    public AlarmAdSessionCreateResponse createAdSession(Long memberId, Long alarmId, AlarmAdSessionCreateRequest request) {
-        return alarmCommandService.createAdSession(memberId, alarmId, request);
-    }
-
-    public void removeAlarmByAd(Long memberId, Long alarmId, AlarmDeleteByAdRequest request) {
-        alarmCommandService.removeAlarmByAd(memberId, alarmId, request);
+    public void removeAlarmByAd(Long memberId, String deviceId, Long alarmId, AlarmAdActionRequest request) {
+        alarmCommandService.removeAlarmByAd(memberId, deviceId, alarmId, request);
     }
 
     public AlarmCheckinResponse checkinAlarm(Long memberId, Long alarmId, AlarmCheckinRequest request) {
         return alarmCommandService.checkinAlarm(memberId, alarmId, request);
-    }
-
-    public AlarmPaymentResponse deactivateByPayment(Long memberId, Long alarmId, AlarmPaymentRequest request) {
-        return alarmCommandService.deactivateByPayment(memberId, alarmId, request);
-    }
-
-    public AlarmPaymentResponse deactivateByAppStorePayment(Long memberId, String deviceId, Long alarmId, AppStoreAlarmPaymentRequest request) {
-        return alarmCommandService.deactivateByAppStorePayment(memberId, deviceId, alarmId, request.occurrenceId(),
-            new StorePaymentProof(request.transactionId(), request.productId()));
-    }
-
-    public AlarmPaymentResponse deactivateByGooglePlayPayment(Long memberId, String deviceId, Long alarmId, GooglePlayAlarmPaymentRequest request) {
-        return alarmCommandService.deactivateByGooglePlayPayment(memberId, deviceId, alarmId, request.occurrenceId(),
-            new StorePaymentProof(request.purchaseToken(), request.productId()));
     }
 
     public void ringAlarm(Long memberId, Long alarmId, String deviceId) {
@@ -87,10 +59,6 @@ public class AlarmUseCase {
 
     public AlarmSyncResponse getSyncAlarms(Long memberId, String deviceId) {
         return alarmQueryService.getSyncAlarms(memberId, deviceId);
-    }
-
-    public AlarmDeleteMethodResponse getAlarmDeleteMethod(Long memberId, Long alarmId) {
-        return alarmQueryService.getAlarmDeleteMethod(memberId, alarmId);
     }
 
     public LocationPreparationResponse getLocationPreparation(Long memberId, Long alarmId, Long occurrenceId) {

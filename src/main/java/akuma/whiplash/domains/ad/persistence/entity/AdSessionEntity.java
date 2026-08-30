@@ -5,6 +5,7 @@ import akuma.whiplash.domains.ad.domain.constant.AdPurpose;
 import akuma.whiplash.domains.ad.domain.constant.AdSessionStatus;
 import akuma.whiplash.domains.ad.exception.AdErrorCode;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmEntity;
+import akuma.whiplash.domains.alarm.persistence.entity.AlarmOccurrenceEntity;
 import akuma.whiplash.domains.member.persistence.entity.MemberEntity;
 import akuma.whiplash.global.entity.BaseTimeEntity;
 import akuma.whiplash.global.exception.ApplicationException;
@@ -48,6 +49,10 @@ public class AdSessionEntity extends BaseTimeEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "alarm_id", nullable = false)
     private AlarmEntity alarm;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "alarm_occurrence_id")
+    private AlarmOccurrenceEntity alarmOccurrence;
 
     @Column(name = "device_id", length = 255, nullable = false)
     private String deviceId;
@@ -105,7 +110,14 @@ public class AdSessionEntity extends BaseTimeEntity {
         this.rawCallbackReceivedAt = now;
     }
 
-    public void validateForConsume(Long memberId, Long alarmId, String deviceId, AdPurpose purpose, LocalDateTime now) {
+    public void validateForConsume(
+        Long memberId,
+        Long alarmId,
+        String deviceId,
+        AdPurpose purpose,
+        Long occurrenceId,
+        LocalDateTime now
+    ) {
         if (status == AdSessionStatus.CONSUMED) {
             throw ApplicationException.from(AdErrorCode.AD_SESSION_ALREADY_CONSUMED);
         }
@@ -119,7 +131,9 @@ public class AdSessionEntity extends BaseTimeEntity {
         if (!this.member.getId().equals(memberId)
             || !this.alarm.getId().equals(alarmId)
             || !this.deviceId.equals(deviceId)
-            || this.purpose != purpose) {
+            || this.purpose != purpose
+            || (purpose == AdPurpose.STOP_ALARM && (alarmOccurrence == null || !alarmOccurrence.getId().equals(occurrenceId)))
+            || (purpose == AdPurpose.DELETE_ALARM && alarmOccurrence != null)) {
             throw ApplicationException.from(AdErrorCode.AD_SESSION_MISMATCH);
         }
     }

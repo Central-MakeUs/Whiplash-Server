@@ -7,6 +7,8 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.Optional;
+import jakarta.persistence.LockModeType;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -21,6 +23,15 @@ public interface AlarmRepository extends JpaRepository<AlarmEntity, Long> {
         WHERE a.id = :alarmId
     """)
     Optional<AlarmEntity> findByIdWithMember(@Param("alarmId") Long alarmId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+        SELECT a
+        FROM AlarmEntity a
+        JOIN FETCH a.member
+        WHERE a.id = :alarmId
+    """)
+    Optional<AlarmEntity> findByIdWithMemberForUpdate(@Param("alarmId") Long alarmId);
 
     List<AlarmEntity> findAllByMemberId(Long memberId);
 

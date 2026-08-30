@@ -48,6 +48,9 @@ public class AlarmDeactivationLogEntity extends BaseTimeEntity {
     @Column(name = "payment_id", length = 512)
     private String paymentId;
 
+    @Column(name = "ad_proof_token", length = 64)
+    private String adProofToken;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "deactivate_type", length = 20, nullable = false)
     private DeactivateType deactivateType;

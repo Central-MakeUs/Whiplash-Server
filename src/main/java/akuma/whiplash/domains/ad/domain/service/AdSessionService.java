@@ -4,6 +4,7 @@ import akuma.whiplash.domains.ad.application.dto.request.AdMobRewardCallbackRequ
 import akuma.whiplash.domains.ad.domain.constant.AdPurpose;
 import akuma.whiplash.domains.ad.persistence.entity.AdSessionEntity;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmEntity;
+import akuma.whiplash.domains.alarm.persistence.entity.AlarmOccurrenceEntity;
 import akuma.whiplash.domains.member.persistence.entity.MemberEntity;
 import java.time.LocalDateTime;
 
@@ -17,7 +18,18 @@ public interface AdSessionService {
         LocalDateTime expiresAt
     );
 
+    AdSessionEntity createSession(
+        MemberEntity member,
+        AlarmEntity alarm,
+        AlarmOccurrenceEntity alarmOccurrence,
+        String deviceId,
+        AdPurpose purpose,
+        LocalDateTime expiresAt
+    );
+
     void verifyRewardCallback(AdMobRewardCallbackRequest request);
+
+    AdSessionEntity getSessionTarget(String adSessionId);
 
     AdSessionEntity getVerifiedSessionForConsume(
         String adSessionId,
@@ -25,5 +37,14 @@ public interface AdSessionService {
         Long alarmId,
         String deviceId,
         AdPurpose purpose
+    );
+
+    AdSessionEntity getVerifiedSessionForConsume(
+        String adSessionId,
+        Long memberId,
+        Long alarmId,
+        String deviceId,
+        AdPurpose purpose,
+        Long occurrenceId
     );
 }

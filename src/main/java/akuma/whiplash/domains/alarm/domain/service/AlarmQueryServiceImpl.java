@@ -1,14 +1,10 @@
 package akuma.whiplash.domains.alarm.domain.service;
 
-import static akuma.whiplash.domains.alarm.exception.AlarmErrorCode.ALARM_NOT_FOUND;
-
 import akuma.whiplash.domains.alarm.application.dto.etc.OccurrencePushInfo;
 import akuma.whiplash.domains.alarm.application.dto.etc.RingingPushInfo;
-import akuma.whiplash.domains.alarm.application.dto.response.AlarmDeleteMethodResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmSyncResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.GetAlarmsResponse;
 import akuma.whiplash.domains.alarm.application.mapper.AlarmMapper;
-import akuma.whiplash.domains.alarm.domain.constant.AlarmDeleteMethod;
 import akuma.whiplash.domains.alarm.domain.constant.AlarmStatus;
 import akuma.whiplash.domains.alarm.domain.constant.OccurrenceStatus;
 import akuma.whiplash.domains.alarm.domain.constant.Weekday;
@@ -17,7 +13,6 @@ import akuma.whiplash.domains.alarm.persistence.entity.AlarmEntity;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmOccurrenceEntity;
 import akuma.whiplash.domains.alarm.persistence.repository.AlarmOccurrenceRepository;
 import akuma.whiplash.domains.alarm.persistence.repository.AlarmRepository;
-import akuma.whiplash.domains.auth.exception.AuthErrorCode;
 import akuma.whiplash.domains.member.exception.MemberErrorCode;
 import akuma.whiplash.domains.member.persistence.entity.MemberDeviceEntity;
 import akuma.whiplash.domains.member.persistence.repository.MemberDeviceRepository;
@@ -179,21 +174,6 @@ public class AlarmQueryServiceImpl implements AlarmQueryService {
     }
 
     @Override
-    public AlarmDeleteMethodResponse getAlarmDeleteMethod(Long memberId, Long alarmId) {
-        AlarmEntity alarm = findAlarmById(alarmId);
-        validAlarmOwner(memberId, alarm.getMember().getId());
-
-        AlarmDeleteMethod deleteMethod = alarmOccurrenceRepository
-            .findStatusByAlarmIdAndDate(alarmId, timeProvider.today())
-            .map(status -> requiresPayment(status)
-                ? AlarmDeleteMethod.PAYMENT
-                : AlarmDeleteMethod.AD)
-            .orElse(AlarmDeleteMethod.AD);
-
-        return AlarmMapper.mapToAlarmDeleteMethodResponse(deleteMethod);
-    }
-
-    @Override
     @Transactional
     public List<OccurrencePushInfo> getPreNotificationTargets(LocalDateTime startInclusive, LocalDateTime endInclusive) {
         return alarmOccurrenceRepository.findPreNotificationTargetsByScheduledAtBetween(
@@ -206,21 +186,6 @@ public class AlarmQueryServiceImpl implements AlarmQueryService {
     @Override
     public List<RingingPushInfo> getRingingNotificationTargets() {
         return alarmOccurrenceRepository.findRingingNotificationTargets(OccurrenceStatus.RINGING);
-    }
-
-    private AlarmEntity findAlarmById(Long alarmId) {
-        return alarmRepository.findByIdWithMember(alarmId)
-            .orElseThrow(() -> ApplicationException.from(ALARM_NOT_FOUND));
-    }
-
-    private boolean requiresPayment(OccurrenceStatus status) {
-        return status == OccurrenceStatus.SCHEDULED || status == OccurrenceStatus.RINGING;
-    }
-
-    private static void validAlarmOwner(Long reqMemberId, Long alarmMemberId) {
-        if (!reqMemberId.equals(alarmMemberId)) {
-            throw ApplicationException.from(AuthErrorCode.PERMISSION_DENIED);
-        }
     }
 
     private ZoneId resolveMemberZone(Long memberId, String deviceId) {
