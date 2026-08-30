@@ -17,6 +17,8 @@ import akuma.whiplash.domains.alarm.application.dto.response.AlarmPaymentRespons
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmSyncResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.CreateAlarmResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.GetAlarmsResponse;
+import akuma.whiplash.domains.alarm.application.dto.response.LocationPreparationResponse;
+import akuma.whiplash.domains.alarm.application.service.AlarmLocationPreparationService;
 import akuma.whiplash.domains.alarm.domain.service.AlarmCommandService;
 import akuma.whiplash.domains.alarm.domain.service.AlarmQueryService;
 import akuma.whiplash.domains.payment.domain.command.StorePaymentProof;
@@ -29,6 +31,7 @@ public class AlarmUseCase {
 
     private final AlarmCommandService alarmCommandService;
     private final AlarmQueryService alarmQueryService;
+    private final AlarmLocationPreparationService alarmLocationPreparationService;
 
     public CreateAlarmResponse createAlarm(AlarmRegisterRequest request, Long memberId, String deviceId) {
         return alarmCommandService.createAlarm(request, memberId, deviceId);
@@ -88,5 +91,9 @@ public class AlarmUseCase {
 
     public AlarmDeleteMethodResponse getAlarmDeleteMethod(Long memberId, Long alarmId) {
         return alarmQueryService.getAlarmDeleteMethod(memberId, alarmId);
+    }
+
+    public LocationPreparationResponse getLocationPreparation(Long memberId, Long alarmId, Long occurrenceId) {
+        return alarmLocationPreparationService.getLocationPreparation(memberId, alarmId, occurrenceId);
     }
 }

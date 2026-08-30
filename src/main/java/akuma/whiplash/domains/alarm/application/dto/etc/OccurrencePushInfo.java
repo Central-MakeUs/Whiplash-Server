@@ -6,8 +6,7 @@ import lombok.Builder;
 public record OccurrencePushInfo(
     Long occurrenceId,
     Long memberId,
-    Long alarmId,
-    String address
+    Long alarmId
 ) {
 
 }

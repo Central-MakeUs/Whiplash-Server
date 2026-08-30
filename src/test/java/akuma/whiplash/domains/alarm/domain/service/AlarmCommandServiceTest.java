@@ -12,7 +12,7 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.lenient;
-import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
@@ -344,8 +344,8 @@ class AlarmCommandServiceTest {
         }
 
         @Test
-        @DisplayName("성공: 만료된 Google 장소 캐시는 인증 전에 재조회한다")
-        void success_refreshExpiredGooglePlaceCache() {
+        @DisplayName("실패: 만료된 Google 장소 cache는 외부 조회 없이 위치 준비 완료를 요구한다")
+        void fail_locationNotReadyWithoutGoogleRefresh() {
             // given
             MemberEntity member = MemberFixture.MEMBER_10.toMockEntity();
             AlarmEntity alarm = buildAlarm(member, AlarmFixture.ALARM_10);
@@ -356,26 +356,17 @@ class AlarmCommandServiceTest {
             given(alarmRepository.findById(alarm.getId())).willReturn(Optional.of(alarm));
             given(alarmOccurrenceRepository.findByIdAndAlarmId(occurrence.getId(), alarm.getId()))
                 .willReturn(Optional.of(occurrence));
-            given(alarmOccurrenceRepository.findNextScheduledByAlarmIds(
-                eq(List.of(alarm.getId())), eq(OccurrenceStatus.SCHEDULED), any(LocalDateTime.class)
-            )).willReturn(List.of());
             given(alarmLocationCacheService.hasValidGoogleLocationCache(alarm, FIXED_NOW)).willReturn(false);
-            doAnswer(invocation -> {
-                AlarmEntity target = invocation.getArgument(0);
-                target.updateGooglePlaceLocation(
-                    "google-place-id", "새 장소", 37.5663, 126.9779, FIXED_NOW
-                );
-                return null;
-            }).when(alarmLocationCacheService).modifyGoogleLocationCache(alarm);
 
             // when
-            alarmCommandService.checkinAlarm(
+            // then
+            assertThatThrownBy(() -> alarmCommandService.checkinAlarm(
                 member.getId(), alarm.getId(), buildRequest(occurrence, 37.5663, 126.9779)
+            )).isInstanceOfSatisfying(ApplicationException.class, e ->
+                assertThat(e.getCode()).isEqualTo(ALARM_LOCATION_NOT_READY)
             );
 
-            // then
-            verify(alarmLocationCacheService).modifyGoogleLocationCache(alarm);
-            assertThat(occurrence.getStatus()).isEqualTo(OccurrenceStatus.CHECKIN);
+            verify(alarmLocationCacheService, never()).modifyGoogleLocationCache(alarm);
         }
 
         @Test

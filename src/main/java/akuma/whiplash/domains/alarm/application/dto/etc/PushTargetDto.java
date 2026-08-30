@@ -5,8 +5,8 @@ import lombok.Builder;
 @Builder
 public record PushTargetDto(
     String token,
-    String address,
     Long memberId,
+    Long alarmId,
     Long occurrenceId
 ) {
 

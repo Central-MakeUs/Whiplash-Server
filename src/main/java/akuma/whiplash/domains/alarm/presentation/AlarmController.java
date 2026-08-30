@@ -22,6 +22,7 @@ import akuma.whiplash.domains.alarm.application.dto.response.AlarmPaymentRespons
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmSyncResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.CreateAlarmResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.GetAlarmsResponse;
+import akuma.whiplash.domains.alarm.application.dto.response.LocationPreparationResponse;
 import akuma.whiplash.domains.alarm.application.usecase.AlarmUseCase;
 import akuma.whiplash.domains.auth.application.dto.etc.MemberContext;
 import akuma.whiplash.global.annotation.swagger.CustomErrorCodes;
@@ -168,10 +169,31 @@ public class AlarmController {
         alarmErrorCodes = {
             ALARM_NOT_FOUND,
             ALARM_OCCURRENCE_NOT_FOUND,
+            ALREADY_DEACTIVATED,
+            CHECKIN_NOT_YET_AVAILABLE
+        },
+        authErrorCodes = {PERMISSION_DENIED}
+    )
+    @Operation(summary = "알람 목적지 조회", description = "인증 화면에 표시할 알람 목적지 정보를 반환하고, 필요한 경우 비동기로 최신 위치 정보를 준비합니다.")
+    @PostMapping("/{alarmId}/occurrences/{occurrenceId}/destination")
+    public ApplicationResponse<LocationPreparationResponse> getLocationPreparation(
+        @AuthenticationPrincipal MemberContext memberContext,
+        @PathVariable @Positive(message = "METHOD_ARGUMENT_NOT_VALID") Long alarmId,
+        @PathVariable @Positive(message = "METHOD_ARGUMENT_NOT_VALID") Long occurrenceId
+    ) {
+        return ApplicationResponse.onSuccess(
+            alarmUseCase.getLocationPreparation(memberContext.memberId(), alarmId, occurrenceId)
+        );
+    }
+
+    @CustomErrorCodes(
+        alarmErrorCodes = {
+            ALARM_NOT_FOUND,
+            ALARM_OCCURRENCE_NOT_FOUND,
             CHECKIN_OUT_OF_RANGE,
             ALREADY_DEACTIVATED,
             CHECKIN_NOT_YET_AVAILABLE,
-            ALARM_LOCATION_RESELECTION_REQUIRED
+            ALARM_LOCATION_NOT_READY
         },
         authErrorCodes = {PERMISSION_DENIED}
     )

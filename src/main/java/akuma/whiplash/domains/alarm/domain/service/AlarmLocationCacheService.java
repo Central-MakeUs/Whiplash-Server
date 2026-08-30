@@ -2,6 +2,7 @@ package akuma.whiplash.domains.alarm.domain.service;
 
 import akuma.whiplash.domains.alarm.domain.constant.LocationSource;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmEntity;
+import akuma.whiplash.domains.alarm.persistence.repository.AlarmRepository;
 import akuma.whiplash.domains.place.domain.client.GoogleClient;
 import akuma.whiplash.domains.place.domain.model.PlaceDetailsCriteria;
 import akuma.whiplash.domains.place.domain.model.SelectedPlaceDetail;
@@ -22,6 +23,7 @@ public class AlarmLocationCacheService {
 
     private final GoogleClient googleClient;
     private final TimeProvider timeProvider;
+    private final AlarmRepository alarmRepository;
     private final AlarmLocationCachePersistenceService alarmLocationCachePersistenceService;
 
     public boolean hasValidGoogleLocationCache(AlarmEntity alarm, LocalDateTime now) {
@@ -39,6 +41,11 @@ public class AlarmLocationCacheService {
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public void modifyGoogleLocationCache(AlarmEntity alarm) {
         modifyGoogleLocationCache(alarm, null);
+    }
+
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    public void modifyGoogleLocationCache(Long alarmId) {
+        alarmRepository.findById(alarmId).ifPresent(this::modifyGoogleLocationCache);
     }
 
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
