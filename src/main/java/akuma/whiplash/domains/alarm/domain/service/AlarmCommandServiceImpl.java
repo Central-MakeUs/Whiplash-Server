@@ -113,16 +113,23 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
     public AlarmCheckinResponse checkinAlarm(Long memberId, Long alarmId, AlarmCheckinRequest request) {
         AlarmEntity alarm = findAlarmById(alarmId);
         MemberEntity member = alarm.getMember();
+
         validAlarmOwner(memberId, member.getId());
+
         AlarmOccurrenceEntity occurrence = alarmOccurrenceRepository.findByIdAndAlarmId(request.occurrenceId(), alarmId)
             .orElseThrow(() -> ApplicationException.from(ALARM_OCCURRENCE_NOT_FOUND));
+
         if (occurrence.getStatus() != OccurrenceStatus.SCHEDULED && occurrence.getStatus() != OccurrenceStatus.RINGING) throw ApplicationException.from(ALREADY_DEACTIVATED);
+
         LocalDateTime now = timeProvider.now();
+
         if (now.isBefore(occurrence.getScheduledAt().minusHours(3))) throw ApplicationException.from(CHECKIN_NOT_YET_AVAILABLE);
         if (alarm.getLocationSource() == LocationSource.GOOGLE_PLACE && !alarmLocationCacheService.hasValidGoogleLocationCache(alarm, now)) throw ApplicationException.from(ALARM_LOCATION_NOT_READY);
         if (!isWithinDistance(alarm.getLatitude(), alarm.getLongitude(), request.latitude(), request.longitude(), CHECKIN_RADIUS_METERS)) throw ApplicationException.from(CHECKIN_OUT_OF_RANGE);
+
         occurrence.checkin(now);
         eventPublisher.publishEvent(new AlarmCheckinCompletedEvent(occurrence.getId(), member.getId(), request.deviceId(), now, now));
+
         return AlarmMapper.mapToAlarmCheckinResponse(alarm, findNextScheduledOccurrence(alarmId, now));
     }
 
@@ -155,26 +162,39 @@ public class AlarmCommandServiceImpl implements AlarmCommandService {
         alarmOccurrenceRepository.deleteByAlarmId(alarmId);
         alarmRepository.deleteByAlarmId(alarmId);
     }
+
     private boolean isWithinDistance(double targetLat, double targetLon, double reqLat, double reqLon, double radiusMeters) {
         double dLat = Math.toRadians(reqLat - targetLat), dLon = Math.toRadians(reqLon - targetLon);
         double a = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(Math.toRadians(targetLat)) * Math.cos(Math.toRadians(reqLat)) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
         return 6_371_000 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)) <= radiusMeters;
     }
-    private MemberEntity findMemberById(Long memberId) { return memberRepository.findById(memberId).orElseThrow(() -> ApplicationException.from(MemberErrorCode.MEMBER_NOT_FOUND)); }
-    private AlarmEntity findAlarmById(Long alarmId) { return alarmRepository.findById(alarmId).orElseThrow(() -> ApplicationException.from(ALARM_NOT_FOUND)); }
+
+    private MemberEntity findMemberById(Long memberId) {
+        return memberRepository.findById(memberId).orElseThrow(() -> ApplicationException.from(MemberErrorCode.MEMBER_NOT_FOUND));
+    }
+
+    private AlarmEntity findAlarmById(Long alarmId) {
+        return alarmRepository.findById(alarmId).orElseThrow(() -> ApplicationException.from(ALARM_NOT_FOUND));
+    }
+
     private AlarmEntity findActiveAlarmByIdForUpdate(Long alarmId) {
         AlarmEntity alarm = alarmRepository.findByIdWithMemberForUpdate(alarmId).orElseThrow(() -> ApplicationException.from(ALARM_NOT_FOUND));
         if (alarm.getStatus() == AlarmStatus.DELETED) throw ApplicationException.from(ALARM_NOT_FOUND);
         return alarm;
     }
+
     private AlarmOccurrenceEntity findActiveOccurrenceForUpdate(Long occurrenceId, Long alarmId, LocalDateTime now) {
         AlarmOccurrenceEntity occurrence = alarmOccurrenceRepository.findByIdAndAlarmId(occurrenceId, alarmId).orElseThrow(() -> ApplicationException.from(ALARM_OCCURRENCE_NOT_FOUND));
         if (occurrence.getStatus() != OccurrenceStatus.SCHEDULED && occurrence.getStatus() != OccurrenceStatus.RINGING) throw ApplicationException.from(ALREADY_DEACTIVATED);
         if (now.isBefore(occurrence.getScheduledAt().minusHours(3))) throw ApplicationException.from(CHECKIN_NOT_YET_AVAILABLE);
         return occurrence;
     }
+
     private ZoneId resolveMemberZone(Long memberId, String deviceId) {
         return memberDeviceRepository.findByMember_IdAndDeviceId(memberId, deviceId).map(MemberDeviceEntity::getTimeZone).map(AlarmScheduleCalculator::resolveZone).orElse(AlarmScheduleCalculator.DEFAULT_ZONE);
     }
-    private static void validAlarmOwner(Long memberId, Long alarmMemberId) { if (!memberId.equals(alarmMemberId)) throw ApplicationException.from(AuthErrorCode.PERMISSION_DENIED); }
+
+    private static void validAlarmOwner(Long memberId, Long alarmMemberId) {
+        if (!memberId.equals(alarmMemberId)) throw ApplicationException.from(AuthErrorCode.PERMISSION_DENIED);
+    }
 }

@@ -40,7 +40,7 @@ out/
 env.properties
 env-*.properties
 google.json
-whiplash-firebase-key.json
+timebomb-firebase-key.json
 
 # log
 logs/
