@@ -89,6 +89,8 @@ spring:
     baseline-on-migrate: true
     baseline-version: 12
     baseline-description: manual_schema_before_flyway
+    user: ${FLYWAY_DB_USERNAME}
+    password: ${FLYWAY_DB_PASSWORD}
 
   jpa:
     hibernate:
