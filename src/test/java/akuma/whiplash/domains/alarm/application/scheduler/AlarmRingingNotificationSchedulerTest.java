@@ -73,8 +73,8 @@ class AlarmRingingNotificationSchedulerTest {
         @SuppressWarnings({"rawtypes", "unchecked"})
         void success() {
             // given
-            RingingPushInfo firstInfo = new RingingPushInfo(1L, 10L);
-            RingingPushInfo secondInfo = new RingingPushInfo(2L, 20L);
+            RingingPushInfo firstInfo = new RingingPushInfo(101L, 1L, 10L);
+            RingingPushInfo secondInfo = new RingingPushInfo(202L, 2L, 20L);
             given(alarmQueryService.getRingingNotificationTargets())
                 .willReturn(List.of(firstInfo, secondInfo));
             given(redisService.getFcmTokens(10L)).willReturn(Set.of("token-a", "token-b"));
@@ -92,11 +92,12 @@ class AlarmRingingNotificationSchedulerTest {
             verify(fcmService).sendRingingNotifications(targetsCaptor.capture());
             List<RingingPushTargetDto> targets = targetsCaptor.getValue();
             assertThat(targets)
-                .extracting(RingingPushTargetDto::alarmId, RingingPushTargetDto::memberId, RingingPushTargetDto::token)
+                .extracting(RingingPushTargetDto::occurrenceId, RingingPushTargetDto::alarmId,
+                    RingingPushTargetDto::memberId, RingingPushTargetDto::token)
                 .containsExactlyInAnyOrder(
-                    tuple(1L, 10L, "token-a"),
-                    tuple(1L, 10L, "token-b"),
-                    tuple(2L, 20L, "token-c")
+                    tuple(101L, 1L, 10L, "token-a"),
+                    tuple(101L, 1L, 10L, "token-b"),
+                    tuple(202L, 2L, 20L, "token-c")
                 );
         }
     }

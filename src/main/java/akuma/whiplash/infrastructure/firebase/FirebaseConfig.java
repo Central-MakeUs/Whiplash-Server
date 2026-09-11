@@ -5,19 +5,27 @@ import com.google.firebase.FirebaseApp;
 import com.google.firebase.FirebaseOptions;
 import jakarta.annotation.PostConstruct;
 import java.io.InputStream;
+import org.springframework.beans.factory.annotation.Value;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.core.io.ClassPathResource;
+import org.springframework.core.io.Resource;
 
 @Configuration
 public class FirebaseConfig {
 	private static final Logger log = LoggerFactory.getLogger(FirebaseConfig.class);
+	private final Resource firebaseConfig;
+
+	public FirebaseConfig(
+		@Value("${fcm.firebase.config.path}") Resource firebaseConfig
+	) {
+		this.firebaseConfig = firebaseConfig;
+	}
 
 	@PostConstruct
     public void init(){
     	try{
-        	InputStream serviceAccount = new ClassPathResource("whiplash-firebase-key.json").getInputStream();
+        InputStream serviceAccount = firebaseConfig.getInputStream();
         	FirebaseOptions options = new FirebaseOptions.Builder()
             		.setCredentials(GoogleCredentials.fromStream(serviceAccount))
                     .build();

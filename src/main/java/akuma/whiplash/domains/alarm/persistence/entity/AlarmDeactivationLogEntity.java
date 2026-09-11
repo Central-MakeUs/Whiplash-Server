@@ -45,8 +45,11 @@ public class AlarmDeactivationLogEntity extends BaseTimeEntity {
     @JoinColumn(name = "member_id", nullable = false)
     private MemberEntity member;
 
-    @Column(name = "payment_id", length = 100)
+    @Column(name = "payment_id", length = 512)
     private String paymentId;
+
+    @Column(name = "ad_proof_token", length = 64)
+    private String adProofToken;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "deactivate_type", length = 20, nullable = false)

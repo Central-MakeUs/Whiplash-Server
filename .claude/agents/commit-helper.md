@@ -1,7 +1,7 @@
 ---
 name: commit-helper
 description: >
-  변경된 파일을 분석해서 Whiplash 프로젝트 커밋 메시지 컨벤션에 맞는 커밋 메시지를 생성한다.
+  변경된 파일을 분석해서 Time Bomb Server 커밋 메시지 컨벤션에 맞는 커밋 메시지를 생성한다.
   "커밋 메시지 작성해줘", "커밋해줘", "커밋 메시지 만들어줘" 요청 시 PROACTIVELY use.
 tools: Bash
 ---

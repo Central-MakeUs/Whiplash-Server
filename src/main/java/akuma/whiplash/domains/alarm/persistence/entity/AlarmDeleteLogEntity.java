@@ -48,7 +48,7 @@ public class AlarmDeleteLogEntity extends BaseTimeEntity {
     @Column(name = "reason", length = 2000, nullable = false)
     private String reason;
 
-    @Column(name = "payment_id", length = 100)
+    @Column(name = "payment_id", length = 512)
     private String paymentId;
 
     @Column(name = "ad_proof_token", length = 255)

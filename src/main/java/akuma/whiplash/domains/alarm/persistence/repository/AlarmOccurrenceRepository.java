@@ -64,6 +64,17 @@ public interface AlarmOccurrenceRepository extends JpaRepository<AlarmOccurrence
         @Param("alarmId") Long alarmId
     );
 
+    @Query("""
+    SELECT ao
+    FROM AlarmOccurrenceEntity ao
+    WHERE ao.id = :occurrenceId
+      AND ao.alarm.id = :alarmId
+    """)
+    Optional<AlarmOccurrenceEntity> findByIdAndAlarmIdForLocationPreparation(
+        @Param("occurrenceId") Long occurrenceId,
+        @Param("alarmId") Long alarmId
+    );
+
     Optional<AlarmOccurrenceEntity> findTopByAlarmIdAndStatusInOrderByOccurrenceDateDescOccurrenceTimeDesc(
         Long alarmId, List<OccurrenceStatus> statuses
     );
@@ -74,6 +85,13 @@ public interface AlarmOccurrenceRepository extends JpaRepository<AlarmOccurrence
     WHERE ao.alarm.id = :alarmId
     """)
     List<AlarmOccurrenceEntity> findAllByAlarmId(@Param("alarmId") Long alarmId);
+
+    @Modifying
+    @Query("""
+        DELETE FROM AlarmOccurrenceEntity ao
+        WHERE ao.alarm.id = :alarmId
+    """)
+    void deleteByAlarmId(@Param("alarmId") Long alarmId);
 
     @Query("""
     SELECT ao.alarm.id
@@ -90,7 +108,7 @@ public interface AlarmOccurrenceRepository extends JpaRepository<AlarmOccurrence
     void deleteByMemberId(@Param("memberId") Long memberId);
 
     @Query("""
-    SELECT new akuma.whiplash.domains.alarm.application.dto.etc.OccurrencePushInfo(o.id, m.id, a.address)
+    SELECT new akuma.whiplash.domains.alarm.application.dto.etc.OccurrencePushInfo(o.id, m.id, a.id)
     FROM AlarmOccurrenceEntity o
     JOIN o.alarm a
     JOIN a.member m
@@ -107,7 +125,7 @@ public interface AlarmOccurrenceRepository extends JpaRepository<AlarmOccurrence
     );
 
     @Query("""
-    SELECT new akuma.whiplash.domains.alarm.application.dto.etc.OccurrencePushInfo(o.id, m.id, a.address)
+    SELECT new akuma.whiplash.domains.alarm.application.dto.etc.OccurrencePushInfo(o.id, m.id, a.id)
     FROM AlarmOccurrenceEntity o
     JOIN o.alarm a
     JOIN a.member m
@@ -123,7 +141,7 @@ public interface AlarmOccurrenceRepository extends JpaRepository<AlarmOccurrence
     );
 
     @Query("""
-    SELECT new akuma.whiplash.domains.alarm.application.dto.etc.OccurrencePushInfo(o.id, m.id, a.address)
+    SELECT new akuma.whiplash.domains.alarm.application.dto.etc.OccurrencePushInfo(o.id, m.id, a.id)
     FROM AlarmOccurrenceEntity o
     JOIN o.alarm a
     JOIN a.member m
@@ -131,7 +149,7 @@ public interface AlarmOccurrenceRepository extends JpaRepository<AlarmOccurrence
       AND o.occurrenceTime <= :end
       AND o.status = :status
       AND o.reminderSent = false
-""")
+    """)
     List<OccurrencePushInfo> findPreNotificationTargetsUntilTime(
         @Param("date") LocalDate date,
         @Param("end") LocalTime end,
@@ -139,14 +157,14 @@ public interface AlarmOccurrenceRepository extends JpaRepository<AlarmOccurrence
     );
 
     @Query("""
-    SELECT new akuma.whiplash.domains.alarm.application.dto.etc.OccurrencePushInfo(o.id, m.id, a.address)
+    SELECT new akuma.whiplash.domains.alarm.application.dto.etc.OccurrencePushInfo(o.id, m.id, a.id)
     FROM AlarmOccurrenceEntity o
     JOIN o.alarm a
     JOIN a.member m
     WHERE o.scheduledAt BETWEEN :startInclusive AND :endInclusive
       AND o.status = :status
       AND o.reminderSent = false
-""")
+    """)
     List<OccurrencePushInfo> findPreNotificationTargetsByScheduledAtBetween(
         @Param("startInclusive") LocalDateTime startInclusive,
         @Param("endInclusive") LocalDateTime endInclusive,
@@ -162,7 +180,7 @@ public interface AlarmOccurrenceRepository extends JpaRepository<AlarmOccurrence
     void markReminderSentIn(@Param("ids") Set<Long> ids);
 
     @Query("""
-    SELECT new akuma.whiplash.domains.alarm.application.dto.etc.RingingPushInfo(a.id, m.id)
+    SELECT new akuma.whiplash.domains.alarm.application.dto.etc.RingingPushInfo(o.id, a.id, m.id)
     FROM AlarmOccurrenceEntity o
     JOIN o.alarm a
     JOIN a.member m

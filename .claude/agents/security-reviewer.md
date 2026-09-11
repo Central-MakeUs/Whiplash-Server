@@ -61,7 +61,7 @@ Grep: "model.addAttribute|ModelAndView" (Thymeleaf/JSP 미사용 확인)
 - `Content-Type: text/html` 응답에 사용자 데이터를 이스케이프 없이 포함하는가?
 - Spring Security의 기본 XSS 헤더(`X-XSS-Protection`, `Content-Security-Policy`)가 비활성화되었는가?
 
-**Whiplash 특이사항**
+**Time Bomb Server 특이사항**
 - REST API 전용 프로젝트이므로 직접 HTML 렌더링 위험은 낮음
 - `SecurityConfig`의 `headers()` 설정에서 기본 보안 헤더 비활성화 여부 확인
 
@@ -126,7 +126,7 @@ Grep: "valueOf|parseInt" (예외 처리 없는 형변환)
 - 숫자 변환 시 `NumberFormatException` 처리가 없는가?
 - 파일 업로드 시 확장자/MIME 타입 검증 없이 저장하는가?
 
-**Whiplash 특이사항**
+**Time Bomb Server 특이사항**
 - `SocialLoginRequest`의 `@SocialTypeFormat` 커스텀 검증 어노테이션이 실제로 동작하는지 확인
 - Enum 변환 실패 시 `ApplicationException` 대신 500이 반환되지 않는지 확인
 
@@ -147,7 +147,7 @@ Grep: "memberId" + "PathVariable" (타인 리소스 접근 가능 여부)
 - `@Profile("qa")`, `@Profile("!prod")` 컨트롤러가 prod 환경에서 비활성화됨을 확인
 - `/actuator/**` 엔드포인트가 인증 없이 노출되는가?
 
-**Whiplash 특이사항**
+**Time Bomb Server 특이사항**
 - `QaAuthController`: `@Profile("qa")` 로 prod 격리 확인
 - `LoadTestMemberHelper`: `@Profile("!prod")` 로 prod 격리 확인
 - 멤버 리소스 조회 시 `MemberContext.memberId()` 와 대상 `memberId` 일치 검증 여부
@@ -188,7 +188,7 @@ Grep: "GlobalExceptionHandler|ControllerAdvice" (에러 응답 구조 확인)
 - `e.getMessage()`를 그대로 클라이언트에 반환하여 내부 구조가 노출되는가?
 - prod 환경에서 `server.error.include-stacktrace: always` 설정이 있는가?
 
-**Whiplash 특이사항**
+**Time Bomb Server 특이사항**
 - `ApplicationResponse`의 에러 응답이 `code` + `message` 만 반환하는지 확인
 - `message` 필드에 DB 테이블명, 컬럼명 등 내부 정보가 포함되지 않는지 확인
 
@@ -210,6 +210,6 @@ Grep: "new SecretKeySpec"
 - 난수 생성 시 `new Random()` 을 보안 용도로 사용하는가? (`SecureRandom` 권장)
 - JWT 서명 알고리즘이 `none` 또는 `HS256` 이하의 취약 알고리즘인가?
 
-**Whiplash 특이사항**
+**Time Bomb Server 특이사항**
 - JWT 서명에 사용하는 알고리즘 (`JwtProvider`) 확인: RS256 또는 HS256 + 충분한 키 길이
 - FCM 통신은 Google SDK가 처리하므로 직접 암호화 로직 없음

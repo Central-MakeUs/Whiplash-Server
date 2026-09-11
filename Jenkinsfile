@@ -43,8 +43,8 @@ pipeline {
                     def SSH_PORT_CRED        = (env.DEPLOY_ENV == 'prod') ? 'PROD_WAS_SSH_PORT' : 'QA_WAS_SSH_PORT'
 
                     def ENV_PROPERTIES_CRED  = (env.DEPLOY_ENV == 'prod') ? 'PROD_ENV_PROPERTIES' : 'QA_ENV_PROPERTIES'
-                    //def GOOGLE_JSON_CRED     = (env.DEPLOY_ENV == 'prod') ? 'PROD_GOOGLE_JSON_BASE64' : 'QA_GOOGLE_JSON_BASE64'
-                    //def FIREBASE_JSON_CRED   = (env.DEPLOY_ENV == 'prod') ? 'PROD_FIREBASE_KEY_JSON_BASE64' : 'QA_FIREBASE_KEY_JSON_BASE64'
+                    def GOOGLE_JSON_CRED     = (env.DEPLOY_ENV == 'prod') ? 'PROD_GOOGLE_JSON_BASE64' : 'QA_GOOGLE_JSON_BASE64'
+                    def FIREBASE_JSON_CRED   = (env.DEPLOY_ENV == 'prod') ? 'PROD_FIREBASE_KEY_JSON_BASE64' : 'QA_FIREBASE_KEY_JSON_BASE64'
 
                     // DockerHub 정보 prod/qa 분리
                     def DOCKERHUB_CRED       = (env.DEPLOY_ENV == 'prod') ? 'PROD_DOCKERHUB_CREDENTIALS' : 'QA_DOCKERHUB_CREDENTIALS'
@@ -62,10 +62,8 @@ pipeline {
 
                         // Application Config Files
                         file(credentialsId: ENV_PROPERTIES_CRED, variable: 'ENV_PROPERTIES_FILE_PATH'),
-                        string(credentialsId: 'PROD_GOOGLE_JSON_BASE64', variable: 'GOOGLE_JSON_B64'),
-                        string(credentialsId: 'PROD_FIREBASE_KEY_JSON_BASE64', variable: 'FIREBASE_KEY_B64')
-                        //string(credentialsId: GOOGLE_JSON_CRED, variable: 'GOOGLE_JSON_B64'),
-                        //string(credentialsId: FIREBASE_JSON_CRED, variable: 'FIREBASE_KEY_B64')
+                        string(credentialsId: GOOGLE_JSON_CRED, variable: 'GOOGLE_JSON_B64'),
+                        string(credentialsId: FIREBASE_JSON_CRED, variable: 'FIREBASE_KEY_B64')
                     ]) {
                         // DockerHub 계정/토큰은 usernamePassword로 관리
                         withCredentials([usernamePassword(
@@ -84,8 +82,37 @@ pipeline {
                                         # ENV_PROPERTIES_FILE_PATH 변수에는 임시 파일의 경로가 담겨있음
                                         rm -f src/main/resources/env.properties
                                         cp "${ENV_PROPERTIES_FILE_PATH}" src/main/resources/env.properties
-                                        echo "${GOOGLE_JSON_B64}" | base64 -d > src/main/resources/google.json
-                                        echo "${FIREBASE_KEY_B64}" | base64 -d > src/main/resources/whiplash-firebase-key.json
+                                        printf '%s' "${GOOGLE_JSON_B64}" | base64 -d > src/main/resources/google.json
+
+                                        FIREBASE_CONFIG_PATH_VALUE=$(
+                                            awk -F= '$1 == "FIREBASE_CONFIG_PATH" {
+                                                sub(/^[^=]*=/, "")
+                                                print
+                                                exit
+                                            }' src/main/resources/env.properties
+                                        )
+
+                                        case "$FIREBASE_CONFIG_PATH_VALUE" in
+                                            classpath:firebase/*.json)
+                                                FIREBASE_RESOURCE_PATH="${FIREBASE_CONFIG_PATH_VALUE#classpath:}"
+                                                ;;
+                                            *)
+                                                echo "Invalid FIREBASE_CONFIG_PATH: expected classpath:firebase/*.json" >&2
+                                                exit 1
+                                                ;;
+                                        esac
+
+                                        case "$FIREBASE_RESOURCE_PATH" in
+                                            *..*|*//*|/*)
+                                                echo "Unsafe FIREBASE_CONFIG_PATH: $FIREBASE_CONFIG_PATH_VALUE" >&2
+                                                exit 1
+                                                ;;
+                                        esac
+
+                                        mkdir -p "src/main/resources/$(dirname "$FIREBASE_RESOURCE_PATH")"
+                                        printf '%s' "$FIREBASE_KEY_B64" \
+                                            | base64 -d \
+                                            > "src/main/resources/$FIREBASE_RESOURCE_PATH"
                                     '''
                                 }
 

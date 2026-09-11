@@ -6,6 +6,7 @@ import lombok.Builder;
 public record RingingPushTargetDto(
     String token,
     Long alarmId,
+    Long occurrenceId,
     Long memberId
 ) {
 }

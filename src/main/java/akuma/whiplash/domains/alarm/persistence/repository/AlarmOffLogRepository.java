@@ -13,6 +13,7 @@ public interface AlarmOffLogRepository extends JpaRepository<AlarmOffLogEntity, 
     @Query("""
         DELETE FROM AlarmOffLogEntity aol
         WHERE aol.member.id = :memberId
+           OR aol.alarm.member.id = :memberId
     """)
     void deleteByMemberId(@Param("memberId") Long memberId);
 }

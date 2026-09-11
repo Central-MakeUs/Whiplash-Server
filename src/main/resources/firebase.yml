@@ -1,0 +1,31 @@
+---
+spring.config.activate.on-profile: local
+
+fcm:
+  firebase:
+    config:
+      path: ${FIREBASE_CONFIG_PATH}
+
+---
+spring.config.activate.on-profile: qa
+
+fcm:
+  firebase:
+    config:
+      path: ${FIREBASE_CONFIG_PATH}
+
+---
+spring.config.activate.on-profile: prod
+
+fcm:
+  firebase:
+    config:
+      path: ${FIREBASE_CONFIG_PATH}
+
+---
+spring.config.activate.on-profile: test
+
+fcm:
+  firebase:
+    config:
+      path: ${FIREBASE_CONFIG_PATH:classpath:firebase/timebomb-firebase-key.json}

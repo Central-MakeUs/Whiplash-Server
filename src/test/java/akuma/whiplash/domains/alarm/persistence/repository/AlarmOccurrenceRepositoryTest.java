@@ -159,6 +159,7 @@ class AlarmOccurrenceRepositoryTest {
 
             // then
             assertThat(result).hasSize(1);
+            assertThat(result.get(0).occurrenceId()).isEqualTo(ringingOccurrence.getId());
             assertThat(result.get(0).alarmId()).isEqualTo(ringingAlarm.getId());
             assertThat(result.get(0).memberId()).isEqualTo(ringingMember.getId());
         }

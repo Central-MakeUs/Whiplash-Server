@@ -5,6 +5,7 @@ import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 
 @Schema(description = "장소 정보 요청 DTO")
 public record PlaceRequest(
@@ -22,6 +23,14 @@ public record PlaceRequest(
     @NotNull(message = "경도를 입력해주세요.")
     @DecimalMin(value = "-180.0", message = "경도는 -180 이상이어야 합니다.")
     @DecimalMax(value = "180.0", message = "경도는 -180 이하이어야 합니다.")
-    double longitude
-) {
-}
+    double longitude,
+
+    @Schema(description = "Google Places 장소 식별자", example = "ChIJz2v...")
+    @NotBlank(message = "Google Place ID를 입력해주세요.")
+    @Size(max = 255, message = "Google Place ID는 255자 이하여야 합니다.")
+    String googlePlaceId,
+
+    @Schema(description = "장소 자동완성 세션 토큰", nullable = true)
+    @Size(max = 64, message = "장소 세션 토큰은 64자 이하여야 합니다.")
+    String sessionToken
+) {}

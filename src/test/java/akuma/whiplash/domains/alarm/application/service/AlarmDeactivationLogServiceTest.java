@@ -77,7 +77,9 @@ class AlarmDeactivationLogServiceTest {
             assertThat(savedLog.getDeactivateType()).isEqualTo(DeactivateType.CHECKIN);
             assertThat(savedLog.getResult()).isEqualTo(DeactivationResult.SUCCESS);
             assertThat(savedLog.getRequestDeviceId()).isEqualTo("device-uuid");
+            assertThat(savedLog.getAdProofToken()).isNull();
             assertThat(Arrays.stream(AlarmDeactivationLogEntity.class.getDeclaredFields()).map(Field::getName))
+                .contains("adProofToken")
                 .doesNotContain("requestLatitude", "requestLongitude");
         }
     }

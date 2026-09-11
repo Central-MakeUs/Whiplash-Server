@@ -61,7 +61,7 @@ class MemberControllerIntegrationTest {
 
     @Nested
     @DisplayName("[DELETE] /api/v1/members - 회원 탈퇴")
-    class SoftDeleteMemberTest {
+    class DeleteMemberTest {
 
         @Test
         @DisplayName("성공: 회원 탈퇴 요청 시 200 OK를 반환한다")

@@ -1,7 +1,7 @@
 ---
 name: ask-env
 description: >
-  Whiplash 프로젝트 실행 커맨드, 스프링 프로파일, 인프라 의존성, Claude Code 문서 조회 안내.
+  Time Bomb Server 실행 커맨드, 스프링 프로파일, 인프라 의존성, Claude Code 문서 조회 안내.
   "어떻게 실행해", "프로파일", "Docker", "인프라", "Claude Code 문서" 요청 시 참고.
 ---
 

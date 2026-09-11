@@ -3,6 +3,7 @@ package akuma.whiplash.domains.alarm.application.dto.request;
 import akuma.whiplash.global.util.date.LocalTime24HourDeserializer;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
@@ -16,6 +17,7 @@ public record AlarmRegisterRequest(
 
     @Schema(description = "장소 정보")
     @NotNull(message = "장소 정보를 입력해주세요.")
+    @Valid
     PlaceRequest place,
 
     @Schema(description = "알람 목적", example = "도서관 정기 출석 알람")

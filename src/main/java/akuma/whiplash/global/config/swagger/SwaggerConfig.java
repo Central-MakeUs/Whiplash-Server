@@ -1,5 +1,6 @@
 package akuma.whiplash.global.config.swagger;
 
+import akuma.whiplash.domains.ad.exception.AdErrorCode;
 import akuma.whiplash.domains.alarm.exception.AlarmErrorCode;
 import akuma.whiplash.domains.auth.exception.AuthErrorCode;
 import akuma.whiplash.domains.device.exception.DeviceErrorCode;
@@ -93,6 +94,7 @@ public class SwaggerConfig {
                 generateErrorCodeResponse(
                     operation,
                     customErrorCodes.commonErrorCodes(),
+                    customErrorCodes.adErrorCodes(),
                     customErrorCodes.alarmErrorCodes(),
                     customErrorCodes.authErrorCodes(),
                     customErrorCodes.memberErrorCodes(),
@@ -109,6 +111,7 @@ public class SwaggerConfig {
     private void generateErrorCodeResponse(
             Operation operation,
             CommonErrorCode[] commonErrorCodes,
+            AdErrorCode[] adErrorCodes,
             AlarmErrorCode[] alarmErrorCodes,
             AuthErrorCode[] authErrorCodes,
             MemberErrorCode[] memberErrorCodes,
@@ -120,6 +123,11 @@ public class SwaggerConfig {
 
         if (commonErrorCodes != null) {
             for (CommonErrorCode errorCode : commonErrorCodes) {
+                SwaggerExampleHolder SwaggerExampleHolder = getSwaggerExampleHolder(errorCode);
+                addExamplesToResponses(responses, SwaggerExampleHolder);
+            }
+
+            for (AdErrorCode errorCode : adErrorCodes) {
                 SwaggerExampleHolder SwaggerExampleHolder = getSwaggerExampleHolder(errorCode);
                 addExamplesToResponses(responses, SwaggerExampleHolder);
             }

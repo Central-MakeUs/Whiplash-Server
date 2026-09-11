@@ -1,7 +1,7 @@
 ---
 name: test-reviewer
 description: >
-  작성된 테스트 코드가 Whiplash 프로젝트 컨벤션을 준수하는지 리뷰한다.
+  작성된 테스트 코드가 Time Bomb Server 컨벤션을 준수하는지 리뷰한다.
   "테스트 리뷰해줘", "테스트 컨벤션 확인해줘", "테스트 코드 검토해줘" 요청 시 PROACTIVELY use.
 tools: Read, Grep, Glob
 ---

@@ -12,12 +12,12 @@ description: 이 저장소에서 큰 기능 설계나 정책 변경을 시작하
 - 큰 기능을 구현하기 전에 애매한 요구사항을 줄인다.
 - 사용자 표현, 기존 코드, 도메인 용어, 과거 결정이 같은 의미를 가리키는지 확인한다.
 - `CONTEXT.md`로 프로젝트 glossary를 유지하고, 필요한 경우 ADR로 결정 배경을 남긴다.
-- 기존 `docs/history/0001-feature-slug/PLAN.md` 형식의 작업 이력, API 계약, 도메인 규칙과 충돌하지 않게 한다.
+- `docs/history/README.md`와 도메인 인덱스에서 기존 작업 이력, API 계약, 도메인 규칙을 찾아 충돌하지 않게 한다.
 - 질문 결과를 공유된 이해, PRD, PLAN.md, CONTEXT.md, ADR 후보, history 반영 후보로 정리한다.
 
 ## 진행 순서
 
-1. `AGENTS.md`와 관련 `CONTEXT.md`, `CONTEXT-MAP.md`, `docs/adr/*`, `docs/history/0001-feature-slug/PLAN.md` 형식의 PLAN이 있는지 먼저 확인한다.
+1. `AGENTS.md`와 관련 `CONTEXT.md`, `CONTEXT-MAP.md`를 확인하고, `docs/adr/README.md`와 관련 도메인 인덱스에서 기존 ADR을 찾는다. `docs/history/README.md`와 관련 도메인 인덱스에서는 기존 PLAN을 찾는다.
 2. 관련 controller, DTO, use case, service, exception, repository를 읽어 코드가 실제로 어떤 용어와 정책을 쓰는지 확인한다.
 3. 사용자 설명과 문서/코드 사이의 용어 불일치, 정책 충돌, 빠진 결정을 찾는다.
 4. 코드베이스 탐색으로 답할 수 없는 질문만 사용자에게 묻는다.
@@ -32,6 +32,7 @@ description: 이 저장소에서 큰 기능 설계나 정책 변경을 시작하
 /
 ├── CONTEXT.md
 ├── docs/
+│   ├── README.md
 │   ├── adr/
 │   └── history/
 └── src/
@@ -39,23 +40,25 @@ description: 이 저장소에서 큰 기능 설계나 정책 변경을 시작하
 
 루트에 `CONTEXT-MAP.md`가 있으면 여러 컨텍스트가 있는 저장소로 본다. 이 경우 map은 각 컨텍스트의 `CONTEXT.md`와 context-specific `docs/adr/` 위치를 가리킨다.
 
-파일은 필요할 때만 만든다. `CONTEXT.md`가 없으면 첫 용어가 확정될 때 만들고, `docs/adr/`는 첫 ADR이 필요할 때, `docs/history/`는 작업 계획이나 PLAN을 남길 때 사용한다.
+파일은 필요할 때만 만든다. `CONTEXT.md`가 없으면 첫 용어가 확정될 때 만들고, `docs/adr/`는 첫 ADR이 필요할 때, `docs/history/`는 작업 계획이나 PLAN을 남길 때 사용한다. 기존 문서는 각 디렉터리의 `README.md`에서 먼저 탐색한다.
 
 ## 문서 역할
 
 - `CONTEXT.md`: 이 앱에서 쓰는 용어의 정확한 의미를 담는 용어 정의서다. 같은 단어라도 사람마다 해석이 달라질 수 있는 표현을 프로젝트 기준으로 고정한다.
 - `CONTEXT-MAP.md`: 도메인 간 관계나 bounded context 경계가 중요해질 때만 사용한다. 현재 저장소에 없으면 억지로 만들지 않는다.
-- `docs/adr/`: 시스템 구조 설계 시 내린 결정의 기록을 둔다. 개발자들이 근거를 가지고 토론한 뒤 결정한 아키텍처/정책 선택을 남긴다.
-- `docs/history/`: 작업 시 사용한 PLAN 파일, PRD, 구현 계획, 진행 이력처럼 특정 작업의 기록을 둔다. 디렉터리는 `0001-feature-slug`처럼 4자리 번호와 하이픈 slug를 사용한다.
+- `docs/adr/`: 시스템 구조 설계 시 내린 결정의 기록을 둔다. 물리적 원본은 `docs/adr/{도메인 번호}. {한글 도메인}/{4자리 전역 번호}-{decision-slug}.md`에 한 번만 두고 루트와 도메인 인덱스로 탐색한다.
+- `docs/history/`: 작업 시 사용한 PLAN 파일, PRD, 구현 계획, 진행 이력처럼 특정 작업의 기록을 둔다. 물리적 원본은 `docs/history/{도메인 번호}. {한글 도메인}/{4자리 전역 번호}-{feature-slug}/`에 한 번만 두고 루트와 도메인 인덱스로 탐색한다.
 
 ## CONTEXT.md에 남길 것
 
-- Whiplash에서 쓰는 핵심 도메인 용어와 한 문장 정의
+- Time Bomb에서 쓰는 핵심 도메인 용어와 한 문장 정의
 - 비슷하지만 다른 용어의 차이
 - 사용자나 클라이언트가 쓰는 표현과 서버 코드 용어의 매핑
-- 여러 기능에서 반복해서 참조되는 정책의 짧은 요약
+- 공개 저장소에 노출되어도 괜찮은 최소 제품 맥락
 
-구현 절차, 상세 API 스펙, 일회성 작업 TODO는 `CONTEXT.md`가 아니라 `docs/history/0001-feature-slug/PLAN.md`에 둔다.
+상세 비즈니스 정책, 데이터 구조, 임계값, 방어 로직과 인프라 구성은 `CONTEXT.md`가 아니라 Git에서 제외된 관련 `docs/` 문서에 둔다.
+
+구현 절차, 상세 API 스펙, 일회성 작업 TODO는 `CONTEXT.md`가 아니라 관련 `docs/history/{도메인 번호}. {한글 도메인}/{4자리 번호}-{feature-slug}/PLAN.md`에 둔다.
 
 ## ADR로 남길 것
 
@@ -70,12 +73,15 @@ description: 이 저장소에서 큰 기능 설계나 정책 변경을 시작하
 
 단순 네이밍, 작은 리팩터링, AGENTS.md에 이미 있는 규칙 반복은 ADR로 남기지 않는다.
 
+ADR을 새로 만들 때는 주 도메인을 하나 선택하고, 모든 도메인의 ADR 파일에서 가장 큰 번호를 찾아 다음 4자리 전역 번호를 사용한다. 루트 바로 아래에는 ADR을 만들지 않는다. 생성 후 `docs/adr/README.md`의 시간순 인덱스와 주 도메인 인덱스를 갱신하고, 다른 도메인에 실제 정책 영향이 있을 때만 연관 ADR로 연결한다. 새 도메인이 필요하면 기존 번호를 바꾸지 않고 다음 2자리 번호와 한글 도메인명을 사용한다.
+
 ## history에 남길 것
 
 - 기능 구현 또는 수정 시 사용한 PLAN.md
 - 요구사항 정리, API 계약, 테스트 계획, 마이그레이션 계획
 - 완료된 작업의 구현 이력과 후속 작업
-- 디렉터리명은 `0001-기능명-slug` 형식으로 작성한다.
+- 주 도메인을 하나 선택하고, 모든 도메인의 가장 큰 작업 번호 다음 4자리 전역 번호를 사용해 `{도메인 번호}. {한글 도메인}/{번호}-기능명-slug` 형식으로 작성한다.
+- 새 작업을 만들면 루트 시간순 인덱스와 주 도메인 인덱스를 함께 갱신한다.
 - ADR 수준의 구조 결정은 history가 아니라 `docs/adr/`로 분리한다.
 
 ## 질문해야 하는 경우
@@ -85,7 +91,7 @@ description: 이 저장소에서 큰 기능 설계나 정책 변경을 시작하
 - 결제, 알람 삭제, 위치 인증처럼 클라이언트 UX와 서버 정책이 함께 바뀌는 경우
 - ErrorCode 또는 상태 코드 정책 선택이 필요한 경우
 - DB migration이나 Redis key 정책이 필요한 경우
-- 기존 `docs/history/0001-feature-slug/PLAN.md` 또는 ADR과 다른 방향의 요구사항이 들어온 경우
+- 기존 history 작업 문서 또는 ADR과 다른 방향의 요구사항이 들어온 경우
 
 ## 질문하지 말아야 하는 경우
 

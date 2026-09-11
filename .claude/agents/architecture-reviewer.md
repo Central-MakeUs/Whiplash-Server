@@ -35,7 +35,7 @@ tools: Read, Grep, Glob
 ---
 
 ## 3. ErrorCode 포맷
-- 형식: `NAME(HttpStatus.STATUS, "DOMAIN_x001", "~입니다.")`
+- 형식: `NAME(HttpStatus.STATUS, "DOMAIN_001", "~입니다.")`
 - 허용 HttpStatus: 400 / 401 / 403 / 404 / 409
 - 예외 발생: `ApplicationException.from(XxxErrorCode.NAME)` 패턴
 

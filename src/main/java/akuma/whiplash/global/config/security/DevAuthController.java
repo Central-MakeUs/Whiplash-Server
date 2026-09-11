@@ -4,7 +4,6 @@ import akuma.whiplash.domains.auth.application.dto.response.TokenResponse;
 import akuma.whiplash.domains.member.domain.contants.Role;
 import akuma.whiplash.domains.member.persistence.entity.MemberEntity;
 import akuma.whiplash.domains.member.persistence.repository.MemberRepository;
-import akuma.whiplash.infrastructure.firebase.FcmService;
 import akuma.whiplash.global.config.security.jwt.JwtProvider;
 import akuma.whiplash.global.response.ApplicationResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -47,10 +46,4 @@ public class DevAuthController {
         return ApplicationResponse.onSuccess(new TokenResponse(accessToken, refreshToken));
     }
 
-    @Operation(summary = "FCM 지연 시간 설정 (Test Only)", description = "FcmService의 지연 시간을 설정합니다 (ms 단위).")
-    @PostMapping("/fcm-delay")
-    public ApplicationResponse<Void> setFcmDelay(@RequestParam long delay) {
-        FcmService.TEST_DELAY_MS = delay;
-        return ApplicationResponse.onSuccess();
-    }
 }

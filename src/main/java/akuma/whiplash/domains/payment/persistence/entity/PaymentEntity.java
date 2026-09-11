@@ -42,7 +42,7 @@ public class PaymentEntity extends BaseTimeEntity {
     @JoinColumn(name = "alarm_id", nullable = false)
     private AlarmEntity alarm;
 
-    @Column(name = "payment_id", length = 100, nullable = false, unique = true)
+    @Column(name = "payment_id", length = 512, nullable = false, unique = true)
     private String paymentId;
 
     @Enumerated(EnumType.STRING)

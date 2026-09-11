@@ -175,8 +175,10 @@ public class GoogleClientImpl implements GoogleClient {
 
     private GooglePlaceDetailsResponse requestPlaceDetails(PlaceDetailsCriteria criteria) {
         UriComponentsBuilder uriBuilder = UriComponentsBuilder.fromUriString(placeDetailsUrl)
-            .pathSegment(criteria.providerPlaceId())
-            .queryParam("sessionToken", criteria.sessionToken());
+            .pathSegment(criteria.providerPlaceId());
+        if (criteria.sessionToken() != null && !criteria.sessionToken().isBlank()) {
+            uriBuilder.queryParam("sessionToken", criteria.sessionToken());
+        }
         if (criteria.languageCode() != null) {
             uriBuilder.queryParam("languageCode", criteria.languageCode());
         }

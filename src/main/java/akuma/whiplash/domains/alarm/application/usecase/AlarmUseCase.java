@@ -1,17 +1,17 @@
 package akuma.whiplash.domains.alarm.application.usecase;
 
+import akuma.whiplash.domains.alarm.application.dto.request.AlarmAdActionRequest;
+import akuma.whiplash.domains.alarm.application.dto.request.AlarmOffAdSessionCreateRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmCheckinRequest;
-import akuma.whiplash.domains.alarm.application.dto.request.AlarmDeleteByAdRequest;
-import akuma.whiplash.domains.alarm.application.dto.request.AlarmDeleteByPaymentRequest;
-import akuma.whiplash.domains.alarm.application.dto.request.AlarmPaymentRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmRegisterRequest;
+import akuma.whiplash.domains.alarm.application.dto.response.AlarmAdSessionCreateResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmCheckinResponse;
-import akuma.whiplash.domains.alarm.application.dto.response.AlarmDeleteMethodResponse;
-import akuma.whiplash.domains.alarm.application.dto.response.AlarmPaymentResponse;
+import akuma.whiplash.domains.alarm.application.dto.response.AlarmDeactivationResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmSyncResponse;
-import akuma.whiplash.domains.alarm.application.dto.response.CreateAlarmOccurrenceResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.CreateAlarmResponse;
 import akuma.whiplash.domains.alarm.application.dto.response.GetAlarmsResponse;
+import akuma.whiplash.domains.alarm.application.dto.response.LocationPreparationResponse;
+import akuma.whiplash.domains.alarm.application.service.AlarmLocationPreparationService;
 import akuma.whiplash.domains.alarm.domain.service.AlarmCommandService;
 import akuma.whiplash.domains.alarm.domain.service.AlarmQueryService;
 import akuma.whiplash.global.annotation.architecture.UseCase;
@@ -23,29 +23,30 @@ public class AlarmUseCase {
 
     private final AlarmCommandService alarmCommandService;
     private final AlarmQueryService alarmQueryService;
+    private final AlarmLocationPreparationService alarmLocationPreparationService;
 
     public CreateAlarmResponse createAlarm(AlarmRegisterRequest request, Long memberId, String deviceId) {
         return alarmCommandService.createAlarm(request, memberId, deviceId);
     }
 
-    public CreateAlarmOccurrenceResponse createAlarmOccurrence(Long memberId, Long alarmId) {
-        return alarmCommandService.createAlarmOccurrence(memberId, alarmId);
+    public AlarmAdSessionCreateResponse createOffAdSession(Long memberId, String deviceId, Long alarmId, AlarmOffAdSessionCreateRequest request) {
+        return alarmCommandService.createOffAdSession(memberId, deviceId, alarmId, request);
     }
 
-    public void removeAlarmByPayment(Long memberId, Long alarmId, AlarmDeleteByPaymentRequest request) {
-        alarmCommandService.removeAlarmByPayment(memberId, alarmId, request);
+    public AlarmDeactivationResponse deactivateByAd(Long memberId, String deviceId, Long alarmId, AlarmAdActionRequest request) {
+        return alarmCommandService.deactivateByAd(memberId, deviceId, alarmId, request);
     }
 
-    public void removeAlarmByAd(Long memberId, Long alarmId, AlarmDeleteByAdRequest request) {
-        alarmCommandService.removeAlarmByAd(memberId, alarmId, request);
+    public AlarmAdSessionCreateResponse createDeleteAdSession(Long memberId, String deviceId, Long alarmId) {
+        return alarmCommandService.createDeleteAdSession(memberId, deviceId, alarmId);
+    }
+
+    public void removeAlarmByAd(Long memberId, String deviceId, Long alarmId, AlarmAdActionRequest request) {
+        alarmCommandService.removeAlarmByAd(memberId, deviceId, alarmId, request);
     }
 
     public AlarmCheckinResponse checkinAlarm(Long memberId, Long alarmId, AlarmCheckinRequest request) {
         return alarmCommandService.checkinAlarm(memberId, alarmId, request);
-    }
-
-    public AlarmPaymentResponse deactivateByPayment(Long memberId, Long alarmId, AlarmPaymentRequest request) {
-        return alarmCommandService.deactivateByPayment(memberId, alarmId, request);
     }
 
     public void ringAlarm(Long memberId, Long alarmId, String deviceId) {
@@ -60,7 +61,7 @@ public class AlarmUseCase {
         return alarmQueryService.getSyncAlarms(memberId, deviceId);
     }
 
-    public AlarmDeleteMethodResponse getAlarmDeleteMethod(Long memberId, Long alarmId) {
-        return alarmQueryService.getAlarmDeleteMethod(memberId, alarmId);
+    public LocationPreparationResponse getLocationPreparation(Long memberId, Long alarmId, Long occurrenceId) {
+        return alarmLocationPreparationService.getLocationPreparation(memberId, alarmId, occurrenceId);
     }
 }

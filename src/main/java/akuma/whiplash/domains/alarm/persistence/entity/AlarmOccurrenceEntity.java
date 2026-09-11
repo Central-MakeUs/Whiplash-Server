@@ -91,6 +91,12 @@ public class AlarmOccurrenceEntity extends BaseTimeEntity {
         this.alarmRinging = false;
     }
 
+    public void deactivateByAd(LocalDateTime now) {
+        this.status = OccurrenceStatus.WATCH_AD;
+        this.deactivatedAt = now;
+        this.alarmRinging = false;
+    }
+
     public int ring() {
         this.status = OccurrenceStatus.RINGING;
         this.alarmRinging = true;

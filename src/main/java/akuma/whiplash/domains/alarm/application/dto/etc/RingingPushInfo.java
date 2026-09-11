@@ -4,6 +4,7 @@ import lombok.Builder;
 
 @Builder
 public record RingingPushInfo(
+    Long occurrenceId,
     Long alarmId,
     Long memberId
 ) {

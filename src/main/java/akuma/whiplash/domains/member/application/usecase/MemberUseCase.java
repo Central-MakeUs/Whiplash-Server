@@ -12,7 +12,7 @@ public class MemberUseCase {
 
     private final MemberCommandService memberCommandService;
 
-    public void softDeleteMember(MemberContext memberContext) {
-        memberCommandService.softDeleteMember(memberContext.memberId(), memberContext.deviceId());
+    public void deleteMember(MemberContext memberContext) {
+        memberCommandService.deleteMember(memberContext.memberId(), memberContext.deviceId());
     }
 }

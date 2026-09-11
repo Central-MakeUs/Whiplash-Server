@@ -26,6 +26,9 @@ class LogUtilsTest {
                   "longitude": 126.9294,
                   "paymentId": "payment-success-001",
                   "adProofToken": "ad-proof-token",
+                  "sessionToken": "session-token",
+                  "session_token": "snake-session-token",
+                  "google_place_id": "snake-google-place-id",
                   "fcmToken": "fcm-token",
                   "nested": {
                     "deviceId": "device-uuid"
@@ -41,6 +44,9 @@ class LogUtilsTest {
             assertThat(result).contains("\"longitude\":\"****\"");
             assertThat(result).contains("\"paymentId\":\"****\"");
             assertThat(result).contains("\"adProofToken\":\"****\"");
+            assertThat(result).contains("\"sessionToken\":\"****\"");
+            assertThat(result).contains("\"session_token\":\"****\"");
+            assertThat(result).contains("\"google_place_id\":\"****\"");
             assertThat(result).contains("\"fcmToken\":\"****\"");
             assertThat(result).contains("\"deviceId\":\"****\"");
             assertThat(result).doesNotContain("37.4847");
@@ -56,13 +62,13 @@ class LogUtilsTest {
         @DisplayName("성공: query string의 좌표와 결제 식별자를 마스킹한다")
         void success() {
             // given
-            String query = "latitude=37.4847&longitude=126.9294&paymentId=payment-success-001&query=cafe";
+            String query = "latitude=37.4847&longitude=126.9294&paymentId=payment-success-001&googlePlaceId=ChIJ123&sessionToken=session-token&session_token=snake-session-token&google_place_id=snake-google-place-id&query=cafe";
 
             // when
             String result = LogUtils.maskSensitiveQuery(query);
 
             // then
-            assertThat(result).isEqualTo("latitude=****&longitude=****&paymentId=****&query=cafe");
+            assertThat(result).isEqualTo("latitude=****&longitude=****&paymentId=****&googlePlaceId=****&sessionToken=****&session_token=****&google_place_id=****&query=cafe");
         }
     }
 }
