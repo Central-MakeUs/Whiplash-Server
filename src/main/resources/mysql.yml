@@ -85,6 +85,10 @@ spring:
     enabled: true
     locations:
       - classpath:db/migration
+      - classpath:db/prod-migration
+    baseline-on-migrate: true
+    baseline-version: 12
+    baseline-description: manual_schema_before_flyway
 
   jpa:
     hibernate:
