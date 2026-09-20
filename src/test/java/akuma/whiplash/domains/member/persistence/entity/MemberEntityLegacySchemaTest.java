@@ -2,9 +2,13 @@ package akuma.whiplash.domains.member.persistence.entity;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import akuma.whiplash.common.fixture.MemberFixture;
 import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.sql.Timestamp;
+import java.time.LocalDateTime;
 import org.hibernate.Session;
 import org.hibernate.SessionFactory;
 import org.hibernate.cfg.AvailableSettings;
@@ -63,53 +67,80 @@ class MemberEntityLegacySchemaTest {
             statement.execute("""
                 CREATE TABLE member (
                     id BIGINT PRIMARY KEY,
-                    provider VARCHAR(20) NOT NULL,
-                    provider_user_id VARCHAR(100) NOT NULL,
-                    email VARCHAR(255) NULL,
-                    nickname VARCHAR(50) NULL,
-                    status VARCHAR(20) NOT NULL,
-                    role VARCHAR(255) NULL,
-                    created_at DATETIME(6) NOT NULL,
-                    updated_at DATETIME(6) NOT NULL
-                )
-                """);
-            statement.execute("""
-                INSERT INTO member (
-                    id, provider, provider_user_id, email, nickname, status, role,
-                    created_at, updated_at
-                ) VALUES (
-                    1, 'KAKAO', 'legacy-kakao-id', 'legacy@example.com', 'legacy', 'ACTIVE', 'USER',
-                    CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
+                    social_id VARCHAR(255) NOT NULL UNIQUE,
+                    email VARCHAR(50) NOT NULL,
+                    nickname VARCHAR(50) NOT NULL,
+                    role VARCHAR(255) NOT NULL,
+                    privacy_policy BOOLEAN NOT NULL,
+                    push_notification_policy BOOLEAN NOT NULL,
+                    privacy_agreed_at DATETIME NOT NULL,
+                    push_agreed_at DATETIME NOT NULL,
+                    created_at DATETIME NOT NULL,
+                    updated_at DATETIME NOT NULL
                 )
                 """);
         }
     }
 
     @Nested
-    @DisplayName("find - legacy member 조회")
-    class FindTest {
+    @DisplayName("persist - 레거시 member 스키마 보정")
+    class PersistTest {
 
         @Test
-        @DisplayName("성공: last_login_at 없는 레거시 스키마를 보정한 뒤 회원을 조회한다")
+        @DisplayName("성공: v2 스키마 보정 후 소셜 회원을 저장하고 조회한다")
         void success() throws SQLException {
             // given
-            Long memberId = 1L;
             applyLastLoginAtMigration();
             applyLastLoginAtMigration();
+            applyMemberV2SchemaMigration();
+            applyMemberV2SchemaMigration();
+            MemberEntity member = MemberFixture.MEMBER_1.toEntity();
 
             // when
-            MemberEntity member = findMember(memberId);
+            insertMember(member);
+            MemberEntity savedMember = findMember(member);
 
             // then
-            assertThat(member).isNotNull();
-            assertThat(member.getEmail()).isEqualTo("legacy@example.com");
+            assertThat(savedMember.getProvider()).isEqualTo(member.getProvider());
+            assertThat(savedMember.getProviderUserId()).isEqualTo(member.getProviderUserId());
             assertThat(hasLastLoginAtColumn()).isTrue();
+            assertThat(hasMemberV2Columns()).isTrue();
+            assertThat(hasMemberProviderUniqueKey()).isTrue();
         }
     }
 
-    private MemberEntity findMember(Long memberId) {
+    private void insertMember(MemberEntity member) throws SQLException {
+        try (Connection connection = getConnection(); PreparedStatement statement = connection.prepareStatement("""
+            INSERT INTO member (
+                provider, provider_user_id, email, nickname, status, role, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """)) {
+            statement.setString(1, member.getProvider().name());
+            statement.setString(2, member.getProviderUserId());
+            statement.setString(3, member.getEmail());
+            statement.setString(4, member.getNickname());
+            statement.setString(5, member.getStatus().name());
+            statement.setString(6, member.getRole().name());
+            statement.setTimestamp(7, Timestamp.valueOf(LocalDateTime.of(2026, 9, 20, 0, 0)));
+            statement.setTimestamp(8, Timestamp.valueOf(LocalDateTime.of(2026, 9, 20, 0, 0)));
+            statement.executeUpdate();
+        }
+    }
+
+    private MemberEntity findMember(MemberEntity member) {
         try (Session session = sessionFactory.openSession()) {
-            return session.find(MemberEntity.class, memberId);
+            return session.createQuery(
+                """
+                    SELECT member
+                    FROM MemberEntity member
+                    WHERE member.provider = :provider
+                      AND member.providerUserId = :providerUserId
+                    """,
+                MemberEntity.class
+            )
+                .setParameter("provider", member.getProvider())
+                .setParameter("providerUserId", member.getProviderUserId())
+                .getSingleResult();
         }
     }
 
@@ -130,6 +161,15 @@ class MemberEntityLegacySchemaTest {
         }
     }
 
+    private void applyMemberV2SchemaMigration() throws SQLException {
+        try (Connection connection = getConnection()) {
+            ScriptUtils.executeSqlScript(
+                connection,
+                new ClassPathResource("db/migration/V020__reconcile_member_v2_schema.sql")
+            );
+        }
+    }
+
     private boolean hasLastLoginAtColumn() throws SQLException {
         try (Connection connection = getConnection(); Statement statement = connection.createStatement()) {
             try (var resultSet = statement.executeQuery("""
@@ -141,6 +181,36 @@ class MemberEntityLegacySchemaTest {
                 """)) {
                 resultSet.next();
                 return resultSet.getInt(1) == 1;
+            }
+        }
+    }
+
+    private boolean hasMemberV2Columns() throws SQLException {
+        try (Connection connection = getConnection(); Statement statement = connection.createStatement()) {
+            try (var resultSet = statement.executeQuery("""
+                SELECT COUNT(*)
+                FROM INFORMATION_SCHEMA.COLUMNS
+                WHERE TABLE_SCHEMA = DATABASE()
+                  AND TABLE_NAME = 'member'
+                  AND COLUMN_NAME IN ('provider', 'provider_user_id', 'status')
+                """)) {
+                resultSet.next();
+                return resultSet.getInt(1) == 3;
+            }
+        }
+    }
+
+    private boolean hasMemberProviderUniqueKey() throws SQLException {
+        try (Connection connection = getConnection(); Statement statement = connection.createStatement()) {
+            try (var resultSet = statement.executeQuery("""
+                SELECT COUNT(*)
+                FROM INFORMATION_SCHEMA.STATISTICS
+                WHERE TABLE_SCHEMA = DATABASE()
+                  AND TABLE_NAME = 'member'
+                  AND INDEX_NAME = 'UK_MEMBER_PROVIDER'
+                """)) {
+                resultSet.next();
+                return resultSet.getInt(1) == 2;
             }
         }
     }
