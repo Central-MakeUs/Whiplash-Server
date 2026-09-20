@@ -61,9 +61,6 @@ public class MemberEntity extends BaseTimeEntity {
     @Column(name = "last_login_at")
     private LocalDateTime lastLoginAt;
 
-    @Column(name = "deleted_at")
-    private LocalDateTime deletedAt;
-
     public void updateLastLoginAt() {
         this.lastLoginAt = LocalDateTime.now();
     }
