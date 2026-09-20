@@ -91,7 +91,6 @@ class AuthControllerIntegrationTest {
                 .email("kmh@gmail.com")
                 .nickname("김민형")
                 .role(MemberFixture.MEMBER_1.getRole())
-                .status(MemberFixture.MEMBER_1.getStatus())
                 .build());
             String deviceId = "device-logout-success";
             String accessToken = jwtProvider.generateAccessToken(member.getId(), member.getRole(), deviceId);
@@ -246,8 +245,7 @@ class AuthControllerIntegrationTest {
                 .andExpect(jsonPath("$.result.member.provider").value("MOCK"))
                 .andExpect(jsonPath("$.result.member.nickname").value("김민형"))
                 .andExpect(jsonPath("$.result.member.email").value("kmh@gmail.com"))
-                .andExpect(jsonPath("$.result.member.isNewMember").value(true))
-                .andExpect(jsonPath("$.result.member.status").value("ACTIVE"));
+                .andExpect(jsonPath("$.result.member.isNewMember").value(true));
 
             // then
             MemberEntity member = memberRepository.findByProviderAndProviderUserId(SocialType.MOCK, "123456789")
@@ -275,7 +273,6 @@ class AuthControllerIntegrationTest {
                 .email("kmh@gmail.com")
                 .nickname("김민형")
                 .role(MemberFixture.MEMBER_1.getRole())
-                .status(MemberFixture.MEMBER_1.getStatus())
                 .build());
             memberDeviceRepository.save(MemberDeviceEntity.builder()
                 .member(member)

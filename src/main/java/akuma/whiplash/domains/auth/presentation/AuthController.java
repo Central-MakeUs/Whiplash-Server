@@ -3,7 +3,6 @@ package akuma.whiplash.domains.auth.presentation;
 import static akuma.whiplash.domains.auth.exception.AuthErrorCode.INVALID_TOKEN;
 import static akuma.whiplash.domains.auth.exception.AuthErrorCode.TOKEN_EXPIRED;
 import static akuma.whiplash.domains.auth.exception.AuthErrorCode.UNSUPPORTED_SOCIAL_TYPE;
-import static akuma.whiplash.domains.member.exception.MemberErrorCode.MEMBER_DELETED;
 import static akuma.whiplash.global.response.code.CommonErrorCode.BAD_REQUEST;
 
 import akuma.whiplash.domains.auth.application.dto.etc.MemberContext;
@@ -33,8 +32,7 @@ public class AuthController {
 
     @CustomErrorCodes(
         commonErrorCodes = {BAD_REQUEST},
-        authErrorCodes = {UNSUPPORTED_SOCIAL_TYPE},
-        memberErrorCodes = {MEMBER_DELETED}
+        authErrorCodes = {UNSUPPORTED_SOCIAL_TYPE}
     )
     @Operation(summary = "소셜 로그인", description = "구글, 애플, 카카오 소셜 로그인을 지원합니다.")
     @PostMapping("/social-login")

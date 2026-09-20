@@ -1,7 +1,6 @@
 package akuma.whiplash.domains.auth.domain.service;
 
 import static akuma.whiplash.domains.auth.exception.AuthErrorCode.UNSUPPORTED_SOCIAL_TYPE;
-import static akuma.whiplash.domains.member.exception.MemberErrorCode.MEMBER_DELETED;
 
 import akuma.whiplash.domains.auth.application.dto.etc.MemberContext;
 import akuma.whiplash.domains.auth.application.dto.etc.SocialMemberInfo;
@@ -58,9 +57,6 @@ public class AuthCommandServiceImpl implements AuthCommandService {
 
         if (findMember.isPresent()) {
             member = findMember.get();
-            if (member.isDeleted()) {
-                throw ApplicationException.from(MEMBER_DELETED);
-            }
             member.updateLastLoginAt();
         } else {
             member = memberRepository.save(AuthMapper.mapToMemberEntity(socialMemberInfo));
