@@ -17,7 +17,6 @@ public record LoginResponse(
         String provider,
         String nickname,
         String email,
-        boolean isNewMember,
-        String status
+        boolean isNewMember
     ) {}
 }

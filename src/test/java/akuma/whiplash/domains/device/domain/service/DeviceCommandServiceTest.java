@@ -12,7 +12,6 @@ import static org.mockito.Mockito.when;
 
 import akuma.whiplash.domains.device.application.dto.request.DeviceUpdateRequest;
 import akuma.whiplash.domains.device.application.dto.response.DeviceUpdateResponse;
-import akuma.whiplash.domains.member.domain.contants.MemberStatus;
 import akuma.whiplash.domains.member.domain.contants.Role;
 import akuma.whiplash.domains.member.domain.contants.SocialType;
 import akuma.whiplash.domains.member.persistence.entity.MemberDeviceEntity;
@@ -52,7 +51,6 @@ class DeviceCommandServiceTest {
             .email("user@test.com")
             .nickname("테스트유저")
             .role(Role.USER)
-            .status(MemberStatus.ACTIVE)
             .build();
     }
 

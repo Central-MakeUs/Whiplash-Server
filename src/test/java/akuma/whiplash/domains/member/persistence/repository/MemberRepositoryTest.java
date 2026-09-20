@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import akuma.whiplash.common.config.PersistenceTest;
 import akuma.whiplash.common.fixture.MemberFixture;
-import akuma.whiplash.domains.member.domain.contants.MemberStatus;
 import akuma.whiplash.domains.member.persistence.entity.MemberEntity;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
@@ -83,19 +82,4 @@ class MemberRepositoryTest {
         }
     }
 
-    @Nested
-    @DisplayName("isDeleted - 탈퇴 회원 판별")
-    class IsDeletedTest {
-
-        @Test
-        @DisplayName("성공: status가 ACTIVE이면 isDeleted는 false를 반환한다")
-        void success_activeIsNotDeleted() {
-            // given
-            MemberEntity member = MemberFixture.MEMBER_3.toMockEntity();
-
-            // when & then
-            assertThat(member.isDeleted()).isFalse();
-            assertThat(member.getStatus()).isEqualTo(MemberStatus.ACTIVE);
-        }
-    }
 }

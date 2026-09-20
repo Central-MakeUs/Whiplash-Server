@@ -94,6 +94,8 @@ class MemberEntityLegacySchemaTest {
             applyLastLoginAtMigration();
             applyMemberV2SchemaMigration();
             applyMemberV2SchemaMigration();
+            applyMemberHardDeleteSchemaMigration();
+            applyMemberHardDeleteSchemaMigration();
             MemberEntity member = MemberFixture.MEMBER_1.toEntity();
 
             // when
@@ -106,23 +108,23 @@ class MemberEntityLegacySchemaTest {
             assertThat(hasLastLoginAtColumn()).isTrue();
             assertThat(hasMemberV2Columns()).isTrue();
             assertThat(hasMemberProviderUniqueKey()).isTrue();
+            assertThat(hasHardDeleteColumns()).isTrue();
         }
     }
 
     private void insertMember(MemberEntity member) throws SQLException {
         try (Connection connection = getConnection(); PreparedStatement statement = connection.prepareStatement("""
             INSERT INTO member (
-                provider, provider_user_id, email, nickname, status, role, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                provider, provider_user_id, email, nickname, role, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
             """)) {
             statement.setString(1, member.getProvider().name());
             statement.setString(2, member.getProviderUserId());
             statement.setString(3, member.getEmail());
             statement.setString(4, member.getNickname());
-            statement.setString(5, member.getStatus().name());
-            statement.setString(6, member.getRole().name());
+            statement.setString(5, member.getRole().name());
+            statement.setTimestamp(6, Timestamp.valueOf(LocalDateTime.of(2026, 9, 20, 0, 0)));
             statement.setTimestamp(7, Timestamp.valueOf(LocalDateTime.of(2026, 9, 20, 0, 0)));
-            statement.setTimestamp(8, Timestamp.valueOf(LocalDateTime.of(2026, 9, 20, 0, 0)));
             statement.executeUpdate();
         }
     }
@@ -170,6 +172,15 @@ class MemberEntityLegacySchemaTest {
         }
     }
 
+    private void applyMemberHardDeleteSchemaMigration() throws SQLException {
+        try (Connection connection = getConnection()) {
+            ScriptUtils.executeSqlScript(
+                connection,
+                new ClassPathResource("db/migration/V021__reconcile_member_hard_delete_schema.sql")
+            );
+        }
+    }
+
     private boolean hasLastLoginAtColumn() throws SQLException {
         try (Connection connection = getConnection(); Statement statement = connection.createStatement()) {
             try (var resultSet = statement.executeQuery("""
@@ -192,10 +203,25 @@ class MemberEntityLegacySchemaTest {
                 FROM INFORMATION_SCHEMA.COLUMNS
                 WHERE TABLE_SCHEMA = DATABASE()
                   AND TABLE_NAME = 'member'
-                  AND COLUMN_NAME IN ('provider', 'provider_user_id', 'status')
+                  AND COLUMN_NAME IN ('provider', 'provider_user_id')
                 """)) {
                 resultSet.next();
-                return resultSet.getInt(1) == 3;
+                return resultSet.getInt(1) == 2;
+            }
+        }
+    }
+
+    private boolean hasHardDeleteColumns() throws SQLException {
+        try (Connection connection = getConnection(); Statement statement = connection.createStatement()) {
+            try (var resultSet = statement.executeQuery("""
+                SELECT COUNT(*)
+                FROM INFORMATION_SCHEMA.COLUMNS
+                WHERE TABLE_SCHEMA = DATABASE()
+                  AND TABLE_NAME = 'member'
+                  AND COLUMN_NAME IN ('status', 'deleted_at')
+                """)) {
+                resultSet.next();
+                return resultSet.getInt(1) == 0;
             }
         }
     }

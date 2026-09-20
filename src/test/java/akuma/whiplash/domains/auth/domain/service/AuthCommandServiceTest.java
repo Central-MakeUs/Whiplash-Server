@@ -16,7 +16,6 @@ import akuma.whiplash.domains.auth.application.dto.response.LoginResponse;
 import akuma.whiplash.domains.auth.application.dto.response.TokenResponse;
 import akuma.whiplash.domains.auth.application.utils.SocialVerifier;
 import akuma.whiplash.domains.auth.exception.AuthErrorCode;
-import akuma.whiplash.domains.member.domain.contants.MemberStatus;
 import akuma.whiplash.domains.member.domain.contants.Role;
 import akuma.whiplash.domains.member.domain.contants.SocialType;
 import akuma.whiplash.domains.member.exception.MemberErrorCode;
@@ -82,7 +81,7 @@ class AuthCommandServiceTest {
             .build();
     }
 
-    private MemberEntity buildMember(Long memberId, SocialType socialType, String providerUserId, MemberStatus status) {
+    private MemberEntity buildMember(Long memberId, SocialType socialType, String providerUserId) {
         return MemberEntity.builder()
             .id(memberId)
             .provider(socialType)
@@ -90,7 +89,6 @@ class AuthCommandServiceTest {
             .email("saved-user@test.com")
             .nickname("Saved User")
             .role(Role.USER)
-            .status(status)
             .build();
     }
 
@@ -104,7 +102,7 @@ class AuthCommandServiceTest {
             // given
             SocialLoginRequest request = buildSocialLoginRequest("MOCK", "new-device", "new-fcm-token");
             SocialMemberInfo socialMemberInfo = buildSocialMemberInfo("mock-new-user");
-            MemberEntity savedMember = buildMember(101L, SocialType.MOCK, "mock-new-user", MemberStatus.ACTIVE);
+            MemberEntity savedMember = buildMember(101L, SocialType.MOCK, "mock-new-user");
 
             when(verifierMap.get("MOCK")).thenReturn(socialVerifier);
             when(socialVerifier.verify(request)).thenReturn(socialMemberInfo);
@@ -136,7 +134,7 @@ class AuthCommandServiceTest {
             SocialLoginRequest request = buildSocialLoginRequest("MOCK", "existing-device", "existing-fcm-token");
             SocialMemberInfo socialMemberInfo = buildSocialMemberInfo("mock-existing-user");
             MemberEntity existingMember = spy(
-                buildMember(102L, SocialType.MOCK, "mock-existing-user", MemberStatus.ACTIVE)
+                buildMember(102L, SocialType.MOCK, "mock-existing-user")
             );
 
             when(verifierMap.get("MOCK")).thenReturn(socialVerifier);
@@ -155,26 +153,6 @@ class AuthCommandServiceTest {
             assertThat(response.member().isNewMember()).isFalse();
             verify(existingMember).updateLastLoginAt();
             verify(memberRepository, never()).save(any(MemberEntity.class));
-        }
-
-        @Test
-        @DisplayName("실패: 탈퇴 회원이면 MEMBER_DELETED 예외를 던진다")
-        void fail_deletedMember() {
-            // given
-            SocialLoginRequest request = buildSocialLoginRequest("MOCK", "deleted-device", "deleted-fcm-token");
-            SocialMemberInfo socialMemberInfo = buildSocialMemberInfo("mock-deleted-user");
-            MemberEntity deletedMember = buildMember(103L, SocialType.MOCK, "mock-deleted-user", MemberStatus.DELETED);
-
-            when(verifierMap.get("MOCK")).thenReturn(socialVerifier);
-            when(socialVerifier.verify(request)).thenReturn(socialMemberInfo);
-            when(memberRepository.findByProviderAndProviderUserId(SocialType.MOCK, "mock-deleted-user"))
-                .thenReturn(Optional.of(deletedMember));
-
-            // when & then
-            assertThatThrownBy(() -> authCommandService.login(request))
-                .isInstanceOfSatisfying(ApplicationException.class, e ->
-                    assertThat(e.getCode()).isEqualTo(MemberErrorCode.MEMBER_DELETED)
-                );
         }
 
         @Test

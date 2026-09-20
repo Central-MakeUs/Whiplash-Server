@@ -1,6 +1,5 @@
 package akuma.whiplash.domains.member.persistence.entity;
 
-import akuma.whiplash.domains.member.domain.contants.MemberStatus;
 import akuma.whiplash.domains.member.domain.contants.Role;
 import akuma.whiplash.domains.member.domain.contants.SocialType;
 import akuma.whiplash.global.entity.BaseTimeEntity;
@@ -52,10 +51,6 @@ public class MemberEntity extends BaseTimeEntity {
     private String nickname;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
-    private MemberStatus status;
-
-    @Enumerated(EnumType.STRING)
     private Role role;
 
     @Column(name = "last_login_at")
@@ -65,7 +60,4 @@ public class MemberEntity extends BaseTimeEntity {
         this.lastLoginAt = LocalDateTime.now();
     }
 
-    public boolean isDeleted() {
-        return MemberStatus.DELETED.equals(this.status);
-    }
 }

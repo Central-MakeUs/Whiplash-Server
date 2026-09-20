@@ -115,7 +115,6 @@ class AuthControllerTest {
                     .nickname("김민형")
                     .email("kmh@gmail.com")
                     .isNewMember(true)
-                    .status("ACTIVE")
                     .build())
                 .build();
 
@@ -133,8 +132,7 @@ class AuthControllerTest {
                 .andExpect(jsonPath("$.result.member.provider").value("MOCK"))
                 .andExpect(jsonPath("$.result.member.nickname").value("김민형"))
                 .andExpect(jsonPath("$.result.member.email").value("kmh@gmail.com"))
-                .andExpect(jsonPath("$.result.member.isNewMember").value(true))
-                .andExpect(jsonPath("$.result.member.status").value("ACTIVE"));
+                .andExpect(jsonPath("$.result.member.isNewMember").value(true));
         }
 
         @Test
