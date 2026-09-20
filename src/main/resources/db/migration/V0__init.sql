@@ -5,10 +5,8 @@ CREATE TABLE member
     provider_user_id VARCHAR(100) NOT NULL COMMENT '소셜 제공자 회원 ID | 소셜 제공자가 발급한 회원 식별자',
     email            VARCHAR(255) NULL COMMENT '이메일 | 소셜 로그인으로 수집한 회원 이메일',
     nickname         VARCHAR(50)  NULL COMMENT '닉네임 | 서비스에서 표시할 회원 이름',
-    status           VARCHAR(20)  NOT NULL COMMENT '회원 상태 | ACTIVE, WITHDRAWN 등 회원 이용 상태',
     role             VARCHAR(255) NULL COMMENT '회원 권한 | 서비스 접근 권한 구분',
     last_login_at    DATETIME(6)  NULL COMMENT '마지막 로그인 시각 | 회원이 마지막으로 로그인한 일시',
-    deleted_at       DATETIME(6)  NULL COMMENT '회원 삭제 시각 | 탈퇴 또는 삭제 처리된 일시',
     created_at       DATETIME(6)  NOT NULL COMMENT '생성 시각 | 데이터가 최초 생성된 일시',
     updated_at       DATETIME(6)  NOT NULL COMMENT '수정 시각 | 데이터가 마지막으로 수정된 일시',
     CONSTRAINT UK_MEMBER_PROVIDER UNIQUE (provider, provider_user_id)

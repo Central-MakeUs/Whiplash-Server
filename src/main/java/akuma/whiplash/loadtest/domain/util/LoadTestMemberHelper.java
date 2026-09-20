@@ -1,6 +1,5 @@
 package akuma.whiplash.loadtest.domain.util;
 
-import akuma.whiplash.domains.member.domain.contants.MemberStatus;
 import akuma.whiplash.domains.member.domain.contants.Role;
 import akuma.whiplash.domains.member.domain.contants.SocialType;
 import akuma.whiplash.domains.member.persistence.entity.MemberEntity;
@@ -43,7 +42,6 @@ public class LoadTestMemberHelper {
                 .email("lt-" + runId + "-" + i + "@test.com")
                 .nickname("부하테스트" + i)
                 .role(Role.USER)
-                .status(MemberStatus.ACTIVE)
                 .build();
             member = memberRepository.save(member);
 
