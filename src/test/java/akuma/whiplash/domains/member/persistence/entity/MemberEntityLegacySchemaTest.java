@@ -15,6 +15,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.jdbc.datasource.init.ScriptUtils;
 import org.testcontainers.containers.MySQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -67,7 +69,6 @@ class MemberEntityLegacySchemaTest {
                     nickname VARCHAR(50) NULL,
                     status VARCHAR(20) NOT NULL,
                     role VARCHAR(255) NULL,
-                    last_login_at DATETIME(6) NULL,
                     created_at DATETIME(6) NOT NULL,
                     updated_at DATETIME(6) NOT NULL
                 )
@@ -75,10 +76,10 @@ class MemberEntityLegacySchemaTest {
             statement.execute("""
                 INSERT INTO member (
                     id, provider, provider_user_id, email, nickname, status, role,
-                    last_login_at, created_at, updated_at
+                    created_at, updated_at
                 ) VALUES (
                     1, 'KAKAO', 'legacy-kakao-id', 'legacy@example.com', 'legacy', 'ACTIVE', 'USER',
-                    NULL, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
+                    CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
                 )
                 """);
         }
@@ -89,10 +90,12 @@ class MemberEntityLegacySchemaTest {
     class FindTest {
 
         @Test
-        @DisplayName("성공: deleted_at 없는 레거시 스키마에서도 회원을 조회한다")
-        void success() {
+        @DisplayName("성공: last_login_at 없는 레거시 스키마를 보정한 뒤 회원을 조회한다")
+        void success() throws SQLException {
             // given
             Long memberId = 1L;
+            applyLastLoginAtMigration();
+            applyLastLoginAtMigration();
 
             // when
             MemberEntity member = findMember(memberId);
@@ -100,6 +103,7 @@ class MemberEntityLegacySchemaTest {
             // then
             assertThat(member).isNotNull();
             assertThat(member.getEmail()).isEqualTo("legacy@example.com");
+            assertThat(hasLastLoginAtColumn()).isTrue();
         }
     }
 
@@ -115,5 +119,29 @@ class MemberEntityLegacySchemaTest {
             MYSQL_CONTAINER.getUsername(),
             MYSQL_CONTAINER.getPassword()
         );
+    }
+
+    private void applyLastLoginAtMigration() throws SQLException {
+        try (Connection connection = getConnection()) {
+            ScriptUtils.executeSqlScript(
+                connection,
+                new ClassPathResource("db/migration/V019__add_member_last_login_at.sql")
+            );
+        }
+    }
+
+    private boolean hasLastLoginAtColumn() throws SQLException {
+        try (Connection connection = getConnection(); Statement statement = connection.createStatement()) {
+            try (var resultSet = statement.executeQuery("""
+                SELECT COUNT(*)
+                FROM INFORMATION_SCHEMA.COLUMNS
+                WHERE TABLE_SCHEMA = DATABASE()
+                  AND TABLE_NAME = 'member'
+                  AND COLUMN_NAME = 'last_login_at'
+                """)) {
+                resultSet.next();
+                return resultSet.getInt(1) == 1;
+            }
+        }
     }
 }
