@@ -304,6 +304,30 @@ class GoogleClientTest {
     class GetPlaceDetailsTest {
 
         @Test
+        @DisplayName("성공: 지도 POI 상세 조회는 세션 토큰을 Google에 보내지 않는다")
+        void success_withoutSessionToken() throws Exception {
+            // given
+            mockWebServer.enqueue(jsonResponse("""
+                {
+                  "id":"ChIJ",
+                  "formattedAddress":"경기도 구리시 아차산로 439",
+                  "location":{"latitude":37.5943,"longitude":127.1296}
+                }
+                """));
+
+            // when
+            var result = client.getPlaceDetails(new PlaceDetailsCriteria(
+                "ChIJ", null, null, null
+            ));
+
+            // then
+            assertThat(result.providerPlaceId()).isEqualTo("ChIJ");
+            RecordedRequest request = mockWebServer.takeRequest(3, TimeUnit.SECONDS);
+            assertThat(request).isNotNull();
+            assertThat(request.getRequestUrl().queryParameter("sessionToken")).isNull();
+        }
+
+        @Test
         @DisplayName("성공: Place Details 요청을 보내고 선택 장소 상세 정보로 변환한다")
         void success() throws Exception {
             // given
@@ -457,6 +481,68 @@ class GoogleClientTest {
     @Nested
     @DisplayName("reverseGeocode - Google reverse geocoding")
     class ReverseGeocodeTest {
+
+        @Test
+        @DisplayName("성공: 숫자 건물번호 대신 다음 유효한 지역명을 사용한다")
+        void success_skipsNumericPremise() {
+            // given
+            mockWebServer.enqueue(jsonResponse("""
+                {"results":[{
+                  "formattedAddress":"대한민국 서울특별시 중구 세종대로 110",
+                  "addressComponents":[
+                    {"longText":"110","types":["premise"]},
+                    {"longText":"중구","types":["sublocality_level_1"]},
+                    {"longText":"대한민국","shortText":"KR","types":["country"]}
+                  ]
+                }]}
+                """));
+
+            // when
+            var result = client.reverseGeocode(37.5665, 126.978, "ko");
+
+            // then
+            assertThat(result.placeName()).isEqualTo("중구");
+            assertThat(result.address()).isEqualTo("대한민국 서울특별시 중구 세종대로 110");
+        }
+
+        @Test
+        @DisplayName("성공: 하이픈이 포함된 건물번호도 장소 라벨에서 제외한다")
+        void success_skipsHyphenatedNumericPremise() {
+            // given
+            mockWebServer.enqueue(jsonResponse("""
+                {"results":[{
+                  "formattedAddress":"대한민국 서울특별시 중구 세종대로 110-1",
+                  "addressComponents":[
+                    {"longText":"110-1","types":["premise"]},
+                    {"longText":"중구","types":["sublocality_level_1"]}
+                  ]
+                }]}
+                """));
+
+            // when
+            var result = client.reverseGeocode(37.5665, 126.978, "ko");
+
+            // then
+            assertThat(result.placeName()).isEqualTo("중구");
+        }
+
+        @Test
+        @DisplayName("성공: 주소 구성요소가 모두 숫자면 전체 주소를 제목으로 사용한다")
+        void success_fallsBackToAddressWhenComponentsNumeric() {
+            // given
+            mockWebServer.enqueue(jsonResponse("""
+                {"results":[{
+                  "formattedAddress":"Somewhere 110",
+                  "addressComponents":[{"longText":"110","types":["premise"]}]
+                }]}
+                """));
+
+            // when
+            var result = client.reverseGeocode(37.5665, 126.978, "ko");
+
+            // then
+            assertThat(result.placeName()).isEqualTo("Somewhere 110");
+        }
 
         @Test
         @DisplayName("성공: 첫 결과를 표준 장소 상세 정보로 변환한다")
