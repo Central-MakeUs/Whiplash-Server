@@ -13,6 +13,7 @@ import com.google.firebase.messaging.ApsAlert;
 import com.google.firebase.messaging.BatchResponse;
 import com.google.firebase.messaging.FirebaseMessaging;
 import com.google.firebase.messaging.FirebaseMessagingException;
+import com.google.firebase.messaging.MessagingErrorCode;
 import com.google.firebase.messaging.MulticastMessage;
 import com.google.firebase.messaging.Notification;
 import com.google.firebase.messaging.SendResponse;
@@ -178,7 +179,8 @@ public class FcmService {
                 if (fme != null && isTokenInvalid(fme)) {
                     redisService.removeInvalidToken(dto.memberId(), dto.token());
                 } else {
-                    log.warn("FCM 실패(알람 울림): token={}, ex={}", maskToken(dto.token()), ex != null ? ex.getClass().getSimpleName() : "null");
+                    log.warn("FCM 실패(알람 울림): token={}, error={}", maskToken(dto.token()),
+                        fme != null ? fme.getMessagingErrorCode() : ex != null ? ex.getClass().getSimpleName() : "null");
                 }
             }
         }
@@ -208,7 +210,7 @@ public class FcmService {
                 FirebaseMessagingException fme = (ex instanceof FirebaseMessagingException) ? (FirebaseMessagingException) ex : null;
 
                 if (fme != null) {
-                    log.warn("FCM 실패: token={}, error={}", dto.token(), fme.getErrorCode());
+                    log.warn("FCM 실패: token={}, error={}", dto.token(), fme.getMessagingErrorCode());
                     if (isTokenInvalid(fme)) {
                         invalidTokens.add(dto.token());
                     }
@@ -267,12 +269,7 @@ public class FcmService {
     }
 
     private boolean isTokenInvalid(FirebaseMessagingException e) {
-        return List.of(
-            "registration-token-not-registered",
-            "invalid-argument",
-            "unregistered",
-            "messaging/invalid-registration-token"
-        ).contains(e.getErrorCode());
+        return MessagingErrorCode.UNREGISTERED.equals(e.getMessagingErrorCode());
     }
 
     // 같은 FCM 토큰 중복 제거
