@@ -350,10 +350,20 @@ class PlaceUseCaseTest {
         }
 
         @Test
-        @DisplayName("실패: sessionToken이 없으면 예외가 발생한다")
-        void fail_sessionTokenMissing() {
-            // when & then
-            assertBadRequest(() -> placeUseCase.getPlaceDetails("ChIJ", null, null, null));
+        @DisplayName("성공: 지도 POI는 세션 토큰 없이 상세 조회한다")
+        void success_withoutSessionToken() {
+            // given
+            PlaceDetailsCriteria criteria = new PlaceDetailsCriteria("ChIJ", null, null, null);
+            when(placeQueryService.getPlaceDetails(criteria)).thenReturn(new SelectedPlaceDetail(
+                "경기도 구리시 아차산로 439", 37.5943, 127.1296, "KR", "ChIJ"
+            ));
+
+            // when
+            var response = placeUseCase.getPlaceDetails("ChIJ", null, null, null);
+
+            // then
+            assertThat(response.address()).isEqualTo("경기도 구리시 아차산로 439");
+            verify(placeQueryService).getPlaceDetails(criteria);
         }
 
         @Test
@@ -362,6 +372,15 @@ class PlaceUseCaseTest {
             // when & then
             assertBadRequest(() -> placeUseCase.getPlaceDetails(
                 "ChIJ", "invalid-token", null, null
+            ));
+        }
+
+        @Test
+        @DisplayName("실패: 빈 sessionToken을 명시하면 예외가 발생한다")
+        void fail_sessionTokenBlank() {
+            // when & then
+            assertBadRequest(() -> placeUseCase.getPlaceDetails(
+                "ChIJ", " ", null, null
             ));
         }
 

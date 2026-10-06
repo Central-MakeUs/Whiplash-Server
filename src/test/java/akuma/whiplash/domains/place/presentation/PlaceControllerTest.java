@@ -397,6 +397,29 @@ class PlaceControllerTest {
     class GetPlaceDetailsTest {
 
         @Test
+        @DisplayName("성공: sessionToken이 없어도 Place ID를 상세 조회에 전달한다")
+        void success_withoutSessionToken() throws Exception {
+            // given
+            PlaceDetailResponse response = PlaceDetailResponse.builder()
+                .address("경기도 구리시 아차산로 439")
+                .roadAddress("경기도 구리시 아차산로 439")
+                .latitude(37.5943)
+                .longitude(127.1296)
+                .build();
+            when(placeUseCase.getPlaceDetails(eq("ChIJ"), isNull(), isNull(), isNull()))
+                .thenReturn(response);
+
+            // when
+            var resultActions = mockMvc.perform(get(BASE + "/details")
+                .param("providerPlaceId", "ChIJ"));
+
+            // then
+            resultActions
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.address").value("경기도 구리시 아차산로 439"));
+        }
+
+        @Test
         @DisplayName("성공: 선택 장소는 장소명과 providerPlaceId 없이 반환한다")
         void success() throws Exception {
             // given
