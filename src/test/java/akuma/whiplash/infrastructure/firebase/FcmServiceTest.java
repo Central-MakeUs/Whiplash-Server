@@ -146,107 +146,118 @@ class FcmServiceTest {
         }
     }
 
-    @Test
-    @DisplayName("성공: 사전 알림에서 등록 해제된 토큰을 무효 토큰 결과에 포함한다")
-    void success_returnsUnregisteredTokenForPreAlarm() throws FirebaseMessagingException {
-        // given
-        String token = "token-a";
-        BatchResponse batchResponse = givenBatchFailure(
-            failedSendResponse(MessagingErrorCode.UNREGISTERED)
-        );
-        FirebaseMessaging firebaseMessaging = mock(FirebaseMessaging.class);
+    @Nested
+    @DisplayName("sendBulkNotification - 사전 알림 토큰 분류")
+    class SendBulkNotificationTest {
 
-        try (MockedStatic<FirebaseMessaging> firebaseMessagingStatic = Mockito.mockStatic(FirebaseMessaging.class)) {
-            firebaseMessagingStatic.when(FirebaseMessaging::getInstance).thenReturn(firebaseMessaging);
-            org.mockito.BDDMockito.given(firebaseMessaging.sendEachForMulticast(Mockito.any()))
-                .willReturn(batchResponse);
+        @Test
+        @DisplayName("성공: 사전 알림에서 등록 해제된 토큰을 무효 토큰 결과에 포함한다")
+        void success() throws FirebaseMessagingException {
+            // given
+            String token = "token-a";
+            BatchResponse batchResponse = givenBatchFailure(
+                failedSendResponse(MessagingErrorCode.UNREGISTERED)
+            );
+            FirebaseMessaging firebaseMessaging = mock(FirebaseMessaging.class);
 
-            // when
-            var result = fcmService.sendBulkNotification(List.of(
-                PushTargetDto.builder().token(token).memberId(1L).alarmId(10L).occurrenceId(100L).build()
-            ));
+            try (MockedStatic<FirebaseMessaging> firebaseMessagingStatic = Mockito.mockStatic(FirebaseMessaging.class)) {
+                firebaseMessagingStatic.when(FirebaseMessaging::getInstance).thenReturn(firebaseMessaging);
+                org.mockito.BDDMockito.given(firebaseMessaging.sendEachForMulticast(Mockito.any()))
+                    .willReturn(batchResponse);
 
-            // then
-            assertThat(result.getInvalidTokens()).containsExactly(token);
+                // when
+                var result = fcmService.sendBulkNotification(List.of(
+                    PushTargetDto.builder().token(token).memberId(1L).alarmId(10L).occurrenceId(100L).build()
+                ));
+
+                // then
+                assertThat(result.getInvalidTokens()).containsExactly(token);
+                assertThat(result.getMemberToTokens()).containsEntry(1L, List.of(token));
+            }
+        }
+
+        @Test
+        @DisplayName("실패: 사전 알림에서 INVALID_ARGUMENT를 무효 토큰으로 처리하지 않는다")
+        void fail_invalidArgument() throws FirebaseMessagingException {
+            // given
+            String token = "token-a";
+            BatchResponse batchResponse = givenBatchFailure(
+                failedSendResponse(MessagingErrorCode.INVALID_ARGUMENT)
+            );
+            FirebaseMessaging firebaseMessaging = mock(FirebaseMessaging.class);
+
+            try (MockedStatic<FirebaseMessaging> firebaseMessagingStatic = Mockito.mockStatic(FirebaseMessaging.class)) {
+                firebaseMessagingStatic.when(FirebaseMessaging::getInstance).thenReturn(firebaseMessaging);
+                org.mockito.BDDMockito.given(firebaseMessaging.sendEachForMulticast(Mockito.any()))
+                    .willReturn(batchResponse);
+
+                // when
+                var result = fcmService.sendBulkNotification(List.of(
+                    PushTargetDto.builder().token(token).memberId(1L).alarmId(10L).occurrenceId(100L).build()
+                ));
+
+                // then
+                assertThat(result.getInvalidTokens()).isEmpty();
+            }
         }
     }
 
-    @Test
-    @DisplayName("실패: 사전 알림에서 INVALID_ARGUMENT를 무효 토큰으로 처리하지 않는다")
-    void fail_invalidArgumentDoesNotReturnPreAlarmTokenAsInvalid() throws FirebaseMessagingException {
-        // given
-        String token = "token-a";
-        BatchResponse batchResponse = givenBatchFailure(
-            failedSendResponse(MessagingErrorCode.INVALID_ARGUMENT)
-        );
-        FirebaseMessaging firebaseMessaging = mock(FirebaseMessaging.class);
+    @Nested
+    @DisplayName("sendRingingNotifications - 알람 울림 토큰 분류")
+    class SendRingingNotificationsTest {
 
-        try (MockedStatic<FirebaseMessaging> firebaseMessagingStatic = Mockito.mockStatic(FirebaseMessaging.class)) {
-            firebaseMessagingStatic.when(FirebaseMessaging::getInstance).thenReturn(firebaseMessaging);
-            org.mockito.BDDMockito.given(firebaseMessaging.sendEachForMulticast(Mockito.any()))
-                .willReturn(batchResponse);
+        @Test
+        @DisplayName("성공: 알람 울림에서 등록 해제된 토큰을 Redis에서 제거한다")
+        void success() throws FirebaseMessagingException {
+            // given
+            Long memberId = 1L;
+            String token = "token-a";
+            BatchResponse batchResponse = givenBatchFailure(
+                failedSendResponse(MessagingErrorCode.UNREGISTERED)
+            );
+            FirebaseMessaging firebaseMessaging = mock(FirebaseMessaging.class);
 
-            // when
-            var result = fcmService.sendBulkNotification(List.of(
-                PushTargetDto.builder().token(token).memberId(1L).alarmId(10L).occurrenceId(100L).build()
-            ));
+            try (MockedStatic<FirebaseMessaging> firebaseMessagingStatic = Mockito.mockStatic(FirebaseMessaging.class)) {
+                firebaseMessagingStatic.when(FirebaseMessaging::getInstance).thenReturn(firebaseMessaging);
+                org.mockito.BDDMockito.given(firebaseMessaging.sendEachForMulticast(Mockito.any()))
+                    .willReturn(batchResponse);
 
-            // then
-            assertThat(result.getInvalidTokens()).isEmpty();
+                // when
+                fcmService.sendRingingNotifications(List.of(
+                    RingingPushTargetDto.builder()
+                        .token(token).memberId(memberId).alarmId(10L).occurrenceId(100L).build()
+                ));
+
+                // then
+                verify(redisService).removeInvalidToken(memberId, token);
+            }
         }
-    }
 
-    @Test
-    @DisplayName("성공: 알람 울림에서 등록 해제된 토큰을 Redis에서 제거한다")
-    void success_removesUnregisteredRingingToken() throws FirebaseMessagingException {
-        // given
-        Long memberId = 1L;
-        String token = "token-a";
-        BatchResponse batchResponse = givenBatchFailure(
-            failedSendResponse(MessagingErrorCode.UNREGISTERED)
-        );
-        FirebaseMessaging firebaseMessaging = mock(FirebaseMessaging.class);
+        @Test
+        @DisplayName("실패: 알람 울림에서 INVALID_ARGUMENT 토큰은 Redis에서 제거하지 않는다")
+        void fail_invalidArgument() throws FirebaseMessagingException {
+            // given
+            Long memberId = 1L;
+            String token = "token-a";
+            BatchResponse batchResponse = givenBatchFailure(
+                failedSendResponse(MessagingErrorCode.INVALID_ARGUMENT)
+            );
+            FirebaseMessaging firebaseMessaging = mock(FirebaseMessaging.class);
 
-        try (MockedStatic<FirebaseMessaging> firebaseMessagingStatic = Mockito.mockStatic(FirebaseMessaging.class)) {
-            firebaseMessagingStatic.when(FirebaseMessaging::getInstance).thenReturn(firebaseMessaging);
-            org.mockito.BDDMockito.given(firebaseMessaging.sendEachForMulticast(Mockito.any()))
-                .willReturn(batchResponse);
+            try (MockedStatic<FirebaseMessaging> firebaseMessagingStatic = Mockito.mockStatic(FirebaseMessaging.class)) {
+                firebaseMessagingStatic.when(FirebaseMessaging::getInstance).thenReturn(firebaseMessaging);
+                org.mockito.BDDMockito.given(firebaseMessaging.sendEachForMulticast(Mockito.any()))
+                    .willReturn(batchResponse);
 
-            // when
-            fcmService.sendRingingNotifications(List.of(
-                RingingPushTargetDto.builder()
-                    .token(token).memberId(memberId).alarmId(10L).occurrenceId(100L).build()
-            ));
+                // when
+                fcmService.sendRingingNotifications(List.of(
+                    RingingPushTargetDto.builder()
+                        .token(token).memberId(memberId).alarmId(10L).occurrenceId(100L).build()
+                ));
 
-            // then
-            verify(redisService).removeInvalidToken(memberId, token);
-        }
-    }
-
-    @Test
-    @DisplayName("실패: 알람 울림에서 INVALID_ARGUMENT 토큰은 Redis에서 제거하지 않는다")
-    void fail_invalidArgumentDoesNotRemoveRingingToken() throws FirebaseMessagingException {
-        // given
-        Long memberId = 1L;
-        String token = "token-a";
-        BatchResponse batchResponse = givenBatchFailure(
-            failedSendResponse(MessagingErrorCode.INVALID_ARGUMENT)
-        );
-        FirebaseMessaging firebaseMessaging = mock(FirebaseMessaging.class);
-
-        try (MockedStatic<FirebaseMessaging> firebaseMessagingStatic = Mockito.mockStatic(FirebaseMessaging.class)) {
-            firebaseMessagingStatic.when(FirebaseMessaging::getInstance).thenReturn(firebaseMessaging);
-            org.mockito.BDDMockito.given(firebaseMessaging.sendEachForMulticast(Mockito.any()))
-                .willReturn(batchResponse);
-
-            // when
-            fcmService.sendRingingNotifications(List.of(
-                RingingPushTargetDto.builder()
-                    .token(token).memberId(memberId).alarmId(10L).occurrenceId(100L).build()
-            ));
-
-            // then
-            verify(redisService, Mockito.never()).removeInvalidToken(memberId, token);
+                // then
+                verify(redisService, Mockito.never()).removeInvalidToken(memberId, token);
+            }
         }
     }
 

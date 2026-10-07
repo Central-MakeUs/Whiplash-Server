@@ -57,7 +57,7 @@ public class FcmService {
      * - notification payload와 화면 이동 data를 함께 사용
      * - Android priority=HIGH, iOS apns-priority=10 + content-available=1
      * - 같은 occurrence의 token만 묶어 화면 이동 data가 섞이지 않도록 보장
-     * - 전송 성공한 occurrenceId 수집, 무효 토큰은 즉시 Redis에서 제거
+     * - 전송 성공한 occurrenceId와 회원별 시도 토큰을 수집해 무효 토큰 정리에 사용
      */
     public FcmSendResult sendBulkNotification(List<PushTargetDto> targets) {
         if (targets == null || targets.isEmpty()) {
@@ -199,12 +199,10 @@ public class FcmService {
         for (int i = 0; i < responses.size(); i++) {
             SendResponse res = responses.get(i);
             PushTargetDto dto = batch.get(i);
+            memberToTokens.computeIfAbsent(dto.memberId(), k -> new ArrayList<>()).add(dto.token());
 
             if (res.isSuccessful()) {
                 successOccurrenceIds.add(dto.occurrenceId());
-                memberToTokens.computeIfAbsent(dto.memberId(),
-                    k -> new ArrayList<>()
-                ).add(dto.token());
             } else {
                 Exception ex = res.getException();
                 FirebaseMessagingException fme = (ex instanceof FirebaseMessagingException) ? (FirebaseMessagingException) ex : null;
