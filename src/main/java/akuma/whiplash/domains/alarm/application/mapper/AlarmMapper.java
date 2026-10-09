@@ -45,6 +45,7 @@ public class AlarmMapper {
         MemberEntity memberEntity,
         LocalDateTime locationCachedAt
     ) {
+        boolean googlePlace = request.place().googlePlaceId() != null;
         return AlarmEntity.builder()
             .member(memberEntity)
             .alarmPurpose(request.alarmPurpose())
@@ -54,9 +55,9 @@ public class AlarmMapper {
             .latitude(request.place().latitude())
             .longitude(request.place().longitude())
             .address(request.place().address())
-            .locationSource(LocationSource.GOOGLE_PLACE)
-            .googlePlaceId(request.place().googlePlaceId())
-            .locationCachedAt(locationCachedAt)
+            .locationSource(googlePlace ? LocationSource.GOOGLE_PLACE : LocationSource.USER_PIN)
+            .googlePlaceId(googlePlace ? request.place().googlePlaceId() : null)
+            .locationCachedAt(googlePlace || request.place().address() != null ? locationCachedAt : null)
             .status(AlarmStatus.ACTIVE)
             .build();
     }
@@ -243,6 +244,7 @@ public class AlarmMapper {
 
     public static AlarmPreviewDto mapToAlarmPreviewDto(
         AlarmEntity alarm,
+        String address,
         LocalDateTime now,
         AlarmOccurrenceEntity latestProcessedOccurrence,
         LocalDate firstDate,
@@ -270,7 +272,7 @@ public class AlarmMapper {
             .alarmPurpose(alarm.getAlarmPurpose())
             .alarmTime(alarm.getTime().format(DateTimeFormatter.ofPattern("HH:mm")))
             .repeatDays(alarm.getRepeatDays().stream().map(Weekday::getDescription).toList())
-            .address(alarm.getAddress())
+            .address(address)
             .status(status)
             .arrivalCheckEnabled(arrivalCheckEnabled)
             .nextOccurrence(mapToOccurrenceInfo(alarm, resolvedNext, occurrenceIdsByDate, memberZone))

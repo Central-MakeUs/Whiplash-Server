@@ -31,17 +31,17 @@ class AlarmLocationCacheCleanupSchedulerTest {
     }
 
     @Nested
-    @DisplayName("만료된 Google 장소 위치 캐시를 정리한다")
-    class RemoveExpiredGoogleLocationCachesTest {
+    @DisplayName("만료된 알람 위치 캐시를 정리한다")
+    class RemoveExpiredLocationCachesTest {
 
         @Test
         @DisplayName("성공: 삭제 건수와 마지막 성공 시각을 기록한다")
         void success() {
             // given
-            given(alarmLocationCacheCleanupService.removeExpiredGoogleLocationCaches()).willReturn(3);
+            given(alarmLocationCacheCleanupService.removeExpiredLocationCaches()).willReturn(3);
 
             // when
-            scheduler.removeExpiredGoogleLocationCaches();
+            scheduler.removeExpiredLocationCaches();
 
             // then
             assertThat(meterRegistry.get("alarm.location_cache.cleared").counter().count()).isEqualTo(3);
@@ -52,11 +52,11 @@ class AlarmLocationCacheCleanupSchedulerTest {
         @DisplayName("실패: 정리 실패를 실패 지표로 기록하고 예외를 다시 던진다")
         void fail_databaseUnavailable() {
             // given
-            given(alarmLocationCacheCleanupService.removeExpiredGoogleLocationCaches())
+            given(alarmLocationCacheCleanupService.removeExpiredLocationCaches())
                 .willThrow(new IllegalStateException("database unavailable"));
 
             // when
-            org.assertj.core.api.Assertions.assertThatThrownBy(scheduler::removeExpiredGoogleLocationCaches)
+            org.assertj.core.api.Assertions.assertThatThrownBy(scheduler::removeExpiredLocationCaches)
                 .isInstanceOf(IllegalStateException.class);
 
             // then
