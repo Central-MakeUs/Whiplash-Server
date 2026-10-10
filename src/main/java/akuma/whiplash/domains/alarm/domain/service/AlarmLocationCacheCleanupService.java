@@ -18,11 +18,16 @@ public class AlarmLocationCacheCleanupService {
     private final TimeProvider timeProvider;
 
     @Transactional
-    public int removeExpiredGoogleLocationCaches() {
+    public int removeExpiredLocationCaches() {
         LocalDateTime expiresAt = timeProvider.now().minusDays(CACHE_VALID_DAYS);
-        return alarmRepository.updateLocationCachesBySourceAndCachedAtBefore(
+        int googlePlaceCaches = alarmRepository.updateLocationCachesBySourceAndCachedAtBefore(
             LocationSource.GOOGLE_PLACE,
             expiresAt
         );
+        int userPinAddressCaches = alarmRepository.updateExpiredUserPinAddressCaches(
+            LocationSource.USER_PIN,
+            expiresAt
+        );
+        return googlePlaceCaches + userPinAddressCaches;
     }
 }

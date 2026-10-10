@@ -100,6 +100,53 @@ public interface AlarmRepository extends JpaRepository<AlarmEntity, Long> {
         @Param("expiresAt") LocalDateTime expiresAt
     );
 
+    @Modifying
+    @Query("""
+        UPDATE AlarmEntity a
+        SET a.address = NULL,
+            a.locationCachedAt = NULL
+        WHERE a.locationSource = :locationSource
+          AND a.locationCachedAt <= :expiresAt
+    """)
+    int updateExpiredUserPinAddressCaches(
+        @Param("locationSource") LocationSource locationSource,
+        @Param("expiresAt") LocalDateTime expiresAt
+    );
+
+    @Modifying
+    @Query("""
+        UPDATE AlarmEntity a
+        SET a.latitude = NULL,
+            a.longitude = NULL,
+            a.address = NULL,
+            a.locationCachedAt = NULL
+        WHERE a.id = :alarmId
+          AND a.locationSource = :locationSource
+          AND (a.locationCachedAt = :expectedCachedAt
+               OR (a.locationCachedAt IS NULL AND :expectedCachedAt IS NULL))
+    """)
+    int updateGoogleLocationCacheToEmptyIfUnchanged(
+        @Param("alarmId") Long alarmId,
+        @Param("locationSource") LocationSource locationSource,
+        @Param("expectedCachedAt") LocalDateTime expectedCachedAt
+    );
+
+    @Modifying
+    @Query("""
+        UPDATE AlarmEntity a
+        SET a.address = NULL,
+            a.locationCachedAt = NULL
+        WHERE a.id = :alarmId
+          AND a.locationSource = :locationSource
+          AND (a.locationCachedAt = :expectedCachedAt
+               OR (a.locationCachedAt IS NULL AND :expectedCachedAt IS NULL))
+    """)
+    int updateUserPinAddressCacheToEmptyIfUnchanged(
+        @Param("alarmId") Long alarmId,
+        @Param("locationSource") LocationSource locationSource,
+        @Param("expectedCachedAt") LocalDateTime expectedCachedAt
+    );
+
     interface AlarmOccurrenceBatchTarget {
         Long getAlarmId();
 
