@@ -272,6 +272,7 @@ public class AlarmMapper {
             .alarmPurpose(alarm.getAlarmPurpose())
             .alarmTime(alarm.getTime().format(DateTimeFormatter.ofPattern("HH:mm")))
             .repeatDays(alarm.getRepeatDays().stream().map(Weekday::getDescription).toList())
+            .soundType(alarm.getSoundType().name())
             .address(address)
             .status(status)
             .arrivalCheckEnabled(arrivalCheckEnabled)
