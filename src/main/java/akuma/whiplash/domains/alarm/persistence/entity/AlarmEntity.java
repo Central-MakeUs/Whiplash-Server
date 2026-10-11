@@ -119,6 +119,22 @@ public class AlarmEntity extends BaseTimeEntity {
         this.locationCachedAt = null;
     }
 
+    public void updateUserPinAddressCache(String address, LocalDateTime locationCachedAt) {
+        if (locationSource != LocationSource.USER_PIN) {
+            return;
+        }
+        this.address = address;
+        this.locationCachedAt = locationCachedAt;
+    }
+
+    public void clearUserPinAddressCache() {
+        if (locationSource != LocationSource.USER_PIN) {
+            return;
+        }
+        this.address = null;
+        this.locationCachedAt = null;
+    }
+
     public boolean hasGooglePlaceId() {
         return googlePlaceId != null && !googlePlaceId.isBlank();
     }

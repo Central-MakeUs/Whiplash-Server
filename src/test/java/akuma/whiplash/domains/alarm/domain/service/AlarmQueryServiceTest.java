@@ -42,6 +42,7 @@ class AlarmQueryServiceTest {
     @Mock private MemberRepository memberRepository;
     @Mock private MemberDeviceRepository memberDeviceRepository;
     @Mock private TimeProvider timeProvider;
+    @Mock private AlarmLocationCacheService alarmLocationCacheService;
     @InjectMocks private AlarmQueryServiceImpl alarmQueryService;
 
     @BeforeEach
@@ -70,6 +71,7 @@ class AlarmQueryServiceTest {
     @Test
     @DisplayName("알람 목록에는 알람음 코드가 포함된다")
     void getsAlarmsWithSoundType() {
+        // given
         MemberEntity member = MemberFixture.MEMBER_11.toMockEntity();
         AlarmEntity alarm = AlarmFixture.ALARM_11.toMockEntity(member);
         given(memberRepository.findById(member.getId())).willReturn(Optional.of(member));
@@ -77,11 +79,16 @@ class AlarmQueryServiceTest {
         given(timeProvider.today(any(ZoneId.class))).willReturn(NOW.toLocalDate());
         given(alarmOccurrenceRepository.findLatestProcessedByAlarmIds(anyList(), anyList())).willReturn(List.of());
         given(alarmOccurrenceRepository.findByAlarmIdsAndOccurrenceDates(anyList(), anyList())).willReturn(List.of());
+        given(alarmLocationCacheService.getAddressForAlarmList(alarm)).willReturn(alarm.getAddress());
 
+        // when
         GetAlarmsResponse response = alarmQueryService.getAlarms(member.getId(), "device");
 
-        assertThat(response.alarms()).singleElement()
-            .satisfies(item -> assertThat(item.soundType()).isEqualTo(AlarmFixture.ALARM_11.getSoundType().name()));
+        // then
+        assertThat(response.alarms()).singleElement().satisfies(item -> {
+            assertThat(item.soundType()).isEqualTo(AlarmFixture.ALARM_11.getSoundType().name());
+            assertThat(item.address()).isEqualTo(alarm.getAddress());
+        });
     }
 
     @Test

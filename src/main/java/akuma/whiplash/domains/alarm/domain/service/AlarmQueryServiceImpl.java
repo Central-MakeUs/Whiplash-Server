@@ -31,6 +31,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
@@ -51,8 +52,10 @@ public class AlarmQueryServiceImpl implements AlarmQueryService {
     private final MemberRepository memberRepository;
     private final MemberDeviceRepository memberDeviceRepository;
     private final TimeProvider timeProvider;
+    private final AlarmLocationCacheService alarmLocationCacheService;
 
     @Override
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public GetAlarmsResponse getAlarms(Long memberId, String deviceId) {
         memberRepository.findById(memberId)
             .orElseThrow(() -> ApplicationException.from(MemberErrorCode.MEMBER_NOT_FOUND));
@@ -122,6 +125,7 @@ public class AlarmQueryServiceImpl implements AlarmQueryService {
             .alarms(alarms.stream()
                 .map(alarm -> AlarmMapper.mapToAlarmPreviewDto(
                     alarm,
+                    alarmLocationCacheService.getAddressForAlarmList(alarm),
                     now,
                     latestProcessedMap.get(alarm.getId()),
                     alarmDatesMap.get(alarm.getId()).first(),
