@@ -8,6 +8,7 @@ import akuma.whiplash.common.fixture.AlarmFixture;
 import akuma.whiplash.common.fixture.MemberFixture;
 import akuma.whiplash.domains.alarm.application.dto.etc.OccurrencePushInfo;
 import akuma.whiplash.domains.alarm.application.dto.response.AlarmSyncResponse;
+import akuma.whiplash.domains.alarm.application.dto.response.GetAlarmsResponse;
 import akuma.whiplash.domains.alarm.domain.constant.AlarmStatus;
 import akuma.whiplash.domains.alarm.domain.constant.OccurrenceStatus;
 import akuma.whiplash.domains.alarm.persistence.entity.AlarmEntity;
@@ -41,6 +42,7 @@ class AlarmQueryServiceTest {
     @Mock private MemberRepository memberRepository;
     @Mock private MemberDeviceRepository memberDeviceRepository;
     @Mock private TimeProvider timeProvider;
+    @Mock private AlarmLocationCacheService alarmLocationCacheService;
     @InjectMocks private AlarmQueryServiceImpl alarmQueryService;
 
     @BeforeEach
@@ -64,6 +66,29 @@ class AlarmQueryServiceTest {
         AlarmSyncResponse response = alarmQueryService.getSyncAlarms(member.getId(), "device");
 
         assertThat(response.alarms()).singleElement().satisfies(item -> assertThat(item.nextOccurrence().occurrenceId()).isEqualTo(3L));
+    }
+
+    @Test
+    @DisplayName("알람 목록에는 알람음 코드가 포함된다")
+    void getsAlarmsWithSoundType() {
+        // given
+        MemberEntity member = MemberFixture.MEMBER_11.toMockEntity();
+        AlarmEntity alarm = AlarmFixture.ALARM_11.toMockEntity(member);
+        given(memberRepository.findById(member.getId())).willReturn(Optional.of(member));
+        given(alarmRepository.findAllByMemberIdAndStatusNot(member.getId(), AlarmStatus.DELETED)).willReturn(List.of(alarm));
+        given(timeProvider.today(any(ZoneId.class))).willReturn(NOW.toLocalDate());
+        given(alarmOccurrenceRepository.findLatestProcessedByAlarmIds(anyList(), anyList())).willReturn(List.of());
+        given(alarmOccurrenceRepository.findByAlarmIdsAndOccurrenceDates(anyList(), anyList())).willReturn(List.of());
+        given(alarmLocationCacheService.getAddressForAlarmList(alarm)).willReturn(alarm.getAddress());
+
+        // when
+        GetAlarmsResponse response = alarmQueryService.getAlarms(member.getId(), "device");
+
+        // then
+        assertThat(response.alarms()).singleElement().satisfies(item -> {
+            assertThat(item.soundType()).isEqualTo(AlarmFixture.ALARM_11.getSoundType().name());
+            assertThat(item.address()).isEqualTo(alarm.getAddress());
+        });
     }
 
     @Test

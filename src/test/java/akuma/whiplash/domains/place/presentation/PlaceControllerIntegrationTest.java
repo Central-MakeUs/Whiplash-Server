@@ -251,6 +251,23 @@ class PlaceControllerIntegrationTest {
     class GetPlaceDetailsTest {
 
         @Test
+        @DisplayName("실패: 잘못된 sessionToken은 400을 반환한다")
+        void fail_sessionTokenInvalid() throws Exception {
+            // given
+            MemberEntity member = memberRepository.save(MemberFixture.MEMBER_5.toEntity());
+            String token = jwtProvider.generateAccessToken(member.getId(), member.getRole(), "device");
+
+            // when
+            var resultActions = mockMvc.perform(get("/api/v1/places/details")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                .param("providerPlaceId", "ChIJ")
+                .param("sessionToken", "invalid-token"));
+
+            // then
+            resultActions.andExpect(status().isBadRequest());
+        }
+
+        @Test
         @DisplayName("성공: 선택한 Google place ID로 장소 상세를 조회한다")
         void success() throws Exception {
             // given
@@ -279,8 +296,8 @@ class PlaceControllerIntegrationTest {
         }
 
         @Test
-        @DisplayName("실패: sessionToken이 없으면 400을 반환한다")
-        void fail_sessionTokenMissing() throws Exception {
+        @DisplayName("성공: 지도 POI는 sessionToken 없이 상세 조회한다")
+        void success_withoutSessionToken() throws Exception {
             // given
             MemberEntity member = memberRepository.save(MemberFixture.MEMBER_4.toEntity());
             String token = jwtProvider.generateAccessToken(member.getId(), member.getRole(), "device");
@@ -291,7 +308,9 @@ class PlaceControllerIntegrationTest {
                 .param("providerPlaceId", "ChIJ"));
 
             // then
-            resultActions.andExpect(status().isBadRequest());
+            resultActions
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.address").value("Mock Google Address"));
         }
 
         @Test

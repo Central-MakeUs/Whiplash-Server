@@ -30,31 +30,31 @@ public class AlarmLocationCacheCleanupScheduler {
     @PostConstruct
     void registerMetrics() {
         clearedLocationCacheCounter = meterRegistry.counter(
-            "alarm.location_cache.cleared", "source", "google_place"
+            "alarm.location_cache.cleared", "source", "all"
         );
         cleanupSuccessCounter = meterRegistry.counter("alarm.location_cache.cleanup_success");
         cleanupFailureCounter = meterRegistry.counter("alarm.location_cache.cleanup_failure");
         cleanupTimer = Timer.builder("alarm.location_cache.cleanup_duration")
-            .description("Google 장소 위치 캐시 정리 작업 실행 시간")
+            .description("알람 위치 캐시 정리 작업 실행 시간")
             .publishPercentileHistogram()
             .register(meterRegistry);
         Gauge.builder("alarm.location_cache.last_success_epoch_seconds", lastSuccessEpochSeconds, AtomicLong::get)
-            .description("Google 장소 위치 캐시 정리 작업의 마지막 성공 시각")
+            .description("알람 위치 캐시 정리 작업의 마지막 성공 시각")
             .register(meterRegistry);
     }
 
     @Scheduled(cron = "0 0 * * * *")
-    public void removeExpiredGoogleLocationCaches() {
+    public void removeExpiredLocationCaches() {
         cleanupTimer.record(() -> {
             try {
-                int clearedCount = alarmLocationCacheCleanupService.removeExpiredGoogleLocationCaches();
+                int clearedCount = alarmLocationCacheCleanupService.removeExpiredLocationCaches();
                 clearedLocationCacheCounter.increment(clearedCount);
                 cleanupSuccessCounter.increment();
                 lastSuccessEpochSeconds.set(Instant.now().getEpochSecond());
-                log.info("만료된 Google 장소 위치 캐시 {}건을 삭제했습니다.", clearedCount);
+                log.info("만료된 알람 위치 캐시 {}건을 삭제했습니다.", clearedCount);
             } catch (RuntimeException exception) {
                 cleanupFailureCounter.increment();
-                log.error("Google 장소 위치 캐시 정리에 실패했습니다.", exception);
+                log.error("알람 위치 캐시 정리에 실패했습니다.", exception);
                 throw exception;
             }
         });

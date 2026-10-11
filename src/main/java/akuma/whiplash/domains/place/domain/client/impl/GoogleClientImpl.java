@@ -343,6 +343,7 @@ public class GoogleClientImpl implements GoogleClient {
             .flatMap(Optional::stream)
             .map(AddressComponent::longText)
             .filter(value -> value != null && !value.isBlank())
+            .filter(value -> !value.strip().matches("\\p{N}+(?:\\s*[-/]\\s*\\p{N}+)*"))
             .findFirst();
     }
 

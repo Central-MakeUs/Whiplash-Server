@@ -13,6 +13,7 @@ import static org.mockito.Mockito.mock;
 import akuma.whiplash.domains.alarm.application.dto.etc.OccurrencePushInfo;
 import akuma.whiplash.domains.alarm.application.dto.etc.PushTargetDto;
 import akuma.whiplash.domains.alarm.domain.service.AlarmCommandService;
+import akuma.whiplash.domains.alarm.domain.service.AlarmLocationCacheService;
 import akuma.whiplash.domains.alarm.domain.service.AlarmQueryService;
 import akuma.whiplash.domains.alarm.domain.service.AlarmQueryServiceImpl;
 import akuma.whiplash.domains.alarm.persistence.repository.AlarmOccurrenceRepository;
@@ -141,7 +142,8 @@ class AlarmReminderSchedulerAfterMeasurementTest {
             occurrenceRepository,
             memberRepository,
             memberDeviceRepository,
-            timeProvider
+            timeProvider,
+            mock(AlarmLocationCacheService.class)
         );
 
         List<OccurrencePushInfo> infos = java.util.stream.LongStream.rangeClosed(1, totalTargetCount)

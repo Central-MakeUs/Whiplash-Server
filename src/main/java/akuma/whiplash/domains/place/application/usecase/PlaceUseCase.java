@@ -170,7 +170,8 @@ public class PlaceUseCase {
         String languageCode,
         String regionCode
     ) {
-        if (!StringUtils.hasText(providerPlaceId) || !isUuid(sessionToken)) {
+        if (!StringUtils.hasText(providerPlaceId)
+            || (sessionToken != null && !isUuid(sessionToken))) {
             throw ApplicationException.from(CommonErrorCode.BAD_REQUEST);
         }
 

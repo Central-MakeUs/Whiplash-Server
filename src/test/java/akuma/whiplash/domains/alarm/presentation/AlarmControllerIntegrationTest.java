@@ -1,8 +1,11 @@
 package akuma.whiplash.domains.alarm.presentation;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.hasItems;
+import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -16,6 +19,8 @@ import akuma.whiplash.domains.ad.persistence.entity.AdSessionEntity;
 import akuma.whiplash.domains.ad.persistence.repository.AdSessionRepository;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmAdActionRequest;
 import akuma.whiplash.domains.alarm.application.dto.request.AlarmOffAdSessionCreateRequest;
+import akuma.whiplash.domains.alarm.application.dto.request.AlarmRegisterRequest;
+import akuma.whiplash.domains.alarm.application.dto.request.PlaceRequest;
 import akuma.whiplash.domains.alarm.domain.constant.LocationSource;
 import akuma.whiplash.domains.alarm.domain.constant.OccurrenceStatus;
 import akuma.whiplash.domains.alarm.domain.constant.SoundType;
@@ -30,10 +35,15 @@ import akuma.whiplash.domains.member.persistence.entity.MemberDeviceEntity;
 import akuma.whiplash.domains.member.persistence.entity.MemberEntity;
 import akuma.whiplash.domains.member.persistence.repository.MemberDeviceRepository;
 import akuma.whiplash.domains.member.persistence.repository.MemberRepository;
+import akuma.whiplash.domains.place.domain.client.GoogleClient;
+import akuma.whiplash.domains.place.domain.model.PlaceDetail;
+import akuma.whiplash.domains.place.domain.model.PlaceDetailsCriteria;
+import akuma.whiplash.domains.place.domain.model.SelectedPlaceDetail;
 import akuma.whiplash.global.config.security.jwt.JwtProvider;
 import akuma.whiplash.global.util.date.TimeProvider;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.DayOfWeek;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.ZoneId;
@@ -49,6 +59,8 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 @IntegrationTest
 @AutoConfigureMockMvc
@@ -69,10 +81,12 @@ class AlarmControllerIntegrationTest {
     @Autowired private AlarmDeleteLogRepository alarmDeleteLogRepository;
     @Autowired private AdSessionRepository adSessionRepository;
     @MockitoBean private TimeProvider timeProvider;
+    @MockitoBean private GoogleClient googleClient;
 
     @BeforeEach
     void setUpTimeProvider() {
         given(timeProvider.now()).willReturn(FIXED_NOW);
+        given(timeProvider.today(any(ZoneId.class))).willReturn(LocalDate.of(2026, 5, 4));
         given(timeProvider.now(any(ZoneId.class))).willReturn(FIXED_NOW);
         given(timeProvider.instant()).willReturn(FIXED_NOW.atZone(ZoneId.of("Asia/Seoul")).toInstant());
     }
@@ -86,6 +100,234 @@ class AlarmControllerIntegrationTest {
         memberDeviceRepository.deleteAll();
         alarmRepository.deleteAll();
         memberRepository.deleteAll();
+    }
+
+    @Nested
+    @DisplayName("createAlarm - 알람 장소 등록")
+    class CreateAlarmTest {
+
+        @Test
+        @Transactional(propagation = Propagation.NOT_SUPPORTED)
+        @DisplayName("성공: 검색 장소와 일반 핀을 등록한 뒤 목록에는 주소만 표시한다")
+        void success_listShowsAddressOnly() throws Exception {
+            // given
+            MemberEntity member = memberRepository.save(MemberFixture.MEMBER_9.toEntity());
+            MemberDeviceEntity device = memberDeviceRepository.save(MemberDeviceFixture.IOS.toEntity(member));
+            String authorization = bearer(member, device.getDeviceId());
+            AlarmRegisterRequest googlePlace = new AlarmRegisterRequest(
+                new PlaceRequest("서울특별시 중구 세종대로 110", 37.5665, 126.978, "ChIJ", null),
+                "검색 장소", LocalTime.of(12, 0), List.of("MONDAY"), "KARINA_SCOLDING"
+            );
+            AlarmRegisterRequest userPin = new AlarmRegisterRequest(
+                new PlaceRequest("서울특별시 중구 퇴계로 123", 37.5642, 127.0016, null, null),
+                "일반 지점", LocalTime.of(13, 0), List.of("MONDAY"), "KARINA_SCOLDING"
+            );
+            mockMvc.perform(post(BASE)
+                    .header(HttpHeaders.AUTHORIZATION, authorization)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(googlePlace)))
+                .andExpect(status().isOk());
+            mockMvc.perform(post(BASE)
+                    .header(HttpHeaders.AUTHORIZATION, authorization)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(userPin)))
+                .andExpect(status().isOk());
+
+            // when
+            var result = mockMvc.perform(get(BASE)
+                .header(HttpHeaders.AUTHORIZATION, authorization));
+
+            // then
+            result.andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.alarms[*].address", hasItems(
+                    "서울특별시 중구 세종대로 110", "서울특별시 중구 퇴계로 123"
+                )))
+                .andExpect(jsonPath("$.result.alarms[0].placeName").doesNotExist())
+                .andExpect(jsonPath("$.result.alarms[1].placeName").doesNotExist());
+        }
+
+        @Test
+        @DisplayName("성공: 일반 지도 핀은 터치 좌표와 주소 캐시를 저장한다")
+        void success_userPin() throws Exception {
+            // given
+            MemberEntity member = memberRepository.save(MemberFixture.MEMBER_9.toEntity());
+            MemberDeviceEntity device = memberDeviceRepository.save(MemberDeviceFixture.IOS.toEntity(member));
+            AlarmRegisterRequest request = new AlarmRegisterRequest(
+                new PlaceRequest("서울특별시 중구 세종대로 110", 37.5665, 126.978, null, null),
+                "핀 출근", LocalTime.of(12, 0), List.of("MONDAY"), "KARINA_SCOLDING"
+            );
+
+            // when
+            mockMvc.perform(post(BASE)
+                    .header(HttpHeaders.AUTHORIZATION, bearer(member, device.getDeviceId()))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk());
+
+            // then
+            AlarmEntity alarm = alarmRepository.findAll().get(0);
+            assertThat(alarm.getLocationSource()).isEqualTo(LocationSource.USER_PIN);
+            assertThat(alarm.getGooglePlaceId()).isNull();
+            assertThat(alarm.getAddress()).isEqualTo("서울특별시 중구 세종대로 110");
+            assertThat(alarm.getLocationCachedAt()).isEqualTo(FIXED_NOW);
+            assertThat(alarm.getLatitude()).isEqualTo(37.5665);
+            assertThat(alarm.getLongitude()).isEqualTo(126.978);
+
+            Long occurrenceId = alarmOccurrenceRepository.findAllByAlarmId(alarm.getId()).get(0).getId();
+            mockMvc.perform(post(BASE + "/{alarmId}/occurrences/{occurrenceId}/destination", alarm.getId(), occurrenceId)
+                    .header(HttpHeaders.AUTHORIZATION, bearer(member, device.getDeviceId())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.state").value("READY"))
+                .andExpect(jsonPath("$.result.targetLocation.latitude").value(37.5665))
+                .andExpect(jsonPath("$.result.targetLocation.longitude").value(126.978));
+        }
+
+        @Test
+        @Transactional(propagation = Propagation.NOT_SUPPORTED)
+        @DisplayName("성공: POI는 상세 주소 없이 Place ID와 좌표로 등록한다")
+        void success_googlePlaceWithoutDetails() throws Exception {
+            // given
+            MemberEntity member = memberRepository.save(MemberFixture.MEMBER_9.toEntity());
+            MemberDeviceEntity device = memberDeviceRepository.save(MemberDeviceFixture.IOS.toEntity(member));
+            AlarmRegisterRequest request = new AlarmRegisterRequest(
+                new PlaceRequest(null, 37.5665, 126.978, "ChIJ", null),
+                "POI 출근", LocalTime.of(12, 0), List.of("MONDAY"), "KARINA_SCOLDING"
+            );
+
+            // when
+            mockMvc.perform(post(BASE)
+                    .header(HttpHeaders.AUTHORIZATION, bearer(member, device.getDeviceId()))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk());
+
+            // then
+            AlarmEntity alarm = alarmRepository.findAll().get(0);
+            assertThat(alarm.getLocationSource()).isEqualTo(LocationSource.GOOGLE_PLACE);
+            assertThat(alarm.getGooglePlaceId()).isEqualTo("ChIJ");
+            assertThat(alarm.getAddress()).isNull();
+            assertThat(alarm.getLocationCachedAt()).isEqualTo(FIXED_NOW);
+
+            given(googleClient.getPlaceDetails(new PlaceDetailsCriteria("ChIJ", null, null, null)))
+                .willReturn(new SelectedPlaceDetail(
+                    "서울특별시 중구 세종대로 110", 37.5665, 126.978, "KR", "ChIJ"
+                ));
+            mockMvc.perform(get(BASE)
+                    .header(HttpHeaders.AUTHORIZATION, bearer(member, device.getDeviceId())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.alarms[0].address").value("서울특별시 중구 세종대로 110"))
+                .andExpect(jsonPath("$.result.alarms[0].placeName").doesNotExist());
+            assertThat(alarmRepository.findById(alarm.getId()).orElseThrow().getAddress())
+                .isEqualTo("서울특별시 중구 세종대로 110");
+        }
+
+        @Test
+        @Transactional(propagation = Propagation.NOT_SUPPORTED)
+        @DisplayName("성공: 주소 없이 등록한 일반 핀은 목록 조회에서 역지오코딩 주소를 캐시한다")
+        void success_userPinWithoutAddress() throws Exception {
+            // given
+            MemberEntity member = memberRepository.save(MemberFixture.MEMBER_9.toEntity());
+            MemberDeviceEntity device = memberDeviceRepository.save(MemberDeviceFixture.IOS.toEntity(member));
+            AlarmRegisterRequest request = new AlarmRegisterRequest(
+                new PlaceRequest(null, 37.5665, 126.978, null, null),
+                "핀 출근", LocalTime.of(12, 0), List.of("MONDAY"), "KARINA_SCOLDING"
+            );
+
+            // when
+            mockMvc.perform(post(BASE)
+                    .header(HttpHeaders.AUTHORIZATION, bearer(member, device.getDeviceId()))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk());
+
+            // then
+            AlarmEntity alarm = alarmRepository.findAll().get(0);
+            assertThat(alarm.getLocationSource()).isEqualTo(LocationSource.USER_PIN);
+            assertThat(alarm.getAddress()).isNull();
+            assertThat(alarm.getLocationCachedAt()).isNull();
+
+            given(googleClient.reverseGeocode(37.5665, 126.978, "ko"))
+                .willReturn(new PlaceDetail(
+                    "서울특별시 중구 세종대로 110", null, null, 37.5665, 126.978, "KR"
+                ));
+            mockMvc.perform(get(BASE)
+                    .header(HttpHeaders.AUTHORIZATION, bearer(member, device.getDeviceId())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.alarms[0].address").value("서울특별시 중구 세종대로 110"));
+
+            AlarmEntity refreshed = alarmRepository.findById(alarm.getId()).orElseThrow();
+            assertThat(refreshed.getAddress()).isEqualTo("서울특별시 중구 세종대로 110");
+            assertThat(refreshed.getLatitude()).isEqualTo(37.5665);
+            assertThat(refreshed.getLongitude()).isEqualTo(126.978);
+            assertThat(refreshed.getLocationCachedAt()).isEqualTo(FIXED_NOW);
+        }
+
+        @Test
+        @Transactional(propagation = Propagation.NOT_SUPPORTED)
+        @DisplayName("성공: 역지오코딩 장애 중에도 알람 목록은 주소를 비워 반환한다")
+        void success_userPinAddressProviderUnavailable() throws Exception {
+            // given
+            MemberEntity member = memberRepository.save(MemberFixture.MEMBER_9.toEntity());
+            MemberDeviceEntity device = memberDeviceRepository.save(MemberDeviceFixture.IOS.toEntity(member));
+            String authorization = bearer(member, device.getDeviceId());
+            AlarmRegisterRequest request = new AlarmRegisterRequest(
+                new PlaceRequest(null, 37.5665, 126.978, null, null),
+                "핀 출근", LocalTime.of(12, 0), List.of("MONDAY"), "KARINA_SCOLDING"
+            );
+            mockMvc.perform(post(BASE)
+                    .header(HttpHeaders.AUTHORIZATION, authorization)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk());
+            given(googleClient.reverseGeocode(37.5665, 126.978, "ko"))
+                .willThrow(new IllegalStateException("provider unavailable"));
+
+            // when
+            var result = mockMvc.perform(get(BASE)
+                .header(HttpHeaders.AUTHORIZATION, authorization));
+
+            // then
+            result.andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.alarms[0].address").value(nullValue()));
+        }
+
+        @Test
+        @Transactional(propagation = Propagation.NOT_SUPPORTED)
+        @DisplayName("성공: POI 주소 조회 실패 뒤에도 유효한 목표 좌표로 도착 인증한다")
+        void success_googleAddressProviderUnavailableKeepsDestination() throws Exception {
+            // given
+            MemberEntity member = memberRepository.save(MemberFixture.MEMBER_9.toEntity());
+            MemberDeviceEntity device = memberDeviceRepository.save(MemberDeviceFixture.IOS.toEntity(member));
+            String authorization = bearer(member, device.getDeviceId());
+            AlarmRegisterRequest request = new AlarmRegisterRequest(
+                new PlaceRequest(null, 37.5665, 126.978, "ChIJ", null),
+                "POI 출근", LocalTime.of(12, 0), List.of("MONDAY"), "KARINA_SCOLDING"
+            );
+            mockMvc.perform(post(BASE)
+                    .header(HttpHeaders.AUTHORIZATION, authorization)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk());
+            AlarmEntity alarm = alarmRepository.findAll().get(0);
+            given(googleClient.getPlaceDetails(new PlaceDetailsCriteria("ChIJ", null, null, null)))
+                .willThrow(new IllegalStateException("provider unavailable"));
+
+            // when
+            mockMvc.perform(get(BASE)
+                    .header(HttpHeaders.AUTHORIZATION, authorization))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.alarms[0].address").value(nullValue()));
+
+            // then
+            AlarmEntity retained = alarmRepository.findById(alarm.getId()).orElseThrow();
+            assertThat(retained.getLatitude()).isEqualTo(37.5665);
+            assertThat(retained.getLongitude()).isEqualTo(126.978);
+            Long occurrenceId = alarmOccurrenceRepository.findAllByAlarmId(alarm.getId()).get(0).getId();
+            mockMvc.perform(post(BASE + "/{alarmId}/occurrences/{occurrenceId}/destination", alarm.getId(), occurrenceId)
+                    .header(HttpHeaders.AUTHORIZATION, authorization))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.state").value("READY"));
+        }
     }
 
     @Nested

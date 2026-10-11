@@ -131,11 +131,14 @@ public class PlaceController {
             PROVIDER_ERROR
         }
     )
-    @Operation(summary = "선택 장소 상세 조회", description = "선택한 Google place ID의 상세 정보를 조회합니다.")
+    @Operation(
+        summary = "선택 장소 상세 조회",
+        description = "선택한 Google place ID의 상세 정보를 조회합니다. 자동완성 결과는 sessionToken을 전달하고 지도 POI 터치는 생략할 수 있습니다."
+    )
     @GetMapping("/details")
     public ApplicationResponse<PlaceDetailResponse> getPlaceDetails(
         @RequestParam String providerPlaceId,
-        @RequestParam String sessionToken,
+        @RequestParam(required = false) String sessionToken,
         @RequestParam(required = false) String languageCode,
         @RequestParam(required = false) String regionCode
     ) {

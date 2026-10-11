@@ -1,5 +1,6 @@
 package akuma.whiplash.domains.alarm.domain.service;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
 
@@ -27,22 +28,32 @@ class AlarmLocationCacheCleanupServiceTest {
     private AlarmLocationCacheCleanupService alarmLocationCacheCleanupService;
 
     @Nested
-    @DisplayName("만료된 Google 장소 위치 캐시를 삭제한다")
-    class RemoveExpiredGoogleLocationCachesTest {
+    @DisplayName("만료된 알람 위치 캐시를 삭제한다")
+    class RemoveExpiredLocationCachesTest {
 
         @Test
-        @DisplayName("성공: 29일 지난 Google 장소 캐시만 삭제한다")
+        @DisplayName("성공: Google 좌표 캐시와 핀 주소 캐시를 각각 정리한다")
         void success() {
             // given
             LocalDateTime now = LocalDateTime.of(2026, 7, 25, 12, 0);
             given(timeProvider.now()).willReturn(now);
+            given(alarmRepository.updateLocationCachesBySourceAndCachedAtBefore(
+                LocationSource.GOOGLE_PLACE, now.minusDays(29)
+            )).willReturn(2);
+            given(alarmRepository.updateExpiredUserPinAddressCaches(
+                LocationSource.USER_PIN, now.minusDays(29)
+            )).willReturn(3);
 
             // when
-            alarmLocationCacheCleanupService.removeExpiredGoogleLocationCaches();
+            int cleared = alarmLocationCacheCleanupService.removeExpiredLocationCaches();
 
             // then
+            assertThat(cleared).isEqualTo(5);
             verify(alarmRepository).updateLocationCachesBySourceAndCachedAtBefore(
                 LocationSource.GOOGLE_PLACE, now.minusDays(29)
+            );
+            verify(alarmRepository).updateExpiredUserPinAddressCaches(
+                LocationSource.USER_PIN, now.minusDays(29)
             );
         }
     }

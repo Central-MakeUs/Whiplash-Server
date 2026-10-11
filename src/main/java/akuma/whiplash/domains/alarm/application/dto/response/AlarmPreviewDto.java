@@ -21,6 +21,9 @@ public record AlarmPreviewDto(
     @Schema(description = "반복 요일 단축형", example = "[\"월\",\"화\",\"수\",\"목\",\"금\"]")
     List<String> repeatDays,
 
+    @Schema(description = "알람음 코드", example = "KARINA_SCOLDING")
+    String soundType,
+
     @Schema(description = "목표 장소 주소", example = "서울특별시 강남구 테헤란로 123")
     String address,
 

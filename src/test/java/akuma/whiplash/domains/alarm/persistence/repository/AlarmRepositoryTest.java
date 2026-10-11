@@ -147,4 +147,118 @@ class AlarmRepositoryTest {
             assertThat(retainedLegacyAlarm.getLatitude()).isNotNull();
         }
     }
+
+    @Nested
+    @DisplayName("updateExpiredUserPinAddressCaches - 일반 핀 주소 캐시 정리")
+    class ClearExpiredUserPinAddressCachesTest {
+
+        @Test
+        @DisplayName("성공: 만료된 핀 주소만 삭제하고 목표 좌표와 Google 장소 캐시는 유지한다")
+        void success() {
+            // given
+            MemberEntity member = memberRepository.save(MemberFixture.MEMBER_8.toEntity());
+            AlarmEntity userPin = AlarmFixture.ALARM_08.toEntity(member);
+            userPin.updateUserPinAddressCache("만료된 주소", LocalDateTime.of(2026, 6, 26, 12, 0));
+            AlarmEntity googlePlace = AlarmFixture.ALARM_09.toEntity(member);
+            googlePlace.updateGooglePlaceLocation(
+                "google-place-id", "Google 주소", googlePlace.getLatitude(), googlePlace.getLongitude(),
+                LocalDateTime.of(2026, 6, 26, 12, 0)
+            );
+            alarmRepository.saveAndFlush(userPin);
+            alarmRepository.saveAndFlush(googlePlace);
+
+            // when
+            int cleared = alarmRepository.updateExpiredUserPinAddressCaches(
+                LocationSource.USER_PIN, LocalDateTime.of(2026, 7, 25, 12, 0)
+            );
+            entityManager.clear();
+
+            // then
+            AlarmEntity refreshedPin = alarmRepository.findById(userPin.getId()).orElseThrow();
+            AlarmEntity retainedGooglePlace = alarmRepository.findById(googlePlace.getId()).orElseThrow();
+            assertThat(cleared).isEqualTo(1);
+            assertThat(refreshedPin.getAddress()).isNull();
+            assertThat(refreshedPin.getLocationCachedAt()).isNull();
+            assertThat(refreshedPin.getLatitude()).isEqualTo(userPin.getLatitude());
+            assertThat(refreshedPin.getLongitude()).isEqualTo(userPin.getLongitude());
+            assertThat(retainedGooglePlace.getAddress()).isEqualTo("Google 주소");
+        }
+    }
+
+    @Nested
+    @DisplayName("조건부 위치 캐시 정리 - 동시 갱신 보호")
+    class ConditionalLocationCacheCleanupTest {
+
+        @Test
+        @DisplayName("성공: 다른 요청이 갱신한 일반 핀 주소는 오래된 요청이 지우지 않는다")
+        void success_userPinRefreshWins() {
+            // given
+            MemberEntity member = memberRepository.save(MemberFixture.MEMBER_8.toEntity());
+            AlarmEntity pin = AlarmFixture.ALARM_08.toEntity(member);
+            LocalDateTime oldCachedAt = LocalDateTime.of(2026, 6, 26, 12, 0);
+            LocalDateTime newCachedAt = LocalDateTime.of(2026, 7, 25, 12, 0);
+            pin.updateUserPinAddressCache("만료된 주소", oldCachedAt);
+            alarmRepository.saveAndFlush(pin);
+            pin.updateUserPinAddressCache("새 주소", newCachedAt);
+            entityManager.flush();
+
+            // when
+            int cleared = alarmRepository.updateUserPinAddressCacheToEmptyIfUnchanged(
+                pin.getId(), LocationSource.USER_PIN, oldCachedAt
+            );
+            entityManager.clear();
+
+            // then
+            AlarmEntity retained = alarmRepository.findById(pin.getId()).orElseThrow();
+            assertThat(cleared).isZero();
+            assertThat(retained.getAddress()).isEqualTo("새 주소");
+            assertThat(retained.getLatitude()).isEqualTo(pin.getLatitude());
+            assertThat(retained.getLongitude()).isEqualTo(pin.getLongitude());
+        }
+
+        @Test
+        @DisplayName("성공: 다른 요청이 갱신한 Google 장소 좌표와 주소는 오래된 요청이 지우지 않는다")
+        void success_googlePlaceRefreshWins() {
+            // given
+            MemberEntity member = memberRepository.save(MemberFixture.MEMBER_8.toEntity());
+            AlarmEntity place = AlarmFixture.ALARM_08.toEntity(member);
+            LocalDateTime oldCachedAt = LocalDateTime.of(2026, 6, 26, 12, 0);
+            LocalDateTime newCachedAt = LocalDateTime.of(2026, 7, 25, 12, 0);
+            place.updateGooglePlaceLocation("google-place-id", "만료된 주소", 37.5, 127.1, oldCachedAt);
+            alarmRepository.saveAndFlush(place);
+            place.updateGooglePlaceLocation("google-place-id", "새 주소", 37.6, 127.2, newCachedAt);
+            entityManager.flush();
+
+            // when
+            int cleared = alarmRepository.updateGoogleLocationCacheToEmptyIfUnchanged(
+                place.getId(), LocationSource.GOOGLE_PLACE, oldCachedAt
+            );
+            entityManager.clear();
+
+            // then
+            AlarmEntity retained = alarmRepository.findById(place.getId()).orElseThrow();
+            assertThat(cleared).isZero();
+            assertThat(retained.getAddress()).isEqualTo("새 주소");
+            assertThat(retained.getLatitude()).isEqualTo(37.6);
+            assertThat(retained.getLongitude()).isEqualTo(127.2);
+        }
+
+        @Test
+        @DisplayName("성공: 이전 캐시 시각이 없는 일반 핀도 조건부로 정리할 수 있다")
+        void success_userPinWithoutPreviousCache() {
+            // given
+            MemberEntity member = memberRepository.save(MemberFixture.MEMBER_8.toEntity());
+            AlarmEntity pin = AlarmFixture.ALARM_08.toEntity(member);
+            pin.clearUserPinAddressCache();
+            alarmRepository.saveAndFlush(pin);
+
+            // when
+            int cleared = alarmRepository.updateUserPinAddressCacheToEmptyIfUnchanged(
+                pin.getId(), LocationSource.USER_PIN, null
+            );
+
+            // then
+            assertThat(cleared).isEqualTo(1);
+        }
+    }
 }
