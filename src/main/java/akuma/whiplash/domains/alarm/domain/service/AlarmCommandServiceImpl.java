@@ -33,7 +33,7 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 @Transactional
 public class AlarmCommandServiceImpl implements AlarmCommandService {
-    private static final double CHECKIN_RADIUS_METERS = 50.0;
+    private static final double CHECKIN_RADIUS_METERS = 100.0;
     private final AlarmRepository alarmRepository;
     private final AlarmOccurrenceRepository alarmOccurrenceRepository;
     private final AlarmRingingLogRepository alarmRingingLogRepository;
