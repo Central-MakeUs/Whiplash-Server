@@ -176,11 +176,9 @@ public class FcmService {
             if (!res.isSuccessful()) {
                 Exception ex = res.getException();
                 FirebaseMessagingException fme = (ex instanceof FirebaseMessagingException) ? (FirebaseMessagingException) ex : null;
+                logSendFailure("알람 울림", dto.token(), ex);
                 if (fme != null && isTokenInvalid(fme)) {
                     redisService.removeInvalidToken(dto.memberId(), dto.token());
-                } else {
-                    log.warn("FCM 실패(알람 울림): token={}, error={}", maskToken(dto.token()),
-                        fme != null ? fme.getMessagingErrorCode() : ex != null ? ex.getClass().getSimpleName() : "null");
                 }
             }
         }
@@ -206,17 +204,22 @@ public class FcmService {
             } else {
                 Exception ex = res.getException();
                 FirebaseMessagingException fme = (ex instanceof FirebaseMessagingException) ? (FirebaseMessagingException) ex : null;
+                logSendFailure("사전 알림", dto.token(), ex);
 
-                if (fme != null) {
-                    log.warn("FCM 실패: token={}, error={}", dto.token(), fme.getMessagingErrorCode());
-                    if (isTokenInvalid(fme)) {
-                        invalidTokens.add(dto.token());
-                    }
-                } else {
-                    log.warn("FCM 실패(원인 미상): token={}, ex={}", dto.token(), ex != null ? ex.getClass().getSimpleName() : "null");
+                if (fme != null && isTokenInvalid(fme)) {
+                    invalidTokens.add(dto.token());
                 }
             }
         }
+    }
+
+    private void logSendFailure(String notificationType, String token, Exception ex) {
+        FirebaseMessagingException fme = (ex instanceof FirebaseMessagingException) ? (FirebaseMessagingException) ex : null;
+        log.warn("FCM 실패({}): token={}, errorCode={}, messagingErrorCode={}, exceptionType={}, causeType={}",
+            notificationType, maskToken(token), fme != null ? fme.getErrorCode() : null,
+            fme != null ? fme.getMessagingErrorCode() : null,
+            ex != null ? ex.getClass().getSimpleName() : "null",
+            ex != null && ex.getCause() != null ? ex.getCause().getClass().getSimpleName() : "null");
     }
 
     private AndroidConfig buildAndroidConfig(Duration ttl, Priority priority) {
